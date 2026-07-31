@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./navixa.css";
 
-type Task={title:string;done:boolean};
+type Task={title:string;done:boolean;meta?:string};
 const starters:Task[]=[{title:"مراجعة عرض المشروع",done:false},{title:"تأكيد موعد الفريق",done:true},{title:"إنهاء ملخص المحاضرة",done:false}];
 
 export default function Home(){
@@ -18,17 +18,19 @@ export default function Home(){
   const [modal,setModal]=useState<"tasks"|"ask"|"notifications"|"automation"|null>(null);
   const recognitionRef=useRef<any>(null);
   const screenRef=useRef<MediaStream|null>(null);
+  const lastIntentRef=useRef("");
   const notify=(message:string)=>{setToast(message);setTimeout(()=>setToast(""),2200)};
   useEffect(()=>{const saved=localStorage.getItem("navixa-life-tasks");if(saved)setTasks(JSON.parse(saved));setReady(true)},[]);
   useEffect(()=>{if(ready)localStorage.setItem("navixa-life-tasks",JSON.stringify(tasks))},[tasks,ready]);
   useEffect(()=>{if(!running)return;const timer=setInterval(()=>setSeconds(s=>{if(s<=1){setRunning(false);notify("أحسنت! انتهت جلسة التركيز");return 25*60}return s-1}),1000);return()=>clearInterval(timer)},[running]);
   const time=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
+  const captureSpokenIntent=(spoken:string)=>{const text=spoken.trim();if(!text||text===lastIntentRef.current)return;const kinds=[{words:["موعد","اجتماع","مقابلة"],label:"موعد"},{words:["كويز","اختبار","امتحان"],label:"اختبار"},{words:["تاريخ","تسليم","ددلاين"],label:"تاريخ مهم"},{words:["ملاحظة","لاحظ","ركز على","تذكر"],label:"ملاحظة"}];const kind=kinds.find(k=>k.words.some(w=>text.includes(w)));if(!kind)return;const date=text.match(/(?:اليوم|بكرة|غدا|الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|الساعة\s+\d{1,2}(?::\d{2})?)/)?.[0]||"من الكلام المسموع";lastIntentRef.current=text;setTasks(current=>[...current,{title:`${kind.label}: ${text}`,done:false,meta:date}]);setModal("tasks");notify(`فهمت ${kind.label} وأضفته للمهام`)};
   const toggleListening=()=>{
     if(listening){recognitionRef.current?.stop();setListening(false);return}
     const SpeechRecognition=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SpeechRecognition){notify("متصفحك لا يدعم الاستماع الصوتي");return}
     const recognition=new SpeechRecognition();recognition.lang="ar-SA";recognition.continuous=true;recognition.interimResults=true;
-    recognition.onresult=(event:any)=>{const text=Array.from(event.results).map((r:any)=>r[0].transcript).join(" ");if(text.includes("سلطان"))notify("تم سماع اسمك: سلطان")};
+    recognition.onresult=(event:any)=>{for(let i=event.resultIndex;i<event.results.length;i++){const result=event.results[i];const text=result[0].transcript;if(text.includes("سلطان"))notify("تم سماع اسمك: سلطان");if(result.isFinal)captureSpokenIntent(text)}};
     recognition.onerror=()=>{setListening(false);notify("تعذر تشغيل الميكروفون — تحقق من الصلاحية")};recognition.onend=()=>setListening(false);
     recognitionRef.current=recognition;recognition.start();setListening(true);notify("بدأ الاستماع لاسم سلطان");
   };
@@ -69,7 +71,7 @@ export default function Home(){
 
       <section className="nx-section" id="assistant"><div className="section-head"><div><small>مساعدك الذكي</small><h2>كل ما تحتاجه ليوم أوضح</h2><p>أدوات فعلية تساعدك في الدراسة والعمل والحياة اليومية.</p></div><button onClick={()=>setModal("ask")}>اسأل المساعد ←</button></div>
         <div className="feature-grid">
-          <article className="wide lavender name-listener"><div className="feature-icon">◉</div><div><small>في الاجتماعات والمحاضرات</small><h3>ينتبه عند سماع اسم سلطان</h3><p>يعطيك المتصفح طلب صلاحية الميكروفون، ثم ينبهك فعليًا إذا سمع اسمك.</p><button onClick={toggleListening}>{listening?"إيقاف الاستماع":"تشغيل الاستماع"}</button></div><span className={`status ${listening?"live":""}`}>{listening?"● الميكروفون يعمل":"○ متوقف"}</span></article>
+          <article className="wide lavender name-listener"><div className="feature-icon">◉</div><div><small>فهم الكلام أثناء الاجتماعات</small><h3>يلتقط اسم سلطان والمواعيد</h3><p>يتعرف على موعد، كويز، اختبار، تاريخ أو ملاحظة ويضيفها تلقائيًا إلى المهام.</p><button onClick={toggleListening}>{listening?"إيقاف الاستماع":"تشغيل الاستماع الذكي"}</button></div><span className={`status ${listening?"live":""}`}>{listening?"● يحلل الكلام الآن":"○ متوقف"}</span></article>
           <article className="wide green"><div className="feature-icon">▣</div><div><small>مشاركة فعلية</small><h3>متابعة نشاط الشاشة</h3><p>اختر نافذة أو شاشة من نافذة الصلاحيات، ويمكنك إيقاف المشاركة في أي وقت.</p><button onClick={toggleScreen}>{screen?"إنهاء المشاركة":"مشاركة ومتابعة الشاشة"}</button></div><span className={`status ${screen?"live":""}`}>{screen?"● الشاشة مشاركة":"○ غير مفعّل"}</span></article>
           <article><div className="feature-icon">▦</div><small>تنظيم</small><h3>مهام ومواعيد</h3><p>رتّب يومك وتابع إنجازك بدون تعقيد.</p><button onClick={()=>setModal("tasks")}>فتح المهام ←</button></article>
           <article><div className="feature-icon">▤</div><small>ذكاء عملي</small><h3>تلخيص سريع</h3><p>حوّل النصوص والاجتماعات إلى نقاط واضحة.</p><button onClick={()=>setModal("ask")}>ابدأ التلخيص ←</button></article>
