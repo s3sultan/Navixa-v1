@@ -1,10 +1,35 @@
 "use client";
-import {useState} from "react";
+
+import {useEffect,useRef,useState} from "react";
 import "./login.css";
 
+const GOOGLE_CLIENT_ID="70980940285-9mr2v4h5qqpgf40mfv2la65ir2kjhlpk.apps.googleusercontent.com";
+
 export default function AdminLogin(){
+  const googleButton=useRef<HTMLDivElement>(null);
   const [error,setError]=useState("");
-  const login=(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);const email=String(data.get("email")).toLowerCase().trim();const password=String(data.get("password"));if(email!=="s2shug@gmail.com"){setError("هذا البريد غير مخوّل لدخول الإدارة");return}if(password.length<6){setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل");return}sessionStorage.setItem("navixa-admin-session",JSON.stringify({name:"سلطان",email}));window.location.href="/admin"};
-  const provider=(name:string)=>setError(`ربط ${name} الحقيقي يحتاج مفاتيح OAuth الرسمية. استخدم البريد الآن.`);
-  return <main className="login-page" dir="rtl"><section className="login-card"><a href="/" className="login-brand"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></a><div className="login-title"><small>دخول آمن</small><h1>أهلًا سلطان</h1><p>سجّل الدخول للوصول إلى لوحة الإدارة والزوار والإعلانات.</p></div><div className="providers"><button onClick={()=>provider("Google")}><b>G</b> المتابعة باستخدام Google</button><button onClick={()=>provider("Facebook")}><b>f</b> المتابعة باستخدام Facebook</button></div><div className="or"><span/>أو بالبريد الإلكتروني<span/></div><form onSubmit={login}><label>البريد الإلكتروني<input name="email" type="email" required placeholder="sultan@example.com"/></label><label>كلمة المرور<input name="password" type="password" required minLength={6} placeholder="••••••••"/></label><div className="login-options"><label><input type="checkbox"/> تذكرني</label><button type="button" onClick={()=>setError("استعادة كلمة المرور تحتاج بريدًا مربوطًا بالخادم")}>نسيت كلمة المرور؟</button></div>{error&&<p className="login-error">{error}</p>}<button className="submit">دخول لوحة الإدارة</button></form><p className="privacy">🔒 لن نطلب صلاحية الميكروفون أو الشاشة من صفحة الدخول.</p></section><aside><span>✦</span><h2>إدارة NAVIXA<br/>بوضوح وثقة.</h2><p>تابع الزوار والمميزات والأتمتة والإعلانات من مركز تحكم واحد.</p><div><b>12.8K+</b><small>مستخدم نشط</small></div></aside></main>
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    const render=()=>{
+      const google=(window as any).google;
+      if(!google||!googleButton.current)return;
+      google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:async({credential}:{credential:string})=>{
+        setLoading(true);setError("");
+        try{
+          const response=await fetch("/api/auth/google",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({credential})});
+          const data=await response.json();
+          if(!response.ok){setError(data.error||"تعذر تسجيل الدخول بهذا الحساب");setLoading(false);return}
+          window.location.href="/admin";
+        }catch{setError("تعذر الاتصال بخدمة تسجيل الدخول");setLoading(false)}
+      }});
+      google.accounts.id.renderButton(googleButton.current,{type:"standard",theme:"outline",size:"large",text:"continue_with",shape:"rectangular",logo_alignment:"left",width:360,locale:"ar"});
+      setLoading(false);
+    };
+    if((window as any).google){render();return}
+    const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;script.onload=render;script.onerror=()=>{setError("تعذر تحميل تسجيل الدخول من Google");setLoading(false)};document.head.appendChild(script);
+  },[]);
+
+  return <main className="login-page" dir="rtl"><section className="login-card"><a href="/" className="login-brand"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></a><div className="login-title"><small>دخول الإدارة الآمن</small><h1>اختر حساب Google</h1><p>ستفتح لوحة الإدارة فقط عندما تؤكد Google أن البريد المختار هو بريد الإدارة الرسمي.</p></div><div className="google-login-box"><div ref={googleButton}/>{loading&&<span>جارٍ تجهيز تسجيل الدخول…</span>}</div>{error&&<p className="login-error">{error}</p>}<p className="allowed-email">الحساب المسموح: <b>s2shug@gmail.com</b></p><p className="privacy">🔒 NAVIXA لا يرى كلمة مرور Google ولا يحفظها.</p></section><aside><span>✦</span><h2>إدارة NAVIXA<br/>بوضوح وثقة.</h2><p>اختر حسابك بنفسك، وGoogle تؤكد البريد قبل فتح لوحة الإدارة.</p></aside></main>
 }
+
