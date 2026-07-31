@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "NAVIXA | ذكاء يفهم وينفّذ عنك",
-  description: "NAVIXA يراقب حديقتك، يفهم احتياجها، ويتخذ القرار وينفذه تلقائيًا.",
+  description: "NAVIXA يسمع اسمك، يراقب شاشتك، يذكّرك بمهامك، ويدير مزرعتك تلقائيًا.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

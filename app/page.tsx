@@ -13,6 +13,8 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [active, setActive] = useState("الرئيسية");
   const [watering, setWatering] = useState(false);
+  const [listening, setListening] = useState(true);
+  const [screenWatch, setScreenWatch] = useState(true);
   const say = (text: string) => { setToast(text); setTimeout(() => setToast(""), 2400); };
 
   return <main dir="rtl" className="shell">
@@ -20,7 +22,7 @@ export default function Home() {
     <aside>
       <div className="logo"><span>ن</span><div><b>NAVIXA</b><small>المساعد الذكي</small></div></div>
       <nav>
-        {["الرئيسية", "مزرعتي", "الأتمتة", "المهام", "التقارير"].map((x, i) => <button key={x} className={active === x ? "on" : ""} onClick={() => {setActive(x); say(`تم فتح ${x}`)}}><i>{["⌂","♧","✦","✓","⌁"][i]}</i>{x}{x === "المهام" && <em>2</em>}</button>)}
+        {["الرئيسية", "مساعدي", "المزرعة", "الأتمتة", "المهام"].map((x, i) => <button key={x} className={active === x ? "on" : ""} onClick={() => {setActive(x); say(`تم فتح ${x}`)}}><i>{["⌂","◉","♧","✦","✓"][i]}</i>{x}{x === "المهام" && <em>2</em>}</button>)}
       </nav>
       <div className="side-bottom"><button onClick={() => say("تم فتح الإعدادات")}>⚙ الإعدادات</button><div className="user"><span>م</span><div><b>محمد</b><small>مزرعة الروضة</small></div><i>⋮</i></div></div>
     </aside>
@@ -29,8 +31,20 @@ export default function Home() {
       <header><div className="mobile-logo">N</div><div><small>الخميس، 31 يوليو</small><h1>هلا محمد، حديقتك بخير 🌱</h1></div><div className="head-actions"><button onClick={() => say("لا توجد تنبيهات جديدة")}>♢<i/></button><span className="weather">☀ <b>28°</b><small>الرياض</small></span></div></header>
 
       <section className="explain">
-        <div><span className="kicker">NAVIXA · ذكاء ينفّذ عنك</span><h2>أنت تزرع، <strong>ونفكسا يهتم بالباقي.</strong></h2><p>من حديقة المنزل إلى المزرعة: نفكسا يراقب كل منطقة، يفهم احتياج المحاصيل، ويتخذ القرار وينفّذه تلقائيًا — بدون جداول معقدة أو متابعة يومية.</p><div className="concept"><span>الحساسات تقرأ</span><i>←</i><span>نفكسا يفهم ويقرر</span><i>←</i><span>التنفيذ تلقائي</span></div></div>
+        <div><span className="kicker">NAVIXA · ذكاء حاضر معك</span><h2>يسمعك، يراقب مهامك، <strong>وينفّذ عنك.</strong></h2><p>مساعد واحد يجمع يومك ومزرعتك: ينبّهك عند سماع اسمك، يتابع الشاشة، يذكّرك بالمواعيد، ويدير الري والحساسات تلقائيًا.</p><div className="concept"><span>يسمع ويفهم</span><i>←</i><span>ينبّه ويقرر</span><i>←</i><span>ينفّذ تلقائيًا</span></div></div>
         <div className="plant-scene"><span className="sun">☀</span><span className="cloud">☁</span><div className="plant">🌱</div><div className="soil"><i/><i/><i/></div><div className="sensor"><b>62%</b><small>رطوبة ممتازة</small></div></div>
+      </section>
+
+      <section className="assistant-hub">
+        <div className="garden-head"><div><small>مساعدي الذكي</small><h2>كل أدوات NAVIXA في مكان واحد</h2><p>شغّالة معك أثناء الدراسة، العمل والاجتماعات</p></div><button onClick={() => say("تم فتح كل أدوات المساعد")}>كل الأدوات ←</button></div>
+        <div className="tools-grid">
+          <article className="tool featured"><div className="tool-top"><span className="tool-icon mic">◉</span><label><input aria-label="متابعة نطق الاسم" type="checkbox" checked={listening} onChange={()=>{setListening(!listening);say(!listening?"بدأ NAVIXA الاستماع لاسمك":"توقفت متابعة الاسم")}}/><i/></label></div><h3>متابعة نطق الاسم</h3><p>ينبّهك فورًا عند سماع اسمك في الاجتماع أو المحاضرة.</p><div className="tool-live"><i className={listening?"wave":""}/> {listening ? "يستمع الآن لاسم: محمد" : "متوقف مؤقتًا"}</div></article>
+          <article className="tool featured"><div className="tool-top"><span className="tool-icon screen">▣</span><label><input aria-label="مراقبة الشاشة" type="checkbox" checked={screenWatch} onChange={()=>{setScreenWatch(!screenWatch);say(!screenWatch?"بدأت مراقبة الشاشة":"توقفت مراقبة الشاشة")}}/><i/></label></div><h3>مراقبة الشاشة</h3><p>ينبّهك عند مغادرة الشاشة أو حدوث تغيير مهم فيها.</p><div className="tool-live"><i className={screenWatch?"safe":""}/> {screenWatch ? "الشاشة تحت المتابعة" : "المتابعة متوقفة"}</div></article>
+          <article className="tool" onClick={()=>say("موعدك القادم: اجتماع الفريق 4:00 م")}><span className="tool-icon calendar">▦</span><h3>المواعيد والمهام</h3><p>تذكيرات ذكية لا تفوّت معها أي موعد.</p><b>اجتماع الفريق · 4:00 م</b></article>
+          <article className="tool" onClick={()=>say("بدأت جلسة تركيز لمدة 25 دقيقة")}><span className="tool-icon focus">◎</span><h3>جلسة تركيز</h3><p>بومودورو ذكي مع تنبيهات الراحة.</p><b>ابدأ 25 دقيقة ←</b></article>
+          <article className="tool" onClick={()=>say("تم فتح الملاحظات السريعة")}><span className="tool-icon notes">▤</span><h3>ملاحظات سريعة</h3><p>دوّن أفكارك وصدّرها في أي وقت.</p><b>3 ملاحظات محفوظة</b></article>
+          <article className="tool" onClick={()=>say("تم فتح روابطك المثبتة")}><span className="tool-icon links">⌁</span><h3>روابط سريعة</h3><p>كل روابطك المهمة بضغطة واحدة.</p><b>8 روابط مثبتة</b></article>
+        </div>
       </section>
 
       <section className="now">
