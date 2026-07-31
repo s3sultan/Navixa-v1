@@ -17,6 +17,7 @@ export default function Home(){
   const [watchTerms,setWatchTerms]=useState("");
   const [heardText,setHeardText]=useState("");
   const [interimText,setInterimText]=useState("");
+  const [alertSound,setAlertSound]=useState("chime");
   const [social,setSocial]=useState({x:"https://x.com",instagram:"https://instagram.com",youtube:"https://youtube.com",github:"https://github.com"});
   const [automations,setAutomations]=useState([{icon:"☀",name:"بداية اليوم",when:"كل صباح · 7:00",action:"ملخص المهام والطقس والمواعيد",on:true},{icon:"◉",name:"وقت الاجتماع",when:"عند بدء الاجتماع",action:"تشغيل متابعة الاسم وتدوين النقاط",on:true},{icon:"◎",name:"وضع التركيز",when:"أيام العمل · 6:30 م",action:"كتم التنبيهات وبدء مؤقت التركيز",on:false}]);
   const [toast,setToast]=useState("");
@@ -24,8 +25,10 @@ export default function Home(){
   const recognitionRef=useRef<any>(null);
   const screenRef=useRef<MediaStream|null>(null);
   const lastIntentRef=useRef("");
-  const notify=(message:string)=>{setToast(message);setTimeout(()=>setToast(""),2200)};
-  useEffect(()=>{const saved=localStorage.getItem("navixa-life-tasks");const savedSocial=localStorage.getItem("navixa-social");if(saved)setTasks(JSON.parse(saved));if(savedSocial)setSocial(JSON.parse(savedSocial));setReady(true)},[]);
+  const playAlert=(sound=alertSound)=>{if(sound==="silent")return;try{const AudioCtx=(window as any).AudioContext||(window as any).webkitAudioContext;const ctx=new AudioCtx();const patterns:Record<string,number[]>={chime:[659,880],bell:[784,659,784],pulse:[440,440,660],urgent:[880,660,880,660]};const notes=patterns[sound]||patterns.chime;notes.forEach((frequency,index)=>{const oscillator=ctx.createOscillator();const gain=ctx.createGain();const start=ctx.currentTime+index*.18;oscillator.type=sound==="urgent"?"square":"sine";oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(sound==="urgent"?.13:.2,start+.02);gain.gain.exponentialRampToValueAtTime(.001,start+.16);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start);oscillator.stop(start+.18)});setTimeout(()=>ctx.close(),notes.length*180+300)}catch{}}
+  const notify=(message:string)=>{playAlert();setToast(message);setTimeout(()=>setToast(""),2200)};
+  useEffect(()=>{const saved=localStorage.getItem("navixa-life-tasks");const savedSocial=localStorage.getItem("navixa-social");const savedSound=localStorage.getItem("navixa-alert-sound");if(saved)setTasks(JSON.parse(saved));if(savedSocial)setSocial(JSON.parse(savedSocial));if(savedSound)setAlertSound(savedSound);setReady(true)},[]);
+  useEffect(()=>{if(ready)localStorage.setItem("navixa-alert-sound",alertSound)},[alertSound,ready]);
   useEffect(()=>{if(ready)localStorage.setItem("navixa-life-tasks",JSON.stringify(tasks))},[tasks,ready]);
   useEffect(()=>{if(!running)return;const timer=setInterval(()=>setSeconds(s=>{if(s<=1){setRunning(false);notify("أحسنت! انتهت جلسة التركيز");return 25*60}return s-1}),1000);return()=>clearInterval(timer)},[running]);
   const time=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
@@ -63,6 +66,7 @@ export default function Home(){
     </aside>
 
     <section className="nx-page" id="top">
+      <details className="sound-dock"><summary aria-label="إعداد صوت التنبيهات">♫ <span>صوت التنبيهات</span></summary><div><h3>اختر صوت التنبيه</h3><p>يُستخدم اختيارك في جميع تنبيهات NAVIXA على هذا الجهاز.</p>{[["chime","رنين هادئ"],["bell","جرس واضح"],["pulse","نبض سريع"],["urgent","تنبيه مهم"],["silent","بدون صوت"]].map(([value,label])=><label className={alertSound===value?"selected":""} key={value}><input type="radio" name="alert-sound" value={value} checked={alertSound===value} onChange={()=>setAlertSound(value)}/><span>{value==="silent"?"◌":"♪"}</span><b>{label}</b><button type="button" disabled={value==="silent"} onClick={event=>{event.preventDefault();playAlert(value)}}>{value==="silent"?"صامت":"تجربة"}</button></label>)}</div></details>
       <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>السبت، 1 أغسطس · الرياض</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><a href="/admin/login">دخول الإدارة</a><button aria-label="التنبيهات" onClick={()=>setModal("notifications")}>♢<i/></button><span className="nx-avatar">ن</span></div></header>
 
       <section className="nx-hero showcase">
