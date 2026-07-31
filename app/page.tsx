@@ -24,7 +24,7 @@ export default function Home() {
       <nav>
         {["الرئيسية", "مساعدي", "المزرعة", "الأتمتة", "المهام"].map((x, i) => <button key={x} className={active === x ? "on" : ""} onClick={() => {setActive(x); say(`تم فتح ${x}`)}}><i>{["⌂","◉","♧","✦","✓"][i]}</i>{x}{x === "المهام" && <em>2</em>}</button>)}
       </nav>
-      <div className="side-bottom"><button onClick={() => say("تم فتح الإعدادات")}>⚙ الإعدادات</button><div className="user"><span>م</span><div><b>محمد</b><small>مزرعة الروضة</small></div><i>⋮</i></div></div>
+      <div className="side-bottom"><a className="admin-link" href="/admin">⚙ لوحة الإدارة <span>←</span></a><div className="user"><span>م</span><div><b>محمد</b><small>مزرعة الروضة</small></div><i>⋮</i></div></div>
     </aside>
 
     <section className="page">
