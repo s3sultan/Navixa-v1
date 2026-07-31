@@ -37,4 +37,7 @@
   .name-listener button{width:100%;min-height:44px;justify-self:stretch!important;font-size:12px!important}
   .name-listener .status{position:static;grid-column:1/-1;margin-top:10px;font-size:10px}
 }
+
+.heard-panel{background:#fff;border:1px solid #ddd6ef;border-radius:13px;padding:12px;display:grid;gap:8px}.heard-panel>label{font-size:10px;font-weight:700;color:var(--lav)}.heard-panel textarea{width:100%;min-height:92px;resize:vertical;border:0;background:#f8f7fb;border-radius:9px;padding:11px;color:var(--ink);line-height:1.8;font:11px "Alexandria",sans-serif;outline:none}.heard-panel>div{display:flex;gap:7px;flex-wrap:wrap}.heard-panel button{background:#edf5f1!important;color:var(--sa)!important;border:1px solid #d4e5dc!important}.heard-panel .clear-heard{background:#fff5f3!important;color:#a64c42!important;border-color:#f0d8d4!important}.command-card .listen-toggle{width:100%;justify-self:stretch!important;font-size:11px!important}
+@media(max-width:650px){.heard-panel textarea{min-height:120px;font-size:12px}.heard-panel>div{display:grid;grid-template-columns:1fr 1fr}.heard-panel .clear-heard{grid-column:1/-1}.name-listener .listen-toggle{min-height:48px}}
  .nx-modal h2:has(+.suggestions){font-size:0}.nx-modal h2:has(+.suggestions):after{content:"وش أقدر أسوي لك؟";font-size:27px}
