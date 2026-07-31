@@ -1,0 +1,10 @@
+"use client";
+import {useState} from "react";
+import "./login.css";
+
+export default function AdminLogin(){
+  const [error,setError]=useState("");
+  const login=(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);const email=String(data.get("email"));const password=String(data.get("password"));if(!email.includes("@")||password.length<6){setError("تأكد من البريد وأن كلمة المرور 6 أحرف على الأقل");return}sessionStorage.setItem("navixa-admin-session",JSON.stringify({name:"سلطان",email}));window.location.href="/admin"};
+  const provider=(name:string)=>setError(`ربط ${name} الحقيقي يحتاج مفاتيح OAuth الرسمية. استخدم البريد الآن.`);
+  return <main className="login-page" dir="rtl"><section className="login-card"><a href="/" className="login-brand"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></a><div className="login-title"><small>دخول آمن</small><h1>أهلًا سلطان</h1><p>سجّل الدخول للوصول إلى لوحة الإدارة والزوار والإعلانات.</p></div><div className="providers"><button onClick={()=>provider("Google")}><b>G</b> المتابعة باستخدام Google</button><button onClick={()=>provider("Facebook")}><b>f</b> المتابعة باستخدام Facebook</button></div><div className="or"><span/>أو بالبريد الإلكتروني<span/></div><form onSubmit={login}><label>البريد الإلكتروني<input name="email" type="email" required placeholder="sultan@example.com"/></label><label>كلمة المرور<input name="password" type="password" required minLength={6} placeholder="••••••••"/></label><div className="login-options"><label><input type="checkbox"/> تذكرني</label><button type="button" onClick={()=>setError("استعادة كلمة المرور تحتاج بريدًا مربوطًا بالخادم")}>نسيت كلمة المرور؟</button></div>{error&&<p className="login-error">{error}</p>}<button className="submit">دخول لوحة الإدارة</button></form><p className="privacy">🔒 لن نطلب صلاحية الميكروفون أو الشاشة من صفحة الدخول.</p></section><aside><span>✦</span><h2>إدارة NAVIXA<br/>بوضوح وثقة.</h2><p>تابع الزوار والمميزات والأتمتة والإعلانات من مركز تحكم واحد.</p><div><b>12.8K+</b><small>مستخدم نشط</small></div></aside></main>
+}

@@ -21,17 +21,17 @@ export default function AdminPage() {
   return <main dir="rtl" className="admin-shell">
     {toast && <div className="toast">✓ {toast}</div>}
     <aside className="admin-side"><div className="logo"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></div><div className="admin-badge">لوحة الإدارة</div>
-      <nav>{["نظرة عامة","المميزات","المستخدمون","الأجهزة","الأتمتة"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);tell(`تم فتح ${x}`)}}><i>{["⌂","✦","♙","⌁","⚙"][i]}</i>{x}</button>)}<button onClick={()=>window.location.href="/admin/ads"}><i>▣</i>الإعلانات<em>4</em></button>{["التنبيهات","سجل النظام"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);tell(`تم فتح ${x}`)}}><i>{["!","▤"][i]}</i>{x}{x==="التنبيهات"&&<em>3</em>}</button>)}</nav>
-      <div className="admin-side-bottom"><a href="/">← العودة إلى NAVIXA</a><div><span>م</span><p><b>محمد</b><small>مدير النظام</small></p></div></div>
+      <nav>{["نظرة عامة","المميزات","الزوار","الأجهزة","الأتمتة"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);document.getElementById(x==="الزوار"?"visitors":x==="الأجهزة"?"devices":x==="الأتمتة"?"automation-admin":"overview")?.scrollIntoView({behavior:"smooth"})}}><i>{["⌂","✦","♙","⌁","⚙"][i]}</i>{x}</button>)}<button onClick={()=>window.location.href="/admin/ads"}><i>▣</i>الإعلانات<em>4</em></button>{["التنبيهات","سجل النظام"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);tell(x==="التنبيهات"?"3 تنبيهات: اجتماع قريب، أجهزة ضعيفة، ومهمة متأخرة":`تم فتح ${x}`)}}><i>{["!","▤"][i]}</i>{x}{x==="التنبيهات"&&<em>3</em>}</button>)}</nav>
+      <div className="admin-side-bottom"><a href="/">← العودة إلى NAVIXA</a><div><span>س</span><p><b>سلطان</b><small>مدير النظام</small></p></div></div>
     </aside>
 
     <section className="admin-page">
-      <header className="admin-header"><div><small>مركز التحكم</small><h1>أهلًا محمد، النظام يعمل بكفاءة.</h1><p>إدارة NAVIXA والمستخدمين والأجهزة من مكان واحد.</p></div><div><button onClick={()=>tell("لا توجد تنبيهات حرجة")}>♢<i/></button><a href="/">عرض التطبيق ↗</a></div></header>
+      <header className="admin-header" id="overview"><div><small>مركز التحكم</small><h1>أهلًا سلطان، النظام يعمل بكفاءة.</h1><p>إدارة NAVIXA والزوار والأجهزة من مكان واحد.</p></div><div><button onClick={()=>tell("3 تنبيهات جديدة تحتاج مراجعتك")}>♢<i/></button><a href="/">عرض التطبيق ↗</a></div></header>
 
       <section className="health-banner"><div><span className="health-icon">✓</span><div><small>حالة النظام</small><h2>جميع الخدمات تعمل بشكل طبيعي</h2><p>آخر فحص قبل 38 ثانية · وقت التشغيل 99.98%</p></div></div><div className="service-pills"><span><i/> الذكاء الاصطناعي</span><span><i/> التنبيهات</span><span><i/> أجهزة IoT</span><span><i/> قاعدة البيانات</span></div></section>
 
       <section className="admin-metrics">
-        <article><span className="am-icon purple">♙</span><div><small>المستخدمون النشطون</small><b>2,847</b><em>+12.4% هذا الشهر</em></div></article>
+        <article id="visitors"><span className="am-icon purple">♙</span><div><small>الزوار اليوم</small><b>1,284</b><em>+12.4% عن أمس</em></div></article>
         <article><span className="am-icon green">⌁</span><div><small>الأجهزة المتصلة</small><b>1,396</b><em>98.7% متصلة</em></div></article>
         <article><span className="am-icon blue">✦</span><div><small>عمليات ذكية اليوم</small><b>18,429</b><em>96% ناجحة</em></div></article>
         <article><span className="am-icon orange">♢</span><div><small>التنبيهات المرسلة</small><b>4,815</b><em>+8.2% اليوم</em></div></article>
