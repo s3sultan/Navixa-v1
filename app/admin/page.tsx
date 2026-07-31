@@ -21,7 +21,7 @@ export default function AdminPage() {
   return <main dir="rtl" className="admin-shell">
     {toast && <div className="toast">✓ {toast}</div>}
     <aside className="admin-side"><div className="logo"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></div><div className="admin-badge">لوحة الإدارة</div>
-      <nav>{["نظرة عامة","المميزات","المستخدمون","الأجهزة","الأتمتة","التنبيهات","سجل النظام"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);tell(`تم فتح ${x}`)}}><i>{["⌂","✦","♙","⌁","⚙","!","▤"][i]}</i>{x}{x==="التنبيهات"&&<em>3</em>}</button>)}</nav>
+      <nav>{["نظرة عامة","المميزات","المستخدمون","الأجهزة","الأتمتة"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);tell(`تم فتح ${x}`)}}><i>{["⌂","✦","♙","⌁","⚙"][i]}</i>{x}</button>)}<button onClick={()=>window.location.href="/admin/ads"}><i>▣</i>الإعلانات<em>4</em></button>{["التنبيهات","سجل النظام"].map((x,i)=><button key={x} className={section===x?"on":""} onClick={()=>{setSection(x);tell(`تم فتح ${x}`)}}><i>{["!","▤"][i]}</i>{x}{x==="التنبيهات"&&<em>3</em>}</button>)}</nav>
       <div className="admin-side-bottom"><a href="/">← العودة إلى NAVIXA</a><div><span>م</span><p><b>محمد</b><small>مدير النظام</small></p></div></div>
     </aside>
 
