@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NAVIXA Smart Garden | حديقتك تنمو بذكاء",
-  description: "منصة احترافية لإدارة وأتمتة الحدائق الذكية بالكامل.",
+  title: "NAVIXA | ذكاء يفهم وينفّذ عنك",
+  description: "NAVIXA يراقب حديقتك، يفهم احتياجها، ويتخذ القرار وينفذه تلقائيًا.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
