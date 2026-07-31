@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "NAVIXA | ذكاء يفهم يومك",
-  description: "مساعد سعودي ذكي يجمع الدراسة والعمل والمهام والتركيز والأتمتة في مكان واحد.",
+  description: "مساعد سعودي ذكي يجمع العمل والمشاريع والمهام والتركيز والأتمتة في مكان واحد.",
   openGraph: {title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد سعودي ذكي لحياة أكثر ترتيبًا.",images:["/og.png"]},
   twitter: {card:"summary_large_image",title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد سعودي ذكي لحياة أكثر ترتيبًا.",images:["/og.png"]},
 };
