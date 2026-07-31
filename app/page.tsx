@@ -14,7 +14,7 @@ export default function Home(){
   const [listening,setListening]=useState(false);
   const [screen,setScreen]=useState(false);
   const [entered,setEntered]=useState(false);
-  const [watchTerms,setWatchTerms]=useState("سلطان");
+  const [watchTerms,setWatchTerms]=useState("");
   const [social,setSocial]=useState({x:"https://x.com",instagram:"https://instagram.com",youtube:"https://youtube.com",github:"https://github.com"});
   const [automations,setAutomations]=useState([{icon:"☀",name:"بداية اليوم",when:"كل صباح · 7:00",action:"ملخص المهام والطقس والمواعيد",on:true},{icon:"◉",name:"وقت الاجتماع",when:"عند بدء الاجتماع",action:"تشغيل متابعة الاسم وتدوين النقاط",on:true},{icon:"◎",name:"وضع التركيز",when:"أيام العمل · 6:30 م",action:"كتم التنبيهات وبدء مؤقت التركيز",on:false}]);
   const [toast,setToast]=useState("");
@@ -35,7 +35,7 @@ export default function Home(){
     const recognition=new SpeechRecognition();recognition.lang="ar-SA";recognition.continuous=true;recognition.interimResults=true;
     recognition.onresult=(event:any)=>{for(let i=event.resultIndex;i<event.results.length;i++){const result=event.results[i];const text=result[0].transcript;const normalized=text.replace(/[،,.؛:!?]/g," ").replace(/\s+/g," ").trim().toLowerCase();const terms=watchTerms.split(/[،,\n]/).map(x=>x.replace(/[،,.؛:!?]/g," ").replace(/\s+/g," ").trim().toLowerCase()).filter(Boolean);const matched=terms.find(term=>normalized.includes(term));if(matched)notify(`تم سماع الكلمة: ${matched}`);if(result.isFinal)captureSpokenIntent(text)}};
     recognition.onerror=()=>{setListening(false);notify("تعذر تشغيل الميكروفون — تحقق من الصلاحية")};recognition.onend=()=>setListening(false);
-    recognitionRef.current=recognition;recognition.start();setListening(true);notify("بدأ الاستماع لاسم سلطان");
+    recognitionRef.current=recognition;recognition.start();setListening(true);notify("بدأ الاستماع للكلمات المختارة");
   };
   const toggleScreen=async()=>{
     if(screen){screenRef.current?.getTracks().forEach(t=>t.stop());screenRef.current=null;setScreen(false);return}
@@ -45,10 +45,10 @@ export default function Home(){
 
   const hour=new Date().getHours();const greeting=hour<12?"صباح الخير":hour<18?"مساء الخير":"مساء النور";
   return <main className={`nx ${entered?"entered":"waiting"}`} dir="rtl">
-    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="navixa-mark"><i/><i/></div><small>{greeting} يا سلطان</small><h1>مرحبًا بك في <b>NAVIXA</b></h1><p>مساعد سعودي ذكي يرتب يومك، يلتقط المواعيد والملاحظات من الكلام، يساعدك على التركيز وينفذ الأتمتة التي تختارها—مع خصوصيتك أولًا.</p><blockquote>“خطوة بسيطة اليوم تصنع فرقًا كبيرًا بكرة.”</blockquote><button onClick={()=>setEntered(true)}>دخول NAVIXA <span>←</span></button><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
+    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="navixa-mark"><i/><i/></div><small>{greeting}</small><h1>مرحبًا بك في <b>NAVIXA</b></h1><p>مساعد سعودي ذكي يرتب يومك، يلتقط المواعيد والملاحظات من الكلام، يساعدك على التركيز وينفذ الأتمتة التي تختارها—مع خصوصيتك أولًا.</p><blockquote>“خطوة بسيطة اليوم تصنع فرقًا كبيرًا بكرة.”</blockquote><button onClick={()=>setEntered(true)}>دخول NAVIXA <span>←</span></button><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
     {toast&&<div className="nx-toast">✓ {toast}</div>}
     <aside className="nx-side">
-      <a className="nx-brand" href="#top"><span>ن</span><div><b>NAVIXA</b><small>مساعد سلطان اليومي</small></div></a>
+      <a className="nx-brand" href="#top"><span>ن</span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
       <nav>
         <a className="active" href="#top"><i>⌂</i> اليوم</a>
         <a href="#assistant"><i>✦</i> مساعدي</a>
@@ -57,11 +57,11 @@ export default function Home(){
         <a href="#automations"><i>⌘</i> الأتمتة</a>
       </nav>
       <a className="nx-admin" href="/admin/login">⚙ دخول الإدارة <span>←</span></a>
-      <div className="nx-user"><span>س</span><div><b>سلطان</b><small>الرياض، السعودية</small></div><i>•••</i></div>
+      <div className="nx-user"><span>ن</span><div><b>مستخدم NAVIXA</b><small>السعودية</small></div><i>•••</i></div>
     </aside>
 
     <section className="nx-page" id="top">
-      <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>السبت، 1 أغسطس · الرياض</small><h1>هلا سلطان، وش ودّك تنجز اليوم؟</h1></div><div><a href="/admin/login">دخول الإدارة</a><button aria-label="التنبيهات" onClick={()=>setModal("notifications")}>♢<i/></button><span className="nx-avatar">س</span></div></header>
+      <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>السبت، 1 أغسطس · الرياض</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><a href="/admin/login">دخول الإدارة</a><button aria-label="التنبيهات" onClick={()=>setModal("notifications")}>♢<i/></button><span className="nx-avatar">ن</span></div></header>
 
       <section className="nx-hero showcase">
         <div className="arch one"/><div className="arch two"/><div className="saudi-pattern"/>
@@ -76,7 +76,7 @@ export default function Home(){
 
       <section className="nx-section" id="assistant"><div className="section-head"><div><small>مساعدك الذكي</small><h2>كل ما تحتاجه ليوم أوضح</h2><p>أدوات مرنة تساعدك في العمل والمشاريع والمواعيد والحياة اليومية.</p></div><button onClick={()=>setModal("ask")}>اسأل المساعد ←</button></div>
         <div className="feature-grid">
-          <article className="wide lavender name-listener command-card"><div className="feature-icon">◉</div><div><small>استماع ذكي</small><h3>الأسماء والكلمات المهمة</h3><p>اكتب أكثر من اسم أو كلمة وافصل بينها بفاصلة. المسافات وعلامات الترقيم لا تؤثر.</p><input aria-label="الأسماء والكلمات" value={watchTerms} onChange={e=>setWatchTerms(e.target.value)} placeholder="سلطان، موعد، اختبار"/><button onClick={toggleListening}>{listening?"إيقاف":"تشغيل الاستماع"}</button></div><span className={`status ${listening?"live":""}`}>{listening?"● يحلل الآن":"○ متوقف"}</span></article>
+          <article className="wide lavender name-listener command-card"><div className="feature-icon">◉</div><div><small>استماع ذكي</small><h3>الأسماء والكلمات المهمة</h3><p>اكتب أكثر من اسم أو كلمة وافصل بينها بفاصلة. المسافات وعلامات الترقيم لا تؤثر.</p><input aria-label="الأسماء والكلمات" value={watchTerms} onChange={e=>setWatchTerms(e.target.value)} placeholder="اسم أو كلمة، موعد، إجراء مهم"/><button onClick={toggleListening}>{listening?"إيقاف":"تشغيل الاستماع"}</button></div><span className={`status ${listening?"live":""}`}>{listening?"● يحلل الآن":"○ متوقف"}</span></article>
           <article className="wide green command-card"><div className="feature-icon">▣</div><div><small>متابعة الشاشة</small><h3>شارك ثم حدّد المنطقة</h3><p>بعد اختيار الشاشة يظهر إطار المنطقة؛ المتابعة محلية ولا تحفظ صورة الشاشة.</p>{screen&&<div className="screen-selector mini"><div className="selection-box"><span>منطقة المتابعة</span></div></div>}<button onClick={toggleScreen}>{screen?"إنهاء المشاركة":"اختيار شاشة"}</button></div><span className={`status ${screen?"live":""}`}>{screen?"● منطقة محددة":"○ غير مفعّل"}</span></article>
           <article><div className="feature-icon">▦</div><small>تنظيم</small><h3>مهام ومواعيد</h3><p>رتّب يومك وتابع إنجازك بدون تعقيد.</p><button onClick={()=>setModal("tasks")}>فتح المهام ←</button></article>
           <article><div className="feature-icon">▤</div><small>ذكاء عملي</small><h3>تلخيص سريع</h3><p>حوّل النصوص والاجتماعات إلى نقاط واضحة.</p><button onClick={()=>setModal("ask")}>ابدأ التلخيص ←</button></article>
