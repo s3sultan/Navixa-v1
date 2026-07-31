@@ -39,13 +39,13 @@ export default function Home(){
     <section className="nx-page" id="top">
       <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>السبت، 1 أغسطس · الرياض</small><h1>هلا محمد، وش ودّك تنجز اليوم؟</h1></div><div><a href="/admin">لوحة الإدارة</a><button aria-label="التنبيهات" onClick={()=>notify("ما عندك تنبيهات عاجلة")}>♢<i/></button><span className="nx-avatar">م</span></div></header>
 
-      <section className="nx-hero">
-        <div className="hero-copy"><span className="eyebrow">صُنع ليواكب يومك في السعودية</span><h2>ذكاء يفهم يومك،<br/><strong>وينفّذ معك.</strong></h2><p>NAVIXA يجمع دراستك، عملك ومواعيدك في مكان واحد. يسمع اسمك، يتابع تركيزك، يرتّب مهامك ويختصر لك الوقت.</p><div className="hero-actions"><button onClick={()=>setModal("ask")}>ابدأ مع NAVIXA <span>←</span></button><a href="#assistant">اكتشف المميزات</a></div><div className="trust"><span>✓ خصوصية أولًا</span><span>✓ عربي من الأساس</span><span>✓ مناسب للدراسة والعمل</span></div></div>
-        <div className="hero-console">
-          <div className="pattern"/><div className="console-top"><span className="spark">✦</span><div><small>NAVIXA الآن</small><b>صباحك مرتب</b></div><i>متصل</i></div>
-          <div className="brief"><small>ملخص يومك</small><h3>عندك 3 أشياء مهمة</h3><div><span>09:30</span><p><b>محاضرة إدارة المشاريع</b><small>القاعة الافتراضية</small></p></div><div><span>14:00</span><p><b>مراجعة العرض مع الفريق</b><small>Microsoft Teams</small></p></div><div><span>18:30</span><p><b>جلسة تركيز شخصية</b><small>45 دقيقة</small></p></div></div>
-          <button className="ask-pill" onClick={()=>setModal("ask")}><span>✦</span> اسأل NAVIXA أي شيء <i>↑</i></button>
-        </div>
+      <section className="nx-hero showcase">
+        <div className="arch one"/><div className="arch two"/><div className="saudi-pattern"/>
+        <div className="lavender lavender-a">⚘<br/>⚘<br/>⚘</div><div className="lavender lavender-b">⚘ ⚘</div>
+        <aside className="day-board"><div className="board-title"><b>اليوم</b><span>⌄</span></div><article><i>▣</i><p><b>دراسة</b><small>ملخص الكيمياء العضوية</small></p></article><article><i>▰</i><p><b>عمل</b><small>تقرير أداء المشروع</small></p></article><article><i>♙</i><p><b>اجتماعات</b><small>مراجعة خطة الربع</small></p></article><article><i>✓</i><p><b>مهام</b><small>{tasks.filter(t=>!t.done).length} مهام متبقية</small></p></article></aside>
+        <div className="hero-center"><div className="navixa-mark"><i/><i/></div><h2>NAVIXA</h2><h3>ذكاء يفهم يومك</h3><button className="main-ask" onClick={()=>setModal("ask")}><span>✦</span> كيف يمكنني مساعدتك اليوم؟ <i>↑</i></button><div className="quick-prompts"><button onClick={()=>setModal("ask")}>تخطيط الأسبوع ▦</button><button onClick={()=>setModal("tasks")}>تنظيم المهام ✓</button><button onClick={()=>setModal("ask")}>إعداد عرض ▣</button><button onClick={()=>setModal("ask")}>تلخيص المستندات ▤</button></div></div>
+        <div className="smart-note"><small>مساعدك الذكي</small><p>لخّص لي نقاط الاجتماع<br/>واقترح الإجراءات التالية</p><button onClick={()=>setModal("ask")}>✦</button></div>
+        <button className="focus-card" onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><b>تركيز</b><span>{time}</span><small>جلسة تركيز</small><i/></button>
       </section>
 
       <section className="daily-strip"><div><small>إنجاز اليوم</small><b>72%</b><span><i style={{width:"72%"}}/></span></div><div><small>وقت التركيز</small><b>2س 15د</b><em>↑ 24 دقيقة</em></div><div><small>المهام المكتملة</small><b>{tasks.filter(t=>t.done).length} / {tasks.length}</b><em>ممتاز، كمّل</em></div><div><small>موعدك القادم</small><b>09:30</b><em>بعد 35 دقيقة</em></div></section>
