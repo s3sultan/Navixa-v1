@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./interactions.css";
 
 const areas = [
@@ -18,9 +18,16 @@ export default function Home() {
   const [screenWatch, setScreenWatch] = useState(true);
   const [panel, setPanel] = useState<string | null>(null);
   const [focusMinutes, setFocusMinutes] = useState(25);
+  const [focusSeconds, setFocusSeconds] = useState(0);
   const [notes, setNotes] = useState(["مراجعة حساس البيت المحمي", "شراء سماد عضوي", "فكرة لتطوير التنبيهات"]);
+  const [tasks, setTasks] = useState([{title:"اجتماع الفريق",time:"4:00 م",done:false},{title:"تعبئة خزان السماد",time:"اليوم",done:false},{title:"تنظيف حساس الرطوبة",time:"الأحد",done:false}]);
+  const [storageReady,setStorageReady]=useState(false);
   const say = (text: string) => { setToast(text); setTimeout(() => setToast(""), 2400); };
   const go = (name: string, id?: string) => { setActive(name); if (id) document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"}); else window.scrollTo({top:0,behavior:"smooth"}); };
+  useEffect(()=>{const n=localStorage.getItem("navixa-notes");const t=localStorage.getItem("navixa-tasks");if(n)setNotes(JSON.parse(n));if(t)setTasks(JSON.parse(t));setStorageReady(true)},[]);
+  useEffect(()=>{if(storageReady)localStorage.setItem("navixa-notes",JSON.stringify(notes))},[notes,storageReady]);
+  useEffect(()=>{if(storageReady)localStorage.setItem("navixa-tasks",JSON.stringify(tasks))},[tasks,storageReady]);
+  useEffect(()=>{if(!focusSeconds)return;const timer=setInterval(()=>setFocusSeconds(s=>Math.max(0,s-1)),1000);return()=>clearInterval(timer)},[focusSeconds]);
 
   return <main dir="rtl" className="shell">
     {toast && <div className="toast">✓ {toast}</div>}
@@ -76,8 +83,8 @@ export default function Home() {
       <section className="ask"><span>✦</span><div><small>اسأل نفكسا</small><h2>“هل تحتاج حديقتي ري اليوم؟”</h2></div><button onClick={() => setPanel("اسأل NAVIXA")}>اسأل الآن ←</button></section>
     </section>
     {panel && <div className="action-back" onClick={()=>setPanel(null)}><section className="action-panel" onClick={e=>e.stopPropagation()}><button className="action-close" onClick={()=>setPanel(null)}>×</button><small>NAVIXA</small><h2>{panel}</h2>
-      {panel==="المهام" && <><div className="real-list"><label><input type="checkbox"/> اجتماع الفريق <time>4:00 م</time></label><label><input type="checkbox"/> تعبئة خزان السماد <time>اليوم</time></label><label><input type="checkbox"/> تنظيف حساس الرطوبة <time>الأحد</time></label></div><form onSubmit={e=>{e.preventDefault();say("تمت إضافة المهمة");setPanel(null)}}><input required placeholder="اكتب مهمة جديدة..."/><button>إضافة المهمة</button></form></>}
-      {panel==="التركيز" && <div className="focus-panel"><b>{focusMinutes}:00</b><p>اختر مدة الجلسة ثم ابدأ المؤقت</p><div>{[15,25,45,60].map(n=><button className={focusMinutes===n?"on":""} key={n} onClick={()=>setFocusMinutes(n)}>{n} دقيقة</button>)}</div><button className="primary" onClick={()=>{say(`بدأت جلسة تركيز ${focusMinutes} دقيقة`);setPanel(null)}}>بدء جلسة التركيز</button></div>}
+      {panel==="المهام" && <><div className="real-list">{tasks.map((t,i)=><label key={`${t.title}-${i}`}><input type="checkbox" checked={t.done} onChange={()=>setTasks(tasks.map((x,j)=>j===i?{...x,done:!x.done}:x))}/><span className={t.done?"done":""}>{t.title}</span><time>{t.time}</time><button onClick={()=>setTasks(tasks.filter((_,j)=>j!==i))}>حذف</button></label>)}</div><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);setTasks([...tasks,{title:String(f.get("task")),time:"الآن",done:false}]);e.currentTarget.reset();say("تمت إضافة المهمة وحفظها")}}><input name="task" required placeholder="اكتب مهمة جديدة..."/><button>إضافة المهمة</button></form></>}
+      {panel==="التركيز" && <div className="focus-panel"><b>{focusSeconds?`${String(Math.floor(focusSeconds/60)).padStart(2,"0")}:${String(focusSeconds%60).padStart(2,"0")}`:`${focusMinutes}:00`}</b><p>{focusSeconds?"جلسة التركيز تعمل الآن":"اختر مدة الجلسة ثم ابدأ المؤقت"}</p><div>{[15,25,45,60].map(n=><button disabled={!!focusSeconds} className={focusMinutes===n?"on":""} key={n} onClick={()=>setFocusMinutes(n)}>{n} دقيقة</button>)}</div><button className="primary" onClick={()=>focusSeconds?setFocusSeconds(0):setFocusSeconds(focusMinutes*60)}>{focusSeconds?"إيقاف المؤقت":"بدء جلسة التركيز"}</button></div>}
       {panel==="الملاحظات" && <><div className="real-list">{notes.map((n,i)=><label key={n}><span>▤ {n}</span><button onClick={()=>setNotes(notes.filter((_,x)=>x!==i))}>حذف</button></label>)}</div><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);setNotes([...notes,String(f.get("note"))]);e.currentTarget.reset()}}><input name="note" required placeholder="اكتب ملاحظة..."/><button>حفظ</button></form></>}
       {panel==="الروابط" && <div className="quick-links"><a href="https://calendar.google.com" target="_blank">التقويم ↗</a><a href="https://drive.google.com" target="_blank">Google Drive ↗</a><a href="https://meet.google.com" target="_blank">Google Meet ↗</a><a href="/admin">لوحة الإدارة ←</a></div>}
       {panel==="التنبيهات" && <div className="real-list"><label><span>♢ رطوبة البيت المحمي منخفضة</span><time>منذ 8 دقائق</time></label><label><span>✓ اكتمل الري بنجاح</span><time>منذ 32 دقيقة</time></label></div>}
