@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NAVIXA | اجلس بوعي وتحرك في وقتك",
-  description: "رفيق صحة مكتبي يراقب وضعية الجلوس محليًا ويذكّرك بالحركة والماء مع خصوصية كاملة.",
-  openGraph: {title:"NAVIXA | اجلس بوعي",description:"رفيقك لجلسة عمل أكثر صحة ووعيًا.",images:["/og-health.png"]},
-  twitter: {card:"summary_large_image",title:"NAVIXA | اجلس بوعي",description:"رفيقك لجلسة عمل أكثر صحة ووعيًا.",images:["/og-health.png"]},
+  title: "NAVIXA | ذكاء يفهم يومك",
+  description: "مساعد سعودي ذكي يجمع العمل والمشاريع والمهام والتركيز والأتمتة في مكان واحد.",
+  openGraph: {title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد سعودي ذكي لحياة أكثر ترتيبًا.",images:["/og.png"]},
+  twitter: {card:"summary_large_image",title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد سعودي ذكي لحياة أكثر ترتيبًا.",images:["/og.png"]},
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -9,8 +9,19 @@ type GoogleIdentity={accounts:{id:{initialize:(options:{client_id:string;callbac
 
 export default function AdminLogin(){
   const googleButton=useRef<HTMLDivElement>(null);
+  const swipeTrack=useRef<HTMLDivElement>(null);
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(true);
+  const [swipe,setSwipe]=useState(0);
+  const [unlocked,setUnlocked]=useState(false);
+
+  const moveSwipe=(clientX:number)=>{
+    const track=swipeTrack.current;if(!track||unlocked)return;
+    const rect=track.getBoundingClientRect();
+    const progress=Math.max(0,Math.min(1,(rect.right-clientX)/(rect.width-58)));
+    setSwipe(progress);
+    if(progress>.92){setUnlocked(true);setSwipe(1)}
+  };
 
   useEffect(()=>{
     const render=()=>{
@@ -32,5 +43,5 @@ export default function AdminLogin(){
     const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;script.onload=render;script.onerror=()=>{setError("تعذر تحميل تسجيل الدخول من Google");setLoading(false)};document.head.appendChild(script);
   },[]);
 
-  return <main className="login-page" dir="rtl"><section className="login-card"><Link href="/" className="login-brand"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></Link><div className="login-title"><small>دخول الإدارة الآمن</small><h1>اختر حساب Google</h1><p>ستفتح لوحة الإدارة فقط عندما تؤكد Google أن البريد المختار هو بريد الإدارة الرسمي.</p></div><div className="google-login-box"><div ref={googleButton}/>{loading&&<span>جارٍ تجهيز تسجيل الدخول…</span>}</div>{error&&<p className="login-error">{error}</p>}<p className="allowed-email">الحساب المسموح: <b>s2shug@gmail.com</b></p><p className="privacy">🔒 NAVIXA لا يرى كلمة مرور Google ولا يحفظها.</p></section><aside><span>✦</span><h2>إدارة NAVIXA<br/>بوضوح وثقة.</h2><p>اختر حسابك بنفسك، وGoogle تؤكد البريد قبل فتح لوحة الإدارة.</p></aside></main>
+  return <main className="login-page" dir="rtl"><section className="login-card"><Link href="/" className="login-brand"><span>ن</span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></Link><div className="login-title"><small>دخول الإدارة الآمن</small><h1>مرحبًا بعودتك</h1><p>اسحب شعار NAVIXA من اليمين إلى اليسار، ثم اختر حساب الإدارة المعتمد.</p></div><div ref={swipeTrack} className={`swipe-login ${unlocked?"unlocked":""}`} onPointerMove={e=>{if(e.currentTarget.hasPointerCapture(e.pointerId))moveSwipe(e.clientX)}} onPointerUp={e=>{e.currentTarget.releasePointerCapture(e.pointerId);if(!unlocked)setSwipe(0)}} onPointerCancel={()=>!unlocked&&setSwipe(0)}><span>{unlocked?"تم التحقق — اختر حسابك":"اسحب للدخول"}</span><button aria-label="اسحب شعار NAVIXA للدخول" style={{right:`calc(5px + ${swipe*100}% - ${swipe*62}px)`}} onPointerDown={e=>{e.preventDefault();e.currentTarget.parentElement?.setPointerCapture(e.pointerId)}}><i/><i/></button></div><div className={`google-login-box ${unlocked?"shown":""}`}><div ref={googleButton}/>{loading&&unlocked&&<span>جارٍ تجهيز تسجيل الدخول…</span>}</div>{error&&<p className="login-error">{error}</p>}<p className="allowed-email">الحساب المسموح: <b>s2shug@gmail.com</b></p><p className="privacy">🔒 NAVIXA لا يرى كلمة مرور Google ولا يحفظها.</p></section><aside><span>✦</span><h2>إدارة NAVIXA<br/>بوضوح وثقة.</h2><p>اسحب للدخول، ثم دع Google تؤكد الحساب قبل فتح لوحة الإدارة.</p></aside></main>
 }

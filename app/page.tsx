@@ -1,193 +1,106 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import "./navixa.css";
 
-type Posture = "idle" | "loading" | "good" | "needs-care";
+type Task={title:string;done:boolean;meta?:string};
+const starters:Task[]=[{title:"مراجعة خطة المشروع",done:false},{title:"تأكيد موعد الفريق",done:true},{title:"إنهاء ملخص الاجتماع",done:false}];
 
-const formatTime = (seconds: number) => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-};
-
-export default function Home() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const landmarkerRef = useRef<PoseLandmarker | null>(null);
-  const frameRef = useRef<number | null>(null);
-  const lastVideoTime = useRef(-1);
-  const poorFrames = useRef(0);
-  const goodFrames = useRef(0);
-
-  const [monitoring, setMonitoring] = useState(false);
-  const [posture, setPosture] = useState<Posture>("idle");
-  const [sessionSeconds, setSessionSeconds] = useState(0);
-  const [breakEvery, setBreakEvery] = useState(30);
-  const [waterEvery, setWaterEvery] = useState(60);
-  const [waterCount, setWaterCount] = useState(0);
-  const [message, setMessage] = useState("جاهز لبدء جلسة صحية");
-
-  useEffect(() => {
-    const saved = Number(localStorage.getItem("navixa-sitting-seconds") || 0);
-    const water = Number(localStorage.getItem("navixa-water-count") || 0);
-    setSessionSeconds(saved);
-    setWaterCount(water);
-  }, []);
-
-  useEffect(() => {
-    if (!monitoring) return;
-    const timer = window.setInterval(() => {
-      setSessionSeconds((value) => {
-        const next = value + 1;
-        localStorage.setItem("navixa-sitting-seconds", String(next));
-        if (next > 0 && next % (breakEvery * 60) === 0) {
-          setMessage(`جلست ${Math.floor(next / 60)} دقيقة — حان وقت التمدد`);
-          if (Notification.permission === "granted") new Notification("NAVIXA", { body: "خذ دقيقة للحركة والتمدد" });
-        }
-        return next;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [monitoring, breakEvery]);
-
-  useEffect(() => () => stopMonitoring(false), []);
-
-  const analyse = () => {
-    const video = videoRef.current;
-    const landmarker = landmarkerRef.current;
-    if (!video || !landmarker || !streamRef.current) return;
-
-    if (video.currentTime !== lastVideoTime.current && video.readyState >= 2) {
-      lastVideoTime.current = video.currentTime;
-      const result = landmarker.detectForVideo(video, performance.now());
-      const points = result.landmarks[0];
-      if (points) {
-        const leftEar = points[7];
-        const rightEar = points[8];
-        const leftShoulder = points[11];
-        const rightShoulder = points[12];
-        const shoulderWidth = Math.max(Math.abs(leftShoulder.x - rightShoulder.x), 0.05);
-        const earY = (leftEar.y + rightEar.y) / 2;
-        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-        const neckHeight = (shoulderY - earY) / shoulderWidth;
-        const shoulderTilt = Math.abs(leftShoulder.y - rightShoulder.y) / shoulderWidth;
-        const isGood = neckHeight > 0.34 && shoulderTilt < 0.18;
-
-        if (isGood) {
-          goodFrames.current += 1;
-          poorFrames.current = 0;
-          if (goodFrames.current > 8) {
-            setPosture("good");
-            setMessage("جلستك متوازنة — استمر");
-          }
-        } else {
-          poorFrames.current += 1;
-          goodFrames.current = 0;
-          if (poorFrames.current > 12) {
-            setPosture("needs-care");
-            setMessage("ارفع رأسك وأرخِ كتفيك قليلًا");
-          }
-        }
-      }
-    }
-    frameRef.current = requestAnimationFrame(analyse);
+export default function Home(){
+  const [tasks,setTasks]=useState<Task[]>(starters);
+  const [ready,setReady]=useState(false);
+  const [seconds,setSeconds]=useState(25*60);
+  const [running,setRunning]=useState(false);
+  const [listening,setListening]=useState(false);
+  const [screen,setScreen]=useState(false);
+  const [entered,setEntered]=useState(false);
+  const [watchTerms,setWatchTerms]=useState("");
+  const [heardText,setHeardText]=useState("");
+  const [interimText,setInterimText]=useState("");
+  const [alertSound,setAlertSound]=useState("chime");
+  const [social,setSocial]=useState({x:"https://x.com",instagram:"https://instagram.com",youtube:"https://youtube.com",github:"https://github.com"});
+  const [automations,setAutomations]=useState([{icon:"☀",name:"بداية اليوم",when:"كل صباح · 7:00",action:"ملخص المهام والطقس والمواعيد",on:true},{icon:"◉",name:"وقت الاجتماع",when:"عند بدء الاجتماع",action:"تشغيل متابعة الاسم وتدوين النقاط",on:true},{icon:"◎",name:"وضع التركيز",when:"أيام العمل · 6:30 م",action:"كتم التنبيهات وبدء مؤقت التركيز",on:false}]);
+  const [toast,setToast]=useState("");
+  const [modal,setModal]=useState<"tasks"|"ask"|"notifications"|"automation"|"screen"|null>(null);
+  const recognitionRef=useRef<any>(null);
+  const screenRef=useRef<MediaStream|null>(null);
+  const lastIntentRef=useRef("");
+  const playAlert=(sound=alertSound)=>{if(sound==="silent")return;try{const AudioCtx=(window as any).AudioContext||(window as any).webkitAudioContext;const ctx=new AudioCtx();const patterns:Record<string,number[]>={chime:[659,880],bell:[784,659,784],pulse:[440,440,660],urgent:[880,660,880,660]};const notes=patterns[sound]||patterns.chime;notes.forEach((frequency,index)=>{const oscillator=ctx.createOscillator();const gain=ctx.createGain();const start=ctx.currentTime+index*.18;oscillator.type=sound==="urgent"?"square":"sine";oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(sound==="urgent"?.13:.2,start+.02);gain.gain.exponentialRampToValueAtTime(.001,start+.16);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start);oscillator.stop(start+.18)});setTimeout(()=>ctx.close(),notes.length*180+300)}catch{}}
+  const notify=(message:string)=>{playAlert();setToast(message);setTimeout(()=>setToast(""),2200)};
+  useEffect(()=>{const saved=localStorage.getItem("navixa-life-tasks");const savedSocial=localStorage.getItem("navixa-social");const savedSound=localStorage.getItem("navixa-alert-sound");if(saved)setTasks(JSON.parse(saved));if(savedSocial)setSocial(JSON.parse(savedSocial));if(savedSound)setAlertSound(savedSound);setReady(true)},[]);
+  useEffect(()=>{if(ready)localStorage.setItem("navixa-alert-sound",alertSound)},[alertSound,ready]);
+  useEffect(()=>{if(ready)localStorage.setItem("navixa-life-tasks",JSON.stringify(tasks))},[tasks,ready]);
+  useEffect(()=>{if(!running)return;const timer=setInterval(()=>setSeconds(s=>{if(s<=1){setRunning(false);notify("أحسنت! انتهت جلسة التركيز");return 25*60}return s-1}),1000);return()=>clearInterval(timer)},[running]);
+  const time=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
+  const captureSpokenIntent=(spoken:string)=>{const text=spoken.trim();if(!text||text===lastIntentRef.current)return;const kinds=[{words:["موعد","اجتماع","مقابلة"],label:"موعد"},{words:["كويز","اختبار","امتحان"],label:"اختبار"},{words:["تاريخ","تسليم","ددلاين"],label:"تاريخ مهم"},{words:["ملاحظة","لاحظ","ركز على","تذكر"],label:"ملاحظة"}];const kind=kinds.find(k=>k.words.some(w=>text.includes(w)));if(!kind)return;const date=text.match(/(?:اليوم|بكرة|غدا|الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|الساعة\s+\d{1,2}(?::\d{2})?)/)?.[0]||"من الكلام المسموع";lastIntentRef.current=text;setTasks(current=>[...current,{title:`${kind.label}: ${text}`,done:false,meta:date}]);setModal("tasks");notify(`فهمت ${kind.label} وأضفته للمهام`)};
+  const toggleListening=()=>{
+    if(listening){recognitionRef.current?.stop();setListening(false);return}
+    const SpeechRecognition=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
+    if(!SpeechRecognition){notify("متصفحك لا يدعم الاستماع الصوتي");return}
+    const recognition=new SpeechRecognition();recognition.lang="ar-SA";recognition.continuous=true;recognition.interimResults=true;
+    recognition.onresult=(event:any)=>{let interim="";for(let i=event.resultIndex;i<event.results.length;i++){const result=event.results[i];const text=result[0].transcript;const normalized=text.replace(/[،,.؛:!?]/g," ").replace(/\s+/g," ").trim().toLowerCase();const terms=watchTerms.split(/[،,\n]/).map(x=>x.replace(/[،,.؛:!?]/g," ").replace(/\s+/g," ").trim().toLowerCase()).filter(Boolean);const matched=terms.find(term=>normalized.includes(term));if(matched)notify(`تم سماع الكلمة: ${matched}`);if(result.isFinal){setHeardText(previous=>`${previous} ${text}`.trim().slice(-5000));captureSpokenIntent(text)}else interim+=`${text} `}setInterimText(interim.trim())};
+    recognition.onerror=()=>{setListening(false);notify("تعذر تشغيل الميكروفون — تحقق من الصلاحية")};recognition.onend=()=>setListening(false);
+    recognitionRef.current=recognition;recognition.start();setListening(true);notify("بدأ الاستماع للكلمات المختارة");
+  };
+  const toggleScreen=async()=>{
+    if(screen){screenRef.current?.getTracks().forEach(t=>t.stop());screenRef.current=null;setScreen(false);return}
+    try{const stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});screenRef.current=stream;stream.getVideoTracks()[0].onended=()=>{setScreen(false);screenRef.current=null};setScreen(true);notify("اسحب الإطار داخل البطاقة لتحديد منطقة المتابعة")}
+    catch{notify("لم تبدأ المشاركة — اختر شاشة واسمح بالصلاحية")}
   };
 
-  const startMonitoring = async () => {
-    try {
-      setPosture("loading");
-      setMessage("نجهّز التحليل المحلي…");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      const vision = await FilesetResolver.forVisionTasks("/mediapipe");
-      landmarkerRef.current = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: "/mediapipe/pose_landmarker_lite.task", delegate: "GPU" },
-        runningMode: "VIDEO",
-        numPoses: 1,
-      });
-      setMonitoring(true);
-      setPosture("good");
-      setMessage("المراقبة تعمل محليًا على جهازك");
-      if (Notification.permission === "default") void Notification.requestPermission();
-      analyse();
-    } catch {
-      stopMonitoring(false);
-      setPosture("idle");
-      setMessage("تعذر تشغيل الكاميرا — تحقق من الصلاحية");
-    }
-  };
+  const hour=new Date().getHours();const greeting=hour<12?"صباح الخير":hour<18?"مساء الخير":"مساء النور";
+  return <main className={`nx ${entered?"entered":"waiting"}`} dir="rtl">
+    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="navixa-mark"><i/><i/></div><small>{greeting}</small><h1>مرحبًا بك في <b>NAVIXA</b></h1><p>مساعد سعودي ذكي يرتب يومك، يلتقط المواعيد والملاحظات من الكلام، يساعدك على التركيز وينفذ الأتمتة التي تختارها—مع خصوصيتك أولًا.</p><blockquote>“خطوة بسيطة اليوم تصنع فرقًا كبيرًا بكرة.”</blockquote><button onClick={()=>setEntered(true)}>دخول NAVIXA <span>←</span></button><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
+    {toast&&<div className="nx-toast">✓ {toast}</div>}
+    <aside className="nx-side">
+      <a className="nx-brand" href="#top"><span>ن</span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
+      <nav>
+        <a className="active" href="#top"><i>⌂</i> اليوم</a>
+        <a href="#assistant"><i>✦</i> مساعدي</a>
+        <button onClick={()=>setModal("tasks")}><i>✓</i> المهام <em>{tasks.filter(t=>!t.done).length}</em></button>
+        <a href="#focus"><i>◎</i> التركيز</a>
+        <a href="#automations"><i>⌘</i> الأتمتة</a>
+      </nav>
+      <a className="nx-admin" href="/admin/login">⚙ دخول الإدارة <span>←</span></a>
+      <div className="nx-user"><span>ن</span><div><b>مستخدم NAVIXA</b><small>السعودية</small></div><i>•••</i></div>
+    </aside>
 
-  const stopMonitoring = (showMessage = true) => {
-    if (frameRef.current) cancelAnimationFrame(frameRef.current);
-    frameRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    landmarkerRef.current?.close();
-    landmarkerRef.current = null;
-    setMonitoring(false);
-    setPosture("idle");
-    if (showMessage) setMessage("توقفت الكاميرا والمراقبة فورًا");
-  };
+    <section className="nx-page" id="top">
+      <details className="sound-dock"><summary aria-label="إعداد صوت التنبيهات">♫ <span>صوت التنبيهات</span></summary><div><h3>اختر صوت التنبيه</h3><p>يُستخدم اختيارك في جميع تنبيهات NAVIXA على هذا الجهاز.</p>{[["chime","رنين هادئ"],["bell","جرس واضح"],["pulse","نبض سريع"],["urgent","تنبيه مهم"],["silent","بدون صوت"]].map(([value,label])=><label className={alertSound===value?"selected":""} key={value}><input type="radio" name="alert-sound" value={value} checked={alertSound===value} onChange={()=>setAlertSound(value)}/><span>{value==="silent"?"◌":"♪"}</span><b>{label}</b><button type="button" disabled={value==="silent"} onClick={event=>{event.preventDefault();playAlert(value)}}>{value==="silent"?"صامت":"تجربة"}</button></label>)}</div></details>
+      <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>السبت، 1 أغسطس · الرياض</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><a href="/admin/login">دخول الإدارة</a><button aria-label="التنبيهات" onClick={()=>setModal("notifications")}>♢<i/></button><span className="nx-avatar">ن</span></div></header>
 
-  const drinkWater = () => {
-    const next = waterCount + 1;
-    setWaterCount(next);
-    localStorage.setItem("navixa-water-count", String(next));
-    setMessage("صحة وعافية — تم تسجيل كوب ماء");
-  };
+      <section className="nx-hero showcase">
+        <div className="arch one"/><div className="arch two"/><div className="saudi-pattern"/>
+        <div className="lavender lavender-a">⚘<br/>⚘<br/>⚘</div><div className="lavender lavender-b">⚘ ⚘</div>
+        <aside className="day-board"><div className="board-title"><b>اليوم</b><span>⌄</span></div><article><i>▣</i><p><b>أولويات</b><small>مراجعة أهداف اليوم</small></p></article><article><i>▰</i><p><b>مشاريع</b><small>تقرير أداء المشروع</small></p></article><article><i>♙</i><p><b>اجتماعات</b><small>مراجعة خطة الربع</small></p></article><article><i>✓</i><p><b>مهام</b><small>{tasks.filter(t=>!t.done).length} مهام متبقية</small></p></article></aside>
+        <div className="hero-center"><div className="navixa-mark"><i/><i/></div><h2>NAVIXA</h2><h3>ذكاء يفهم يومك</h3><button className="main-ask" onClick={()=>setModal("ask")}><span>✦</span> كيف يمكنني مساعدتك اليوم؟ <i>↑</i></button><div className="quick-prompts"><button onClick={()=>setModal("ask")}>تخطيط الأسبوع ▦</button><button onClick={()=>setModal("tasks")}>تنظيم المهام ✓</button><button onClick={()=>setModal("ask")}>إعداد عرض ▣</button><button onClick={()=>setModal("ask")}>تلخيص المستندات ▤</button></div></div>
+        <div className="smart-note"><small>مساعدك الذكي</small><p>لخّص لي نقاط الاجتماع<br/>واقترح الإجراءات التالية</p><button onClick={()=>setModal("ask")}>✦</button></div>
+        <button className="focus-card" onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><b>تركيز</b><span>{time}</span><small>جلسة تركيز</small><i/></button>
+      </section>
 
-  return (
-    <main className="health-app" dir="rtl">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="NAVIXA"><span>ن</span><b>NAVIXA</b></a>
-        <nav aria-label="التنقل الرئيسي"><a href="#monitor">الجلسة</a><a href="#habits">صحتي</a><a href="/admin/login">الإدارة</a></nav>
-        <button className="emergency" onClick={() => stopMonitoring()}>إيقاف فوري</button>
-      </header>
+      <section className="daily-strip"><div><small>إنجاز اليوم</small><b>72%</b><span><i style={{width:"72%"}}/></span></div><div><small>وقت التركيز</small><b>2س 15د</b><em>↑ 24 دقيقة</em></div><div><small>المهام المكتملة</small><b>{tasks.filter(t=>t.done).length} / {tasks.length}</b><em>ممتاز، كمّل</em></div><div><small>موعدك القادم</small><b>09:30</b><em>بعد 35 دقيقة</em></div></section>
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <span className="eyebrow">رفيق صحتك أثناء العمل</span>
-          <h1>اجلس بوعي.<br/><em>وتحرّك في وقتك.</em></h1>
-          <p>يراقب NAVIXA وضعية جلوسك داخل جهازك، ويذكّرك بالحركة والماء بلطف.</p>
-          <div className="privacy-pill"><i/> لا صور محفوظة · لا فيديو مرفوع · التحكم لك</div>
-        </div>
-        <div className="session-card">
-          <small>مدة جلوسك اليوم</small>
-          <strong>{formatTime(sessionSeconds)}</strong>
-          <span className={`posture-status ${posture}`}><i/>{message}</span>
-          <div className="session-actions">
-            {!monitoring ? <button className="primary" onClick={startMonitoring}>ابدأ المراقبة</button> : <button className="primary stop" onClick={() => stopMonitoring()}>إنهاء الجلسة</button>}
-            <button onClick={() => { setSessionSeconds(0); localStorage.setItem("navixa-sitting-seconds", "0"); }}>تصفير العداد</button>
-          </div>
+      <section className="nx-section" id="assistant"><div className="section-head"><div><small>مساعدك الذكي</small><h2>كل ما تحتاجه ليوم أوضح</h2><p>أدوات مرنة تساعدك في العمل والمشاريع والمواعيد والحياة اليومية.</p></div><button onClick={()=>setModal("ask")}>اسأل المساعد ←</button></div>
+        <div className="feature-grid">
+          <article className="wide lavender name-listener command-card"><div className="feature-icon">◉</div><div><small>استماع ذكي</small><h3>الأسماء والكلمات المهمة</h3><p>اكتب أكثر من اسم أو كلمة وافصل بينها بفاصلة. المسافات وعلامات الترقيم لا تؤثر.</p><input aria-label="الأسماء والكلمات" value={watchTerms} onChange={e=>setWatchTerms(e.target.value)} placeholder="اسم أو كلمة، موعد، إجراء مهم"/><div className="heard-panel"><label>ما يسمعه NAVIXA الآن</label><textarea aria-label="النص الذي يسمعه الذكاء" value={[heardText,interimText].filter(Boolean).join(" ")} readOnly placeholder="سيظهر الكلام هنا مباشرة بعد تشغيل الاستماع..."/><div><button onClick={()=>{const text=[heardText,interimText].filter(Boolean).join(" ");if(!text)return notify("لا يوجد نص بعد");navigator.clipboard?.writeText(text);notify("تم نسخ النص المسموع")}}>نسخ النص</button><button onClick={()=>{const text=[heardText,interimText].filter(Boolean).join(" ").trim();if(!text)return notify("لا يوجد نص لإضافته");setTasks(current=>[...current,{title:text,done:false,meta:"من الاستماع الذكي"}]);notify("تمت إضافة النص إلى المهام")}}>إضافة للمهام</button><button className="clear-heard" onClick={()=>{setHeardText("");setInterimText("")}}>مسح</button></div></div><button className="listen-toggle" onClick={toggleListening}>{listening?"إيقاف":"تشغيل الاستماع"}</button></div><span className={`status ${listening?"live":""}`}>{listening?"● يحلل الآن":"○ متوقف"}</span></article>
+          <article className="wide green command-card"><div className="feature-icon">▣</div><div><small>متابعة الشاشة</small><h3>شارك ثم حدّد المنطقة</h3><p>بعد اختيار الشاشة يظهر إطار المنطقة؛ المتابعة محلية ولا تحفظ صورة الشاشة.</p>{screen&&<div className="screen-selector mini"><div className="selection-box"><span>منطقة المتابعة</span></div></div>}<button onClick={toggleScreen}>{screen?"إنهاء المشاركة":"اختيار شاشة"}</button></div><span className={`status ${screen?"live":""}`}>{screen?"● منطقة محددة":"○ غير مفعّل"}</span></article>
+          <article><div className="feature-icon">▦</div><small>تنظيم</small><h3>مهام ومواعيد</h3><p>رتّب يومك وتابع إنجازك بدون تعقيد.</p><button onClick={()=>setModal("tasks")}>فتح المهام ←</button></article>
+          <article><div className="feature-icon">▤</div><small>ذكاء عملي</small><h3>تلخيص سريع</h3><p>حوّل النصوص والاجتماعات إلى نقاط واضحة.</p><button onClick={()=>setModal("ask")}>ابدأ التلخيص ←</button></article>
+          <article><div className="feature-icon">⌁</div><small>في مكان واحد</small><h3>روابطك المهمة</h3><p>ثبّت أدوات العمل والحياة التي تستخدمها يوميًا.</p><a href="https://calendar.google.com" target="_blank">فتح التقويم ↗</a></article>
         </div>
       </section>
 
-      <section className="monitor-grid" id="monitor">
-        <article className="camera-card">
-          <div className="card-head"><div><small>تحليل الوضعية</small><h2>كاميرتك، داخل جهازك فقط</h2></div><span className={monitoring ? "live" : "off"}>{monitoring ? "يعمل الآن" : "متوقف"}</span></div>
-          <div className="video-shell">
-            <video ref={videoRef} muted playsInline />
-            {!monitoring && <div className="camera-empty"><span>◉</span><b>الكاميرا متوقفة</b><small>لن تبدأ إلا بعد موافقتك</small></div>}
-            {monitoring && <div className="scan-line"/>}
-          </div>
-          <p className="local-note">يحلل النموذج نقاط الجسم مباشرة في المتصفح، ولا يرسل الفيديو لأي خادم.</p>
-        </article>
+      <section className="focus-zone" id="focus"><div><small>جلسة تركيز</small><h2>خذ وقتك. خلّ الباقي علينا.</h2><p>مؤقت بسيط يساعدك تنجز بعيدًا عن التشتت.</p><div className="focus-actions"><button onClick={()=>setRunning(!running)}>{running?"إيقاف مؤقت":"ابدأ 25 دقيقة"}</button><button className="ghost" onClick={()=>{setRunning(false);setSeconds(25*60)}}>إعادة</button></div></div><div className={`timer ${running?"running":""}`}><span>{time}</span><small>{running?"أنت الآن في وضع التركيز":"جاهز متى ما كنت"}</small></div><div className="lavender-stem">✦</div></section>
 
-        <div className="side-cards" id="habits">
-          <article className="habit-card break-card"><span>↗</span><div><small>الحركة القادمة</small><h3>تمدد خفيف لدقيقة</h3><p>حرّك كتفيك للخلف ثم قف بهدوء.</p></div><label>كل <select value={breakEvery} onChange={(e) => setBreakEvery(Number(e.target.value))}><option value="20">20</option><option value="30">30</option><option value="45">45</option><option value="60">60</option></select> دقيقة</label></article>
-          <article className="habit-card water-card"><span>◌</span><div><small>الماء اليوم</small><h3>{waterCount} أكواب</h3><p>تذكير قابل للتعديل حسب يومك.</p></div><label>كل <select value={waterEvery} onChange={(e) => setWaterEvery(Number(e.target.value))}><option value="30">30</option><option value="60">60</option><option value="90">90</option></select> دقيقة</label><button onClick={drinkWater}>شربت كوبًا</button></article>
-          <article className="privacy-card"><div className="shield">✓</div><div><small>خصوصيتك أولًا</small><h3>المعالجة محلية 100%</h3><p>يمكنك إيقاف الكاميرا فورًا من أعلى الصفحة.</p></div></article>
-        </div>
-      </section>
+      <section className="nx-section automation" id="automations"><div className="section-head"><div><small>الأتمتة</small><h2>NAVIXA يختصر الخطوات عنك</h2><p>قواعد بسيطة تتكرر تلقائيًا في وقتها.</p></div><button onClick={()=>setModal("automation")}>＋ أتمتة جديدة</button></div><div className="automation-list">{automations.map((x,i)=><article key={`${x.name}-${i}`}><span>{x.icon}</span><div><b>{x.name}</b><small>{x.when}</small></div><p>{x.action}</p><label><input aria-label={`تفعيل ${x.name}`} type="checkbox" checked={x.on} onChange={()=>setAutomations(automations.map((a,j)=>j===i?{...a,on:!a.on}:a))}/><i/></label></article>)}</div></section>
 
-      <footer><b>NAVIXA</b><span>رفيق يوم صحي ومنتج</span><small>المؤشرات إرشادية وليست تشخيصًا طبيًا.</small></footer>
-    </main>
-  );
+      <section className="proof-grid"><article><span>♙</span><b>12.8K+</b><small>مستخدم نشط في NAVIXA</small></article><article><span>◷</span><b>85,000+</b><small>ساعة إنتاجية مسجلة</small></article><article><span>☆</span><b>4.9/5</b><small>تقييم المستخدمين</small></article><article><span>♢</span><b>100%</b><small>خصوصية — بياناتك على جهازك</small></article></section>
+      <section className="faq"><h2>🛡️ دليل الثقة والاستخدام الذكي</h2>{[["هل NAVIXA آمن لبياناتي؟","نعم. لا يبدأ الميكروفون أو مشاركة الشاشة إلا بعد ضغطك وموافقتك على صلاحية المتصفح."],["هل تُرفع الشاشة أو التسجيلات إلى الموقع؟","لا. المعالجة تتم داخل جلسة المتصفح ولا يحفظ الموقع صورة الشاشة أو التسجيل الصوتي."],["هل يعمل أثناء الاجتماعات الحضورية والأونلاين؟","نعم، عند تفعيل الاستماع يمكنه رصد الكلمات التي تختارها من الصوت الذي تسمح به للمتصفح."],["هل أحتاج لتسجيل حساب؟","لاستخدام الصفحة اليومية لا، أما لوحة الإدارة فلها صفحة دخول مستقلة."],["كيف يكتشف المعلومات تلقائيًا؟","من الصلاحيات التي تمنحها أنت فقط، ومن الأتمتة التي تنشئها وتفعّلها."],["كيف أوقف الصلاحيات؟","اضغط إيقاف داخل البطاقة أو استخدم مؤشر المشاركة في المتصفح لإيقافها فورًا."],["هل يمكنني إضافة أكثر من اسم؟","نعم، اكتب الأسماء أو الكلمات وافصلها بفاصلة، ولن تؤثر المسافات أو علامات الترقيم."],["هل يعمل بالعربي والإنجليزي؟","الواجهة عربية، والاستماع مضبوط حاليًا على العربية السعودية ويمكن توسيعه للإنجليزية."]].map(x=><details key={x[0]}><summary>{x[0]}<span>⌄</span></summary><p>{x[1]}</p></details>)}</section>
+      <section className="contact"><h2>🌐 تواصل معنا</h2><p>تابعنا على حساباتنا الرسمية</p><div><a href="mailto:hello@navixa.sa">✉</a><a href={social.x} target="_blank">𝕏</a><a href={social.instagram} target="_blank">◎</a><a href={social.youtube} target="_blank">▶</a><a href={social.github} target="_blank">◉</a></div></section>
+
+      <footer><div className="nx-brand"><span>ن</span><div><b>NAVIXA</b><small>ذكاء سعودي يفهم يومك</small></div></div><p>مصمم لحياة أكثر ترتيبًا، من الرياض إلى كل مكان.</p><span>© 2026 NAVIXA</span></footer>
+    </section>
+
+    {modal&&<div className="nx-modal-back" onClick={()=>setModal(null)}><section className="nx-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(null)}>×</button>{modal==="tasks"?<><small>مهامي</small><h2>خلّ يومك واضح</h2><div className="task-list">{tasks.map((t,i)=><label key={`${t.title}-${i}`}><input type="checkbox" checked={t.done} onChange={()=>setTasks(tasks.map((x,j)=>j===i?{...x,done:!x.done}:x))}/><span className={t.done?"done":""}>{t.title}</span><button onClick={()=>setTasks(tasks.filter((_,j)=>j!==i))}>حذف</button></label>)}</div><form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);setTasks([...tasks,{title:String(data.get("task")),done:false}]);e.currentTarget.reset()}}><input name="task" required placeholder="أضف مهمة جديدة..."/><button>إضافة</button></form></>:modal==="notifications"?<><small>التنبيهات</small><h2>آخر التنبيهات</h2><div className="notification-list"><article><b>اجتماع الفريق قريب</b><small>يبدأ بعد 35 دقيقة</small></article><article><b>مهمتان تحتاجان الإكمال</b><small>من قائمة اليوم</small></article><article><b>جلسة التركيز جاهزة</b><small>25 دقيقة مقترحة</small></article></div></>:modal==="automation"?<><small>أتمتة جديدة</small><h2>أنشئ قاعدة تتكرر تلقائيًا</h2><form className="stack-form" onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);setAutomations([...automations,{icon:"✦",name:String(d.get("name")),when:String(d.get("when")),action:String(d.get("action")),on:true}]);setModal(null);notify("تمت إضافة الأتمتة وتشغيلها")}}><input name="name" required placeholder="اسم الأتمتة"/><input name="when" required placeholder="متى تعمل؟ مثال: كل يوم 8 صباحًا"/><input name="action" required placeholder="ماذا تنفذ؟"/><button>حفظ وتشغيل</button></form></>:<><small>مساعد NAVIXA</small><h2>وش أقدر أسوي لك يا سلطان؟</h2><div className="suggestions"><button onClick={()=>notify("جهزت لك خطة يوم متوازنة")}>رتّب يومي</button><button onClick={()=>notify("أرسل النص وسألخصه لك")}>لخّص لي</button><button onClick={()=>notify("بدأ تجهيز قائمة الأولويات")}>حدّد أولوياتي</button></div><form onSubmit={e=>{e.preventDefault();notify("تم إرسال طلبك إلى NAVIXA");setModal(null)}}><input required placeholder="اكتب طلبك هنا..."/><button>إرسال</button></form></>}</section></div>}
+  </main>
 }
