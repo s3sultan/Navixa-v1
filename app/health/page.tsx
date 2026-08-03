@@ -1,5 +1,2 @@
-"use client";
-import HealthMonitor from "../HealthMonitor";
-import "../navixa.css";
-import "../health-page.css";
-export default function HealthPage(){return <main className="health-page" dir="rtl"><header><a href="/">← العودة للرئيسية</a><div><span>♡</span><div><small>NAVIXA HEALTH</small><h1>مركز صحتي</h1><p>الجلوس والحركة والماء والخصوصية في مكان واحد.</p></div></div></header><HealthMonitor/></main>}
+"use client";import {useEffect,useState} from "react";import HealthMonitor from "../HealthMonitor";import "../navixa.css";import "../health-page.css";
+export default function HealthPage(){const [alerts,setAlerts]=useState(true);useEffect(()=>{localStorage.setItem("navixa-health-visited",new Date().toISOString().slice(0,10));setAlerts(localStorage.getItem("navixa-health-muted")!=="true")},[]);const toggle=()=>{const next=!alerts;setAlerts(next);localStorage.setItem("navixa-health-muted",String(!next))};return <main className="health-page" dir="rtl"><header><a href="/">← العودة للرئيسية</a><div><button onClick={toggle} aria-label="تفعيل أو إلغاء تنبيهات الصحة">{alerts?"🔔":"🔕"}</button><span>♡</span><div><small>NAVIXA HEALTH</small><h1>مركز صحتي</h1><p>الجلوس والحركة والماء والخصوصية في مكان واحد.</p></div></div></header><HealthMonitor/></main>}
