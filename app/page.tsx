@@ -35,9 +35,12 @@ export default function Home(){
   const recognitionRef=useRef<any>(null);
   const screenRef=useRef<MediaStream|null>(null);
   const lastIntentRef=useRef("");
+  const lastNameAlertRef=useRef({name:"",at:0});
   const welcomeTrackRef=useRef<HTMLDivElement>(null);
   const playAlert=(sound=alertSound)=>{if(sound==="silent")return;try{const AudioCtx=(window as any).AudioContext||(window as any).webkitAudioContext;const ctx=new AudioCtx();const patterns:Record<string,number[]>={chime:[659,880],bell:[784,659,784],pulse:[440,440,660],urgent:[880,660,880,660]};const notes=patterns[sound]||patterns.chime;notes.forEach((frequency,index)=>{const oscillator=ctx.createOscillator();const gain=ctx.createGain();const start=ctx.currentTime+index*.18;oscillator.type=sound==="urgent"?"square":"sine";oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(sound==="urgent"?.13:.2,start+.02);gain.gain.exponentialRampToValueAtTime(.001,start+.16);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start);oscillator.stop(start+.18)});setTimeout(()=>ctx.close(),notes.length*180+300)}catch{}}
   const notify=(message:string)=>{playAlert();setToast(message);setTimeout(()=>setToast(""),2200)};
+  const normalizeName=(value:string)=>value.normalize("NFKD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim().toLowerCase();
+  const alertName=(name:string)=>{const now=Date.now();if(lastNameAlertRef.current.name===name&&now-lastNameAlertRef.current.at<15000)return;lastNameAlertRef.current={name,at:now};playAlert("urgent");setToast(`تنبيه: سمعنا اسمك (${name})`);setTimeout(()=>setToast(""),3500);void fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name})})};
   useEffect(()=>{const saved=localStorage.getItem("navixa-life-tasks");const savedSocial=localStorage.getItem("navixa-social");const savedSound=localStorage.getItem("navixa-alert-sound");if(saved)setTasks(JSON.parse(saved));if(savedSocial)setSocial(JSON.parse(savedSocial));if(savedSound)setAlertSound(savedSound);setReady(true)},[]);
   useEffect(()=>{if(ready)localStorage.setItem("navixa-alert-sound",alertSound)},[alertSound,ready]);
   useEffect(()=>{if(ready)localStorage.setItem("navixa-life-tasks",JSON.stringify(tasks))},[tasks,ready]);
@@ -51,7 +54,7 @@ export default function Home(){
     const SpeechRecognition=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
     if(!SpeechRecognition){notify("متصفحك لا يدعم الاستماع الصوتي");return}
     const recognition=new SpeechRecognition();recognition.lang="ar-SA";recognition.continuous=true;recognition.interimResults=true;
-    recognition.onresult=(event:any)=>{let interim="";for(let i=event.resultIndex;i<event.results.length;i++){const result=event.results[i];const text=result[0].transcript;const normalized=text.replace(/[،,.؛:!?]/g," ").replace(/\s+/g," ").trim().toLowerCase();const terms=watchTerms.split(/[،,\n]/).map(x=>x.replace(/[،,.؛:!?]/g," ").replace(/\s+/g," ").trim().toLowerCase()).filter(Boolean);const matched=terms.find(term=>normalized.includes(term));if(matched)notify(`تم سماع الكلمة: ${matched}`);if(result.isFinal){setHeardText(previous=>`${previous} ${text}`.trim().slice(-5000));captureSpokenIntent(text)}else interim+=`${text} `}setInterimText(interim.trim())};
+    recognition.onresult=(event:any)=>{let interim="";for(let i=event.resultIndex;i<event.results.length;i++){const result=event.results[i],text=result[0].transcript,normalized=normalizeName(text),terms=watchTerms.split(/[،,;؛\n]+/).map(normalizeName).filter(Boolean),matched=terms.find(term=>normalized.includes(term));if(matched)alertName(matched);if(result.isFinal){setHeardText(previous=>`${previous} ${text}`.trim().slice(-5000));captureSpokenIntent(text)}else interim+=`${text} `}setInterimText(interim.trim())};
     recognition.onerror=()=>{setListening(false);notify("تعذر تشغيل الميكروفون — تحقق من الصلاحية")};recognition.onend=()=>setListening(false);
     recognitionRef.current=recognition;recognition.start();setListening(true);notify("بدأ الاستماع للكلمات المختارة");
   };
