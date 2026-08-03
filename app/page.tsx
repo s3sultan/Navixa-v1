@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import "./navixa.css";
+import "./welcome.css";
 
 type Task={title:string;done:boolean;meta?:string};
 const starters:Task[]=[{title:"مراجعة خطة المشروع",done:false},{title:"تأكيد موعد الفريق",done:true},{title:"إنهاء ملخص الاجتماع",done:false}];
@@ -14,6 +15,8 @@ export default function Home(){
   const [listening,setListening]=useState(false);
   const [screen,setScreen]=useState(false);
   const [entered,setEntered]=useState(false);
+  const [welcomeSwipe,setWelcomeSwipe]=useState(0);
+  const [quoteIndex,setQuoteIndex]=useState(0);
   const [watchTerms,setWatchTerms]=useState("");
   const [heardText,setHeardText]=useState("");
   const [interimText,setInterimText]=useState("");
@@ -25,11 +28,13 @@ export default function Home(){
   const recognitionRef=useRef<any>(null);
   const screenRef=useRef<MediaStream|null>(null);
   const lastIntentRef=useRef("");
+  const welcomeTrackRef=useRef<HTMLDivElement>(null);
   const playAlert=(sound=alertSound)=>{if(sound==="silent")return;try{const AudioCtx=(window as any).AudioContext||(window as any).webkitAudioContext;const ctx=new AudioCtx();const patterns:Record<string,number[]>={chime:[659,880],bell:[784,659,784],pulse:[440,440,660],urgent:[880,660,880,660]};const notes=patterns[sound]||patterns.chime;notes.forEach((frequency,index)=>{const oscillator=ctx.createOscillator();const gain=ctx.createGain();const start=ctx.currentTime+index*.18;oscillator.type=sound==="urgent"?"square":"sine";oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(sound==="urgent"?.13:.2,start+.02);gain.gain.exponentialRampToValueAtTime(.001,start+.16);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start);oscillator.stop(start+.18)});setTimeout(()=>ctx.close(),notes.length*180+300)}catch{}}
   const notify=(message:string)=>{playAlert();setToast(message);setTimeout(()=>setToast(""),2200)};
   useEffect(()=>{const saved=localStorage.getItem("navixa-life-tasks");const savedSocial=localStorage.getItem("navixa-social");const savedSound=localStorage.getItem("navixa-alert-sound");if(saved)setTasks(JSON.parse(saved));if(savedSocial)setSocial(JSON.parse(savedSocial));if(savedSound)setAlertSound(savedSound);setReady(true)},[]);
   useEffect(()=>{if(ready)localStorage.setItem("navixa-alert-sound",alertSound)},[alertSound,ready]);
   useEffect(()=>{if(ready)localStorage.setItem("navixa-life-tasks",JSON.stringify(tasks))},[tasks,ready]);
+  useEffect(()=>{const timer=setInterval(()=>setQuoteIndex(i=>(i+1)%4),3200);return()=>clearInterval(timer)},[]);
   useEffect(()=>{if(!running)return;const timer=setInterval(()=>setSeconds(s=>{if(s<=1){setRunning(false);notify("أحسنت! انتهت جلسة التركيز");return 25*60}return s-1}),1000);return()=>clearInterval(timer)},[running]);
   const time=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
   const captureSpokenIntent=(spoken:string)=>{const text=spoken.trim();if(!text||text===lastIntentRef.current)return;const kinds=[{words:["موعد","اجتماع","مقابلة"],label:"موعد"},{words:["كويز","اختبار","امتحان"],label:"اختبار"},{words:["تاريخ","تسليم","ددلاين"],label:"تاريخ مهم"},{words:["ملاحظة","لاحظ","ركز على","تذكر"],label:"ملاحظة"}];const kind=kinds.find(k=>k.words.some(w=>text.includes(w)));if(!kind)return;const date=text.match(/(?:اليوم|بكرة|غدا|الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|الساعة\s+\d{1,2}(?::\d{2})?)/)?.[0]||"من الكلام المسموع";lastIntentRef.current=text;setTasks(current=>[...current,{title:`${kind.label}: ${text}`,done:false,meta:date}]);setModal("tasks");notify(`فهمت ${kind.label} وأضفته للمهام`)};
@@ -49,8 +54,10 @@ export default function Home(){
   };
 
   const hour=new Date().getHours();const greeting=hour<12?"صباح الخير":hour<18?"مساء الخير":"مساء النور";
+  const welcomeQuotes=["خطوة بسيطة اليوم تصنع فرقًا كبيرًا بكرة.","رتّب يومك بهدوء، والإنجاز يتبعك.","كل دقيقة تركيز تقرّبك من هدفك.","ابدأ بخطوة واحدة، والباقي يصير أسهل."];
+  const moveWelcomeSwipe=(clientX:number)=>{const track=welcomeTrackRef.current;if(!track)return;const rect=track.getBoundingClientRect();const progress=Math.max(0,Math.min(1,(rect.right-clientX)/(rect.width-72)));setWelcomeSwipe(progress);if(progress>.93)setEntered(true)};
   return <main className={`nx ${entered?"entered":"waiting"}`} dir="rtl">
-    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="navixa-mark"><i/><i/></div><small>{greeting}</small><h1>مرحبًا بك في <b>NAVIXA</b></h1><p>مساعد سعودي ذكي يرتب يومك، يلتقط المواعيد والملاحظات من الكلام، يساعدك على التركيز وينفذ الأتمتة التي تختارها—مع خصوصيتك أولًا.</p><blockquote>“خطوة بسيطة اليوم تصنع فرقًا كبيرًا بكرة.”</blockquote><button onClick={()=>setEntered(true)}>دخول NAVIXA <span>←</span></button><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
+    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="welcome-orb one"/><div className="welcome-orb two"/><div className="navixa-mark"><i/><i/></div><small>{greeting}</small><h1>مرحبًا بك في <b>NAVIXA</b></h1><p>مساعدك الذكي يرتب يومك، يلتقط المواعيد والملاحظات، ويساعدك على التركيز—مع خصوصيتك أولًا.</p><blockquote key={quoteIndex}>“{welcomeQuotes[quoteIndex]}”</blockquote><div className="welcome-benefits"><span>◉ متابعة ذكية</span><span>▣ مراقبة محلية</span><span>◎ تركيز وصحة</span></div><div ref={welcomeTrackRef} className="welcome-swipe" onPointerMove={e=>moveWelcomeSwipe(e.clientX)} onPointerUp={()=>setWelcomeSwipe(0)} onPointerLeave={()=>setWelcomeSwipe(0)}><b>اسحب للدخول</b><button aria-label="اسحب شعار NAVIXA من اليمين إلى اليسار" style={{right:`calc(6px + ${welcomeSwipe*100}% - ${welcomeSwipe*76}px)`}} onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId)}}><i/><i/></button><span>←</span></div><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
     {toast&&<div className="nx-toast">✓ {toast}</div>}
     <aside className="nx-side">
       <a className="nx-brand" href="#top"><span>ن</span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
