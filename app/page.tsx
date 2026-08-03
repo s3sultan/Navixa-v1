@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./navixa.css";
 import "./welcome.css";
+import HealthMonitor from "./HealthMonitor";
 
 type Task={title:string;done:boolean;meta?:string};
 const starters:Task[]=[{title:"مراجعة خطة المشروع",done:false},{title:"تأكيد موعد الفريق",done:true},{title:"إنهاء ملخص الاجتماع",done:false}];
@@ -66,6 +67,7 @@ export default function Home(){
         <a href="#assistant"><i>✦</i> مساعدي</a>
         <button onClick={()=>setModal("tasks")}><i>✓</i> المهام <em>{tasks.filter(t=>!t.done).length}</em></button>
         <a href="#focus"><i>◎</i> التركيز</a>
+        <a href="#health"><i>♡</i> صحتي</a>
         <a href="#automations"><i>⌘</i> الأتمتة</a>
       </nav>
       <a className="nx-admin" href="/admin/login">⚙ دخول الإدارة <span>←</span></a>
@@ -97,6 +99,7 @@ export default function Home(){
         </div>
       </section>
 
+      <HealthMonitor/>
       <section className="focus-zone" id="focus"><div><small>جلسة تركيز</small><h2>خذ وقتك. خلّ الباقي علينا.</h2><p>مؤقت بسيط يساعدك تنجز بعيدًا عن التشتت.</p><div className="focus-actions"><button onClick={()=>setRunning(!running)}>{running?"إيقاف مؤقت":"ابدأ 25 دقيقة"}</button><button className="ghost" onClick={()=>{setRunning(false);setSeconds(25*60)}}>إعادة</button></div></div><div className={`timer ${running?"running":""}`}><span>{time}</span><small>{running?"أنت الآن في وضع التركيز":"جاهز متى ما كنت"}</small></div><div className="lavender-stem">✦</div></section>
 
       <section className="nx-section automation" id="automations"><div className="section-head"><div><small>الأتمتة</small><h2>NAVIXA يختصر الخطوات عنك</h2><p>قواعد بسيطة تتكرر تلقائيًا في وقتها.</p></div><button onClick={()=>setModal("automation")}>＋ أتمتة جديدة</button></div><div className="automation-list">{automations.map((x,i)=><article key={`${x.name}-${i}`}><span>{x.icon}</span><div><b>{x.name}</b><small>{x.when}</small></div><p>{x.action}</p><label><input aria-label={`تفعيل ${x.name}`} type="checkbox" checked={x.on} onChange={()=>setAutomations(automations.map((a,j)=>j===i?{...a,on:!a.on}:a))}/><i/></label></article>)}</div></section>
