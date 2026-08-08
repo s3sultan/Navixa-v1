@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import "./worship.css";
 import TasbihCounter from "./TasbihCounter";
+import {sendTelegramAlert} from "./alertPrefs";
 
 type Timings=Record<string,string>;
 type AzkarItem={ID:number;ARABIC_TEXT:string;REPEAT:number};
@@ -77,14 +78,13 @@ export default function WorshipCenter(){
     if(!nextPrayer)nextPrayer={name:"Fajr",time:addMinutes(parseToday(timings.Fajr),24*60)};
   }
 
-  const notifyTelegram=(message:string)=>{void fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message})}).catch(()=>{})};
   const completeWird=()=>{
     localStorage.setItem(`navixa-wird-${today()}`,"1");
     const streak=Number(localStorage.getItem("navixa-wird-streak")||0)+1;
     localStorage.setItem("navixa-wird-streak",String(streak));
     setWirdDone(true);setShowSadaqah(true);
-    notifyTelegram(`📖 تذكير NAVIXA: أنجز ورد اليوم (صفحة ${dayPage()}) — سلسلة ${streak} يوم`);
-    notifyTelegram("🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام الورد");
+    sendTelegramAlert("wird",`📖 تذكير NAVIXA: أنجز ورد اليوم (صفحة ${dayPage()}) — سلسلة ${streak} يوم`);
+    sendTelegramAlert("sadaqah","🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام الورد");
   };
   const clickEhsan=()=>{
     const next=Number(localStorage.getItem("navixa-ehsan-clicks")||1200)+1;
@@ -101,7 +101,7 @@ export default function WorshipCenter(){
 
   return <section className="worship-center" dir="rtl">
     <article className="prayer-card">
-      <header><small>مواقيت الصلاة والإقامة</small><h3>أوقاتك اليوم</h3></header>
+      <header><span className="card-explain-icon">🕌</span><div><small>مواقيت الصلاة والإقامة</small><h3>أوقاتك اليوم</h3></div></header>
       {locStatus!=="ready"&&<div className="location-request">
         <p>فعّل الموقع لعرض مواقيت الصلاة الدقيقة لمكانك، أو أدخل مدينتك يدويًا.</p>
         <button type="button" onClick={requestLocation} disabled={locStatus==="loading"}>{locStatus==="loading"?"جارٍ التحديد…":"📍 استخدم موقعي"}</button>
@@ -123,22 +123,22 @@ export default function WorshipCenter(){
     </article>
 
     {azkarPeriod&&azkarList&&<article className="azkar-card">
-      <header><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>حصّن يومك بالذكر</h3></header>
+      <header><span className="card-explain-icon">{azkarPeriod==="sabah"?"🌅":"🌙"}</span><div><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>حصّن يومك بالذكر</h3></div></header>
       <div className="azkar-list">{azkarList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div>
     </article>}
 
     {afterPrayerName&&afterPrayerList&&<article className="azkar-card after-prayer">
-      <header><small>أذكار بعد الصلاة</small><h3>بعد صلاة {prayerLabels[afterPrayerName]}</h3></header>
+      <header><span className="card-explain-icon">🤲</span><div><small>أذكار بعد الصلاة</small><h3>بعد صلاة {prayerLabels[afterPrayerName]}</h3></div></header>
       <div className="azkar-list">{afterPrayerList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div>
     </article>}
 
     <article className="tasbih-card">
-      <header><small>سبّح واستغفر</small><h3>عداد التسبيح اليومي</h3></header>
+      <header><span className="card-explain-icon">📿</span><div><small>سبّح واستغفر</small><h3>عداد التسبيح اليومي</h3></div></header>
       <TasbihCounter/>
     </article>
 
     <article className="quran-card">
-      <header><small>ورد اليوم — صفحة {dayPage()}</small><h3>{groupedAyahs[0]?.surah||"جارٍ التحميل…"}</h3></header>
+      <header><span className="card-explain-icon">📗</span><div><small>ورد اليوم — صفحة {dayPage()}</small><h3>{groupedAyahs[0]?.surah||"جارٍ التحميل…"}</h3></div></header>
       {quranError&&<p className="quran-error">{quranError}</p>}
       <div className="quran-text">{groupedAyahs.map(group=><div key={group.surah}><small>سورة {group.surah}</small><p>{group.ayahs.map(a=>`${a.text} ﴿${a.numberInSurah}﴾`).join(" ")}</p></div>)}</div>
       {!wirdDone?<button type="button" className="wird-done" onClick={completeWird} disabled={!quranAyahs}>تم — أنجزت ورد اليوم</button>:<p className="wird-complete">✓ أنجزت ورد اليوم — بارك الله فيك</p>}

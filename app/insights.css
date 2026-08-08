@@ -1,9 +1,11 @@
 .insights-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:18px}
 .insight-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;display:grid;gap:14px;align-content:start}
-.insight-card>header{display:flex;justify-content:space-between;align-items:start;gap:8px}
+.insight-card>header{display:flex;align-items:start;gap:10px}
 .insight-card>header small{color:var(--lav);font-weight:700;font-size:10px}
 .insight-card>header h3{font-size:15px;margin:5px 0 0}
-.insight-badge{background:#edf6f1;color:var(--sa);font-size:9px;border-radius:20px;padding:5px 10px;white-space:nowrap}
+.insight-badge{background:#edf6f1;color:var(--sa);font-size:9px;border-radius:20px;padding:5px 10px;white-space:nowrap;margin-left:auto}
+.card-explain-icon{width:32px;height:32px;border-radius:10px;background:var(--lav2);display:grid;place-items:center;font-size:15px;flex-shrink:0;animation:explainPulse 2.6s ease-in-out infinite}
+@keyframes explainPulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.08);opacity:1}}
 .insight-badge.points{background:var(--lav2);color:#684fb3}
 .review-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;text-align:center}
 .review-stats div{background:#f7f8f5;border-radius:12px;padding:10px 6px}
@@ -44,7 +46,7 @@
 
 .worship-gateway{margin:30px 0;background:linear-gradient(120deg,#2a2350,#4a3d8f);color:#fff;border-radius:28px;padding:25px 30px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .worship-gateway>div{display:flex;gap:16px;align-items:center}
-.worship-gateway>div>span{font-size:36px}
+.worship-gateway>div>span{font-size:36px;display:inline-block;animation:explainPulse 2.6s ease-in-out infinite}
 .worship-gateway h2{margin:4px 0;font-size:18px}
 .worship-gateway p{margin:0;opacity:.75;font-size:11px}
 .worship-gateway>a{background:#fff;color:#3a2f80;text-decoration:none;padding:12px 18px;border-radius:14px;font-weight:700;white-space:nowrap}
@@ -94,3 +96,7 @@ footer>div.counters{display:flex;gap:24px}
 .mosque-minaret.one{right:14px}
 .mosque-minaret.two{left:14px}
 @media(max-width:650px){.prayer-strip{position:static;flex-wrap:wrap}.prayer-strip-next{width:100%}}
+.alert-prefs-list{display:grid;gap:8px;margin:18px 0}
+.alert-prefs-row{display:flex;align-items:center;gap:14px;background:#f7f8f5;border-radius:10px;padding:11px}
+.alert-prefs-row>b{flex:1;font-size:11px}
+.alert-prefs-row label{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}

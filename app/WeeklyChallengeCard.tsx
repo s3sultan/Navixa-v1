@@ -14,7 +14,7 @@ export default function WeeklyChallengeCard({weekSessions,weekHydrationDays,task
     if(nav.share)nav.share({text}).catch(()=>{});else navigator.clipboard?.writeText(text);
   };
   return <article className="insight-card weekly-challenge">
-    <header><div><small>التحدي الأسبوعي</small><h3>حافز أسبوعك</h3></div><span className="insight-badge points">{totalPoints} نقطة</span></header>
+    <header><span className="card-explain-icon">🏆</span><div><small>التحدي الأسبوعي</small><h3>حافز أسبوعك</h3></div><span className="insight-badge points">{totalPoints} نقطة</span></header>
     <div className="challenge-list">{items.map(c=>{
       const pct=Math.min(100,Math.round(c.value/c.target*100));
       const done=c.value>=c.target;

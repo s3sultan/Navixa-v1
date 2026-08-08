@@ -1,7 +1,10 @@
 .worship-center{max-width:1100px;margin:auto;display:grid;gap:16px}
 .prayer-card,.azkar-card,.quran-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px}
+.prayer-card header,.azkar-card header,.quran-card header,.tasbih-card header{display:flex;align-items:start;gap:10px}
 .prayer-card header small,.azkar-card header small,.quran-card header small{color:var(--lav);font-weight:700;font-size:10px}
 .prayer-card header h3,.azkar-card header h3,.quran-card header h3{font-size:18px;margin:5px 0 16px}
+.card-explain-icon{width:36px;height:36px;border-radius:11px;background:var(--lav2);display:grid;place-items:center;font-size:17px;flex-shrink:0;animation:explainPulse 2.6s ease-in-out infinite}
+@keyframes explainPulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.08);opacity:1}}
 .location-request{display:grid;gap:10px}
 .location-request>p{color:var(--muted);font-size:11px;margin:0}
 .location-request>button{justify-self:start;border:0;background:var(--sa);color:#fff;border-radius:11px;padding:11px 18px;font-size:11px;cursor:pointer}

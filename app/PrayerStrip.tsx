@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
+import {isScreenEnabled,sendTelegramAlert,getAdminMessages} from "./alertPrefs";
 
 const prayerLabels:Record<string,string>={Fajr:"الفجر",Dhuhr:"الظهر",Asr:"العصر",Maghrib:"المغرب",Isha:"العشاء"};
 const prayerOrder=["Fajr","Dhuhr","Asr","Maghrib","Isha"];
@@ -11,7 +12,6 @@ const parseToday=(hhmm:string)=>{const [h,m]=cleanTime(hhmm).split(":").map(Numb
 const addMinutes=(date:Date,minutes:number)=>new Date(date.getTime()+minutes*60000);
 const to24=(date:Date)=>`${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
 const fmt12=(hhmm:string)=>{const d=parseToday(hhmm);return d.toLocaleTimeString("ar",{hour:"2-digit",minute:"2-digit",hour12:true})};
-const notifyTelegram=(message:string)=>{void fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message})}).catch(()=>{})};
 
 export default function PrayerStrip(){
   const [timings,setTimings]=useState<Record<string,string>|null>(null);
@@ -62,8 +62,8 @@ export default function PrayerStrip(){
       const hhmm=to24(new Date());
       prayerOrder.forEach(name=>{
         const adhanKey=`navixa-alerted-adhan-${today()}-${name}`,iqamaKey=`navixa-alerted-iqama-${today()}-${name}`;
-        if(cleanTime(timings[name])===hhmm&&!localStorage.getItem(adhanKey)){localStorage.setItem(adhanKey,"1");setAlertInfo({type:"adhan",name});playChime();notifyTelegram(`🕌 حان الآن أذان ${prayerLabels[name]} — ${fmt12(timings[name])}`)}
-        if(iqamaTime(name)===hhmm&&!localStorage.getItem(iqamaKey)){localStorage.setItem(iqamaKey,"1");setAlertInfo({type:"iqama",name});playChime();notifyTelegram(`🕌 حانت الآن إقامة ${prayerLabels[name]} — ${fmt12(iqamaTime(name))}`)}
+        if(cleanTime(timings[name])===hhmm&&!localStorage.getItem(adhanKey)){localStorage.setItem(adhanKey,"1");if(isScreenEnabled("adhan")){setAlertInfo({type:"adhan",name});playChime()}sendTelegramAlert("adhan",`🕌 حان الآن أذان ${prayerLabels[name]} — ${fmt12(timings[name])}`)}
+        if(iqamaTime(name)===hhmm&&!localStorage.getItem(iqamaKey)){localStorage.setItem(iqamaKey,"1");if(isScreenEnabled("iqama")){setAlertInfo({type:"iqama",name});playChime()}sendTelegramAlert("iqama",`🕌 حانت الآن إقامة ${prayerLabels[name]} — ${fmt12(iqamaTime(name))}`)}
       });
     };
     const timer=setInterval(check,10000);
@@ -126,7 +126,7 @@ export default function PrayerStrip(){
       <div className="mosque-scene"><div className="mosque-dome"/><div className="mosque-minaret one"/><div className="mosque-minaret two"/><div className="mosque-glow"/></div>
       <small>{alertInfo.type==="adhan"?"حان الآن وقت أذان":"حانت الآن إقامة صلاة"}</small>
       <h3>{prayerLabels[alertInfo.name]}</h3>
-      <p>حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الْفَلَاحِ — اترك ما بيدك والحق بالصلاة.</p>
+      <p>{getAdminMessages()[alertInfo.type]||"حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الْفَلَاحِ — اترك ما بيدك والحق بالصلاة."}</p>
       <button type="button" onClick={()=>setAlertInfo(null)}>إغلاق</button>
     </article></div>}
   </div>

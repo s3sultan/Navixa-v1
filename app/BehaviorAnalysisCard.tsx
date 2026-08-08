@@ -20,7 +20,7 @@ export default function BehaviorAnalysisCard({weekly,sessionHours}:{weekly:{date
     :pattern==="مسائي"?"طاقتك تعلى مساءً — خصص وقت المساء للمهام التي تحتاج تركيز عالي."
     :"تركيزك موزع بشكل متوازن على اليوم — استمر على هذا الإيقاع.";
   return <article className="insight-card behavior-analysis">
-    <header><div><small>تحليل السلوك</small><h3>كيف تتحرك خلال أسبوعك؟</h3></div><span className="insight-badge">تقديري</span></header>
+    <header><span className="card-explain-icon">🧭</span><div><small>تحليل السلوك</small><h3>كيف تتحرك خلال أسبوعك؟</h3></div><span className="insight-badge">تقديري</span></header>
     <div className="review-stats">
       <div><b>{bestHour||"—"}</b><small>أكثر وقت تركيز</small></div>
       <div><b>{bestDay||"—"}</b><small>أنشط يوم</small></div>

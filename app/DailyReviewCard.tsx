@@ -12,7 +12,7 @@ export default function DailyReviewCard({sessionsToday,tasksDone,tasksTotal,best
   const productivity=Math.max(0,Math.min(100,Math.round(sessionsToday*18+(tasksTotal?tasksDone/tasksTotal*40:0))));
   const dayOfYear=Math.floor((Date.now()-new Date(new Date().getFullYear(),0,0).getTime())/864e5);
   return <article className="insight-card daily-review">
-    <header><div><small>مراجعة اليوم</small><h3>وش سويت اليوم؟</h3></div><span className="insight-badge">تقديري</span></header>
+    <header><span className="card-explain-icon">📊</span><div><small>مراجعة اليوم</small><h3>وش سويت اليوم؟</h3></div><span className="insight-badge">تقديري</span></header>
     <div className="review-stats">
       <div><b>{sessionsToday}</b><small>جلسات تركيز</small></div>
       <div><b>{tasksDone}/{tasksTotal}</b><small>مهام مكتملة</small></div>
