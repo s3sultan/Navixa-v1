@@ -4,7 +4,7 @@ import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import "./login.css";
 
-const GOOGLE_CLIENT_ID="70980940285-9mr2v4h5qqpgf40mfv2la65ir2kjhlpk.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID="876266145464-51o36n0s7jkgrtd0vhqh2cai1koo05r6.apps.googleusercontent.com";
 type GoogleIdentity={accounts:{id:{initialize:(options:{client_id:string;callback:(result:{credential:string})=>void})=>void;renderButton:(element:HTMLElement,options:Record<string,string|number>)=>void}}};
 
 export default function AdminLogin(){

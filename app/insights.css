@@ -1,0 +1,96 @@
+.insights-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:18px}
+.insight-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;display:grid;gap:14px;align-content:start}
+.insight-card>header{display:flex;justify-content:space-between;align-items:start;gap:8px}
+.insight-card>header small{color:var(--lav);font-weight:700;font-size:10px}
+.insight-card>header h3{font-size:15px;margin:5px 0 0}
+.insight-badge{background:#edf6f1;color:var(--sa);font-size:9px;border-radius:20px;padding:5px 10px;white-space:nowrap}
+.insight-badge.points{background:var(--lav2);color:#684fb3}
+.review-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;text-align:center}
+.review-stats div{background:#f7f8f5;border-radius:12px;padding:10px 6px}
+.review-stats b{display:block;font-size:15px}
+.review-stats small{color:var(--muted);font-size:8px}
+.review-progress{display:grid;gap:5px}
+.review-progress small{color:var(--muted);font-size:9px}
+.review-progress span{height:6px;background:#edf0ec;border-radius:6px;overflow:hidden;display:block}
+.review-progress span i{display:block;height:100%;background:linear-gradient(90deg,var(--sa),var(--lav))}
+.review-progress b{font-size:11px;justify-self:start}
+.review-mood{display:grid;gap:6px}
+.review-mood small{color:var(--muted);font-size:9px}
+.review-mood div{display:flex;gap:6px}
+.review-mood button{border:1px solid var(--line);background:#fff;border-radius:10px;width:34px;height:34px;font-size:15px;cursor:pointer}
+.review-mood button.active{border-color:var(--lav);background:var(--lav2)}
+.review-tip{background:#f6f3fd;color:#5d4f8c;border-radius:11px;padding:10px 12px;font-size:10px;line-height:1.7;margin:0}
+.review-actions{display:flex;gap:8px}
+.review-actions button{flex:1;border:0;background:var(--sa);color:#fff;border-radius:10px;padding:9px;font-size:10px;cursor:pointer}
+.review-actions button.ghost{background:#edf4ef;color:var(--sa)}
+.challenge-list{display:grid;gap:12px}
+.challenge-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.challenge-head b{font-size:11px}
+.challenge-head em{font-style:normal;color:var(--lav);font-size:8px;background:var(--lav2);border-radius:20px;padding:3px 8px}
+.challenge-list>div>span{display:block;height:6px;background:#edf0ec;border-radius:6px;overflow:hidden;margin:6px 0 4px}
+.challenge-list>div>span i{display:block;height:100%;background:var(--sa)}
+.challenge-list>div small{color:var(--muted);font-size:9px}
+.challenge-list>div.done small{color:var(--sa);font-weight:700}
+.share-challenge{width:100%;border:1px solid var(--line);background:#edf4ef;color:var(--sa);border-radius:10px;padding:9px;font-size:10px;cursor:pointer}
+.behavior-chart{display:flex;justify-content:space-between;align-items:end;height:70px;gap:6px}
+.behavior-chart div{display:flex;flex-direction:column-reverse;align-items:center;gap:6px;flex:1}
+.behavior-chart span{width:100%;max-width:18px;background:linear-gradient(180deg,var(--lav),var(--sa));border-radius:5px}
+.behavior-chart small{color:var(--muted);font-size:7px}
+@media(max-width:1000px){.insights-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.insights-grid{grid-template-columns:1fr}.review-stats{grid-template-columns:repeat(auto-fit,minmax(60px,1fr))}}
+
+.focus-tasbih-nudge{margin-top:12px;background:rgba(255,255,255,.95);color:var(--sa);border-radius:20px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-size:11px;box-shadow:0 10px 30px rgba(0,0,0,.15);animation:rise .25s ease}
+.focus-tasbih-nudge button{border:0;background:none;color:#9aa39f;font-size:14px;cursor:pointer;line-height:1}
+
+.worship-gateway{margin:30px 0;background:linear-gradient(120deg,#2a2350,#4a3d8f);color:#fff;border-radius:28px;padding:25px 30px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.worship-gateway>div{display:flex;gap:16px;align-items:center}
+.worship-gateway>div>span{font-size:36px}
+.worship-gateway h2{margin:4px 0;font-size:18px}
+.worship-gateway p{margin:0;opacity:.75;font-size:11px}
+.worship-gateway>a{background:#fff;color:#3a2f80;text-decoration:none;padding:12px 18px;border-radius:14px;font-weight:700;white-space:nowrap}
+.ehsan-counter{display:grid;text-align:center}
+.ehsan-counter small{font-size:9px;color:#7a8983}
+.ehsan-counter b{font-size:18px;color:var(--lav)}
+footer>div.counters{display:flex;gap:24px}
+@media(max-width:650px){.worship-gateway{flex-direction:column;align-items:stretch;text-align:center}.worship-gateway>div{flex-direction:column}}
+
+.prayer-strip{position:sticky;top:0;z-index:15;background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 18px;margin:12px 0;display:flex;align-items:center;gap:16px;box-shadow:0 8px 24px rgba(20,35,29,.05)}
+.prayer-strip-list{display:flex;gap:16px;overflow-x:auto;flex:0 0 auto}
+.prayer-strip-list>div{display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:13px}
+.prayer-strip-list b{color:var(--sa);font-size:13px}
+.prayer-strip-list span{direction:ltr;font-size:13px;font-weight:600}
+.prayer-strip-list small{color:var(--muted);font-size:10px}
+.prayer-strip-next{flex:1;display:flex;align-items:center;gap:12px;background:linear-gradient(120deg,var(--sa),var(--lav));color:#fff;border-radius:12px;padding:8px 16px;min-width:0}
+.prayer-strip-next>small{font-size:10px;opacity:.85;white-space:nowrap}
+.prayer-strip-next>b{font-size:16px;direction:ltr;white-space:nowrap}
+.prayer-progress{flex:1;height:5px;background:rgba(255,255,255,.3);border-radius:5px;overflow:hidden;min-width:40px}
+.prayer-progress i{display:block;height:100%;background:#fff}
+.prayer-strip-edit{border:0;background:#edf4ef;color:var(--sa);width:34px;height:34px;border-radius:50%;cursor:pointer;flex-shrink:0;font-size:14px}
+.prayer-edit-back,.adhan-alert-back{position:fixed;inset:0;background:#0a1d16b3;backdrop-filter:blur(7px);display:grid;place-items:center;padding:20px}
+.prayer-edit-back{z-index:96}
+.adhan-alert-back{z-index:95}
+.prayer-edit-back>article{background:#fff;width:min(520px,100%);border-radius:22px;padding:26px;max-height:80vh;overflow:auto}
+.prayer-edit-back h3{margin:0 0 16px;font-size:16px}
+.prayer-edit-grid{display:grid;gap:12px}
+.prayer-edit-grid>div{display:grid;gap:6px;background:#f7f8f5;border-radius:12px;padding:12px}
+.prayer-edit-grid label{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted)}
+.prayer-edit-grid input{border:1px solid var(--line);border-radius:8px;padding:6px}
+.prayer-edit-actions{display:flex;gap:8px;margin-top:16px}
+.prayer-edit-actions button{flex:1;border:0;background:var(--sa);color:#fff;border-radius:10px;padding:11px;cursor:pointer}
+.prayer-edit-actions button.ghost{background:#edf1ee;color:var(--ink)}
+.adhan-alert-back>article{background:#fff;width:min(380px,100%);border-radius:22px;padding:30px;text-align:center;display:grid;gap:8px}
+.adhan-alert-back small{color:var(--lav);font-weight:700;font-size:10px}
+.adhan-alert-back h3{margin:0;font-size:20px}
+.adhan-alert-back p{color:var(--muted);font-size:12px;line-height:2;margin:6px 0 10px}
+.adhan-alert-back button{border:0;background:var(--sa);color:#fff;border-radius:12px;padding:12px;font-size:11px;cursor:pointer}
+.mosque-scene{position:relative;width:180px;height:140px;margin:0 auto 14px;display:flex;align-items:flex-end;justify-content:center}
+.mosque-glow{position:absolute;inset:-20px;background:radial-gradient(circle,rgba(141,120,207,.35),transparent 70%);animation:mosqueGlow 2s ease-in-out infinite}
+@keyframes mosqueGlow{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.05)}}
+.mosque-dome{position:relative;width:70px;height:70px;background:linear-gradient(135deg,var(--sa),var(--lav));border-radius:50% 50% 0 0;z-index:2}
+.mosque-dome:before{content:"";position:absolute;bottom:-14px;left:-15px;width:100px;height:24px;background:inherit;border-radius:6px 6px 0 0}
+.mosque-dome:after{content:"";position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:3px;height:16px;background:#e8e2f7}
+.mosque-minaret{position:absolute;bottom:0;width:12px;height:100px;background:linear-gradient(180deg,var(--lav),var(--sa));border-radius:6px 6px 0 0;z-index:1}
+.mosque-minaret:before{content:"";position:absolute;top:-10px;left:-3px;width:18px;height:14px;background:inherit;border-radius:50% 50% 0 0}
+.mosque-minaret.one{right:14px}
+.mosque-minaret.two{left:14px}
+@media(max-width:650px){.prayer-strip{position:static;flex-wrap:wrap}.prayer-strip-next{width:100%}}

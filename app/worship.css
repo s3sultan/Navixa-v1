@@ -1,0 +1,50 @@
+.worship-center{max-width:1100px;margin:auto;display:grid;gap:16px}
+.prayer-card,.azkar-card,.quran-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px}
+.prayer-card header small,.azkar-card header small,.quran-card header small{color:var(--lav);font-weight:700;font-size:10px}
+.prayer-card header h3,.azkar-card header h3,.quran-card header h3{font-size:18px;margin:5px 0 16px}
+.location-request{display:grid;gap:10px}
+.location-request>p{color:var(--muted);font-size:11px;margin:0}
+.location-request>button{justify-self:start;border:0;background:var(--sa);color:#fff;border-radius:11px;padding:11px 18px;font-size:11px;cursor:pointer}
+.location-request>button:disabled{opacity:.6;cursor:default}
+.location-request form{display:flex;gap:8px;flex-wrap:wrap}
+.location-request form input{flex:1;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:10px}
+.location-request form button{border:0;background:#edf4ef;color:var(--sa);border-radius:10px;padding:0 16px;cursor:pointer}
+.loc-error{color:#a64c42}
+.prayer-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.prayer-grid>div{background:#f7f8f5;border-radius:14px;padding:12px 8px;text-align:center;display:grid;gap:4px}
+.prayer-grid>div.active{background:var(--lav2)}
+.prayer-grid b{font-size:11px}
+.prayer-grid span{font-size:17px;direction:ltr}
+.prayer-grid small{color:var(--muted);font-size:8px}
+.next-prayer{margin:14px 0 0;color:var(--sa);font-size:11px}
+.azkar-list{display:grid;gap:10px;max-height:280px;overflow:auto;padding-left:6px}
+.azkar-list p{background:#f7f8f5;border-radius:12px;padding:12px 14px;line-height:2;font-size:12px;margin:0}
+.azkar-list em{display:block;color:var(--lav);font-style:normal;font-size:9px;margin-top:6px}
+.after-prayer{border-color:#d8cfee;background:#fbfaff}
+.quran-text{display:grid;gap:14px;max-height:340px;overflow:auto;padding-left:6px}
+.quran-text small{color:var(--lav);font-size:9px}
+.quran-text p{margin:6px 0 0;line-height:2.3;font-size:16px;font-family:"Amiri Quran","Alexandria",serif}
+.quran-error{color:#a64c42;font-size:11px}
+.wird-done{margin-top:16px;width:100%;border:0;background:var(--sa);color:#fff;border-radius:12px;padding:13px;font-size:12px;cursor:pointer}
+.wird-done:disabled{opacity:.6;cursor:default}
+.wird-complete{margin-top:16px;background:#edf6f1;color:var(--sa);border-radius:12px;padding:13px;text-align:center;font-size:12px}
+.sadaqah-back{position:fixed;inset:0;background:#0a1d16b3;backdrop-filter:blur(7px);display:grid;place-items:center;z-index:90;padding:20px}
+.sadaqah-back>article{background:#fff;width:min(420px,100%);border-radius:22px;padding:30px;position:relative;text-align:center;display:grid;gap:10px}
+.sadaqah-close{position:absolute;left:16px;top:14px;border:0;background:#f0f1ee;border-radius:50%;width:30px;height:30px}
+.sadaqah-back span{font-size:32px}
+.sadaqah-back h3{margin:0;font-size:16px}
+.sadaqah-back p{color:var(--muted);font-size:11px;line-height:1.9;margin:0}
+.ehsan-link{border:0;background:var(--lav);color:#fff;border-radius:12px;padding:12px;font-size:11px;cursor:pointer;margin-top:6px}
+.sadaqah-back small{color:var(--sa)}
+.tasbih-card header small{color:var(--lav);font-weight:700;font-size:10px}
+.tasbih-card header h3{font-size:18px;margin:5px 0 16px}
+.tasbih-box{display:grid;gap:10px;max-width:260px;margin:auto}
+.tasbih-tap{border:1px solid var(--line);background:#f7f8f5;border-radius:14px;padding:16px;cursor:pointer;display:grid;gap:6px;text-align:center;width:100%}
+.tasbih-tap b{color:var(--sa);font-size:16px}
+.tasbih-tap span{color:var(--lav);font-size:12px;direction:ltr}
+.tasbih-dots{display:flex;gap:6px;justify-content:center}
+.tasbih-dots i{width:9px;height:9px;border-radius:50%;background:#e7e9e4;display:block}
+.tasbih-dots i.active{background:var(--lav)}
+.tasbih-dots i.done{background:var(--sa)}
+.tasbih-reset{border:0;background:transparent;color:var(--muted);font-size:9px;cursor:pointer;justify-self:center}
+@media(max-width:700px){.prayer-grid{grid-template-columns:repeat(3,1fr)}}

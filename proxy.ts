@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 
-const GOOGLE_CLIENT_ID="70980940285-9mr2v4h5qqpgf40mfv2la65ir2kjhlpk.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID="876266145464-51o36n0s7jkgrtd0vhqh2cai1koo05r6.apps.googleusercontent.com";
 const ADMIN_EMAIL="s2shug@gmail.com";
 
 export async function proxy(request:NextRequest){
