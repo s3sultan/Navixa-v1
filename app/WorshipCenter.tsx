@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import "./worship.css";
 import TasbihCounter from "./TasbihCounter";
 import {sendTelegramAlert} from "./alertPrefs";
@@ -31,7 +31,16 @@ export default function WorshipCenter(){
   const [quranError,setQuranError]=useState("");
   const [wirdDone,setWirdDone]=useState(false);
   const [showSadaqah,setShowSadaqah]=useState(false);
+  const [tipText,setTipText]=useState("");
   const [ehsanThanks,setEhsanThanks]=useState(false);
+  const [fontSize,setFontSize]=useState(16);
+  const [marks,setMarks]=useState<number[]>([]);
+  const [lensOn,setLensOn]=useState(false);
+  const [handMode,setHandMode]=useState(false);
+  const [lensPos,setLensPos]=useState<{x:number;y:number}|null>(null);
+  const [lensWidth,setLensWidth]=useState(0);
+  const quranRef=useRef<HTMLDivElement>(null);
+  const LENS=170;
 
   useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[]);
   useEffect(()=>{setWirdDone(localStorage.getItem(`navixa-wird-${today()}`)==="1")},[]);
@@ -40,7 +49,22 @@ export default function WorshipCenter(){
     fetch("/api/azkar?category=25").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAfterPrayerList(d.items)}).catch(()=>{});
     const page=dayPage();
     fetch(`/api/quran-page?page=${page}`).then(r=>r.json()).then(d=>{if(d?.data?.ayahs)setQuranAyahs(d.data.ayahs);else setQuranError("تعذر تحميل صفحة اليوم")}).catch(()=>setQuranError("تعذر تحميل صفحة اليوم"));
+    setMarks(JSON.parse(localStorage.getItem(`navixa-quran-marks-${page}`)||"[]"));
   },[]);
+
+  const toggleMark=(num:number)=>{
+    setMarks(prev=>{
+      const next=prev.includes(num)?prev.filter(n=>n!==num):[...prev,num];
+      localStorage.setItem(`navixa-quran-marks-${dayPage()}`,JSON.stringify(next));
+      return next;
+    });
+  };
+  const handleLensMove=(e:React.MouseEvent)=>{
+    if(!lensOn||!quranRef.current)return;
+    const rect=quranRef.current.getBoundingClientRect();
+    setLensPos({x:e.clientX-rect.left,y:e.clientY-rect.top});
+    setLensWidth(quranRef.current.clientWidth);
+  };
 
   const applyTimings=(data:any)=>{if(data?.data?.timings){setTimings(data.data.timings);setLocStatus("ready")}else setLocStatus("error")};
   const requestLocation=()=>{
@@ -82,7 +106,7 @@ export default function WorshipCenter(){
     localStorage.setItem(`navixa-wird-${today()}`,"1");
     const streak=Number(localStorage.getItem("navixa-wird-streak")||0)+1;
     localStorage.setItem("navixa-wird-streak",String(streak));
-    setWirdDone(true);setShowSadaqah(true);
+    setWirdDone(true);setShowSadaqah(true);setTipText(tips[Math.floor(Math.random()*tips.length)]);
     sendTelegramAlert("wird",`📖 تذكير NAVIXA: أنجز ورد اليوم (صفحة ${dayPage()}) — سلسلة ${streak} يوم`);
     sendTelegramAlert("sadaqah","🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام الورد");
   };
@@ -98,6 +122,7 @@ export default function WorshipCenter(){
     const last=groupedAyahs[groupedAyahs.length-1];
     if(last&&last.surah===ayah.surah.name)last.ayahs.push(ayah);else groupedAyahs.push({surah:ayah.surah.name,ayahs:[ayah]});
   });
+  const renderQuranContent=()=>groupedAyahs.map(group=><div key={group.surah}><small>سورة {group.surah}</small><p>{group.ayahs.map(a=><span key={a.number} className={marks.includes(a.number)?"marked":""} onClick={()=>toggleMark(a.number)}>{a.text} <em>﴿{a.numberInSurah}﴾</em> </span>)}</p></div>);
 
   return <section className="worship-center" dir="rtl">
     <article className="prayer-card">
@@ -137,17 +162,28 @@ export default function WorshipCenter(){
       <TasbihCounter/>
     </article>
 
-    <article className="quran-card">
+    <article className="quran-card mushaf-frame">
       <header><span className="card-explain-icon">📗</span><div><small>ورد اليوم — صفحة {dayPage()}</small><h3>{groupedAyahs[0]?.surah||"جارٍ التحميل…"}</h3></div></header>
+      <div className="quran-toolbar">
+        <div className="zoom-group"><button type="button" onClick={()=>setFontSize(f=>Math.max(14,f-2))}>A-</button><span>{fontSize}</span><button type="button" onClick={()=>setFontSize(f=>Math.min(30,f+2))}>A+</button></div>
+        <button type="button" className={lensOn?"tool-toggle on":"tool-toggle"} onClick={()=>setLensOn(v=>!v)}>🔍 عدسة القراءة</button>
+        <button type="button" className={handMode?"tool-toggle on":"tool-toggle"} onClick={()=>setHandMode(v=>!v)}>✋ مؤشر اليد</button>
+      </div>
       {quranError&&<p className="quran-error">{quranError}</p>}
-      <div className="quran-text">{groupedAyahs.map(group=><div key={group.surah}><small>سورة {group.surah}</small><p>{group.ayahs.map(a=>`${a.text} ﴿${a.numberInSurah}﴾`).join(" ")}</p></div>)}</div>
+      <div ref={quranRef} className={`quran-text${handMode?" hand-cursor":""}`} style={{fontSize}} onMouseMove={handleLensMove} onMouseLeave={()=>setLensPos(null)}>
+        {renderQuranContent()}
+        {lensOn&&lensPos&&<div className="quran-lens" style={{left:lensPos.x-LENS/2,top:lensPos.y-LENS/2,width:LENS,height:LENS}}>
+          <div className="quran-lens-inner" style={{fontSize,width:lensWidth||undefined,transformOrigin:"0 0",transform:`translate(${LENS/2}px,${LENS/2}px) scale(2.3) translate(${-lensPos.x}px,${-lensPos.y}px)`}}>{renderQuranContent()}</div>
+        </div>}
+      </div>
+      <p className="quran-hint">💡 اضغط على أي آية لتمييزها بخط تحتها أثناء القراءة.</p>
       {!wirdDone?<button type="button" className="wird-done" onClick={completeWird} disabled={!quranAyahs}>تم — أنجزت ورد اليوم</button>:<p className="wird-complete">✓ أنجزت ورد اليوم — بارك الله فيك</p>}
     </article>
 
     {showSadaqah&&<div className="sadaqah-back" onClick={()=>setShowSadaqah(false)}><article onClick={e=>e.stopPropagation()}>
       <button className="sadaqah-close" onClick={()=>setShowSadaqah(false)}>×</button>
       <span>🤲</span>
-      <h3>{tips[Math.floor(Math.random()*tips.length)]}</h3>
+      <h3>{tipText}</h3>
       <p>الصدقة ولو يسيرة تجلب البركة وتفرّح قلبك — جرّب تتصدق اليوم عبر منصة إحسان الموثوقة.</p>
       <button type="button" className="ehsan-link" onClick={clickEhsan}>تصدق عبر منصة إحسان ↗</button>
       {ehsanThanks&&<small>جزاك الله خيرًا 🌱</small>}
