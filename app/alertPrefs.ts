@@ -28,8 +28,15 @@ const isChannelEnabled=(type:AlertType,channel:"screen"|"telegram"):boolean=>{
 export const isScreenEnabled=(type:AlertType)=>isChannelEnabled(type,"screen");
 export const isTelegramEnabled=(type:AlertType)=>isChannelEnabled(type,"telegram");
 
+export type TelegramConfig={token:string;chatId:string};
+export const getTelegramConfig=():TelegramConfig|null=>{try{const c=JSON.parse(localStorage.getItem("navixa-telegram-config")||"null");return c?.token&&c?.chatId?c:null}catch{return null}};
+export const setTelegramConfig=(config:TelegramConfig)=>localStorage.setItem("navixa-telegram-config",JSON.stringify(config));
+export const clearTelegramConfig=()=>localStorage.removeItem("navixa-telegram-config");
+
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
   if(!isTelegramEnabled(type))return;
+  const config=getTelegramConfig();
+  if(!config)return;
   const custom=getAdminMessages()[type];
-  void fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:custom||fallbackMessage})}).catch(()=>{});
+  void fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:config.token,chatId:config.chatId,message:custom||fallbackMessage})}).catch(()=>{});
 };

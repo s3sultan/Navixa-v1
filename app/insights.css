@@ -96,6 +96,13 @@ footer>div.counters{display:flex;gap:24px}
 .mosque-minaret.one{right:14px}
 .mosque-minaret.two{left:14px}
 @media(max-width:650px){.prayer-strip{position:static;flex-wrap:wrap}.prayer-strip-next{width:100%}}
+.telegram-setup{background:#f6f3fd;border-radius:12px;padding:14px;margin:14px 0}
+.telegram-setup>small{color:var(--lav);font-weight:700;font-size:10px}
+.telegram-setup>p{font-size:10px;color:var(--muted);line-height:1.8;margin:6px 0 10px}
+.telegram-setup>p a{color:#684fb3}
+.telegram-setup form{display:flex;gap:6px;flex-wrap:wrap}
+.telegram-setup input{flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:9px}
+.telegram-setup button{border:0;background:var(--lav);color:#fff;border-radius:8px;padding:0 14px;font-size:10px;cursor:pointer}
 .alert-prefs-list{display:grid;gap:8px;margin:18px 0}
 .alert-prefs-row{display:flex;align-items:center;gap:14px;background:#f7f8f5;border-radius:10px;padding:11px}
 .alert-prefs-row>b{flex:1;font-size:11px}
