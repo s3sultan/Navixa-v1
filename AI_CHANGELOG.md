@@ -4,6 +4,12 @@
 
 ## 2026-08-12 — Codex
 
+- حسّن جسر Manus لنسخ المرفقات النصية الآمنة والمحدودة إلى تعليق GitHub، مع منع الروابط غير الآمنة والملفات الكبيرة وإبقاء المرفقات الأخرى داخل المهمة الخاصة.
+- أضاف اختبارًا معزولًا يثبت وصول ملخص Manus والتقرير Markdown الكامل دون تفعيل الإشارات للمستخدمين.
+- الملفات: `scripts/manus-task-runner.mjs`, `tests/manus-task-runner.test.mjs`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
+## 2026-08-12 — Codex
+
 - صحح رمز لغة طلب Manus API من `ar-SA` غير المقبول إلى `ar` بعد اختبار الاتصال الحقيقي، وأضاف تحققًا يمنع رجوع الخطأ.
 - الملفات: `scripts/manus-task-runner.mjs`, `tests/manus-task-runner.test.mjs`, `AI_CHANGELOG.md`.
 
