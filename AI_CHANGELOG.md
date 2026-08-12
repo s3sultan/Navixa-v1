@@ -4,6 +4,11 @@
 
 ## 2026-08-12 — Codex
 
+- تحقق من نجاح أول اختبار حي لجسر Gemini للمهمة #3 وإعادة التقرير إلى GitHub دون تطبيق تغييرات، وتأكد من نجاح نشر NAVIXA للنسخة نفسها.
+- الملفات: `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
+## 2026-08-12 — Codex
+
 - أنشأ جسر Gemini API محكومًا يعيد النتائج إلى الـIssue، مع بوابة اعتماد المالك وسياق مستودع نصي محدود بالعدد والحجم والمسارات المذكورة في المهمة.
 - حفظ مفتاح Gemini في GitHub Secret ضمن Free tier دون تفعيل فوترة، وأضاف اختبارًا معزولًا ناجحًا ومنعًا للمسارات غير الآمنة والإشارات النشطة.
 - الملفات: `.github/workflows/gemini-task.yml`, `scripts/gemini-task-runner.mjs`, `tests/gemini-task-runner.test.mjs`, `AI_AGENT_REGISTRY.md`, `PROJECT_MEMORY.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
