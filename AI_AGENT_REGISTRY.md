@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|
 | Codex | المنسق والتنفيذ المعزول | مستودع/worktree محلي | فرع معزول بعد اعتماد المهمة | ممنوع دون اعتماد المستخدم | يحترم الحجوزات ويعيد PR قابلًا للمراجعة |
 | Claude Code | مراجعة ومساهمة محلية | clone محلي | فرع معزول بعد اعتماد صريح | ممنوع | لا مراقبة خلفية في الإعداد الحالي؛ بناء Windows يحتاج أمرًا متوافقًا |
-| Manus | تنفيذ واختبار Linux معزول | snapshot/clone عام | patch فقط حاليًا | ممنوع | لا GitHub credentials ولا Cloudflare secrets؛ API v2 مؤجل |
+| Manus | مراجعة وتنفيذ معزول عبر API v2 | snapshot/clone عام | تقرير أو Unified Diff فقط | ممنوع | يُشغّل بعد اعتماد مالك المستودع؛ لا GitHub credentials ولا Cloudflare secrets |
 | Gemini AI Studio | نماذج أولية ومراجعة patches | snapshot عام ثابت | Unified Diff فقط | ممنوع | يذكر `base_commit`؛ لا OAuth؛ و`compile_applet` ليس اختبار NAVIXA الرسمي |
 
 ## إضافة وكيل جديد
