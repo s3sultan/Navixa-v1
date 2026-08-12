@@ -2,9 +2,8 @@ import {NextResponse} from "next/server";
 const TOKEN_PATTERN=/^\d+:[\w-]+$/;
 export async function POST(request:Request){try{
   const body=await request.json();
-  const name=typeof body.name==="string"?body.name:"";
   const custom=typeof body.message==="string"?body.message:"";
-  const text=custom?custom.slice(0,500):name?`تنبيه: سمعنا اسمك (${name.slice(0,80)})`:"";
+  const text=custom.slice(0,500);
   if(!text)return NextResponse.json({error:"رسالة غير صالحة"},{status:400});
   const token=typeof body.token==="string"?body.token:"";
   const chatId=typeof body.chatId==="string"?body.chatId:"";

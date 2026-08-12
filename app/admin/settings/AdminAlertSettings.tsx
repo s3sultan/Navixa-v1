@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
-import {ALERT_TYPES,ALERT_LABELS,AlertType,Policy,getAdminPolicy,setAdminPolicy,getAdminMessages,setAdminMessages} from "../alertPrefs";
+import {ALERT_TYPES,ALERT_LABELS,AlertType,Policy,getAdminPolicy,setAdminPolicy,getAdminMessages,setAdminMessages} from "../../alertPrefs";
 
 const policyLabels:[Policy,string][]=[["on","تشغيل للجميع"],["off","إيقاف للجميع"],["user","حسب اختيار المستخدم"]];
 

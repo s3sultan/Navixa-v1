@@ -13,7 +13,8 @@ import WeeklyChallengeCard from "./WeeklyChallengeCard";
 import BehaviorAnalysisCard from "./BehaviorAnalysisCard";
 import FocusTasbihNudge from "./FocusTasbihNudge";
 import PrayerStrip from "./PrayerStrip";
-import {isScreenEnabled,sendTelegramAlert,ALERT_TYPES,ALERT_LABELS,AlertType,getUserPrefs,setUserPrefs,getTelegramConfig,setTelegramConfig} from "./alertPrefs";
+import NotificationCenter from "./NotificationCenter";
+import {isScreenEnabled,sendTelegramAlert} from "./alertPrefs";
 
 type Task={title:string;done:boolean;meta?:string};
 const starters:Task[]=[{title:"مراجعة خطة المشروع",done:false},{title:"تأكيد موعد الفريق",done:true},{title:"إنهاء ملخص الاجتماع",done:false}];
@@ -41,10 +42,7 @@ export default function Home(){
   const [social,setSocial]=useState({x:"https://x.com",instagram:"https://instagram.com",youtube:"https://youtube.com",github:"https://github.com"});
   const [automations,setAutomations]=useState([{icon:"☀",name:"بداية اليوم",when:"كل صباح · 7:00",action:"ملخص المهام والطقس والمواعيد",on:true},{icon:"◉",name:"وقت الاجتماع",when:"عند بدء الاجتماع",action:"تشغيل متابعة الاسم وتدوين النقاط",on:true},{icon:"◎",name:"وضع التركيز",when:"أيام العمل · 6:30 م",action:"كتم التنبيهات وبدء مؤقت التركيز",on:false}]);
   const [toast,setToast]=useState("");
-  const [modal,setModal]=useState<"tasks"|"ask"|"notifications"|"automation"|"screen"|"alerts"|null>(null);
-  const [alertPrefsState,setAlertPrefsState]=useState<Record<AlertType,{screen:boolean;telegram:boolean}>|null>(null);
-  const [telegramForm,setTelegramForm]=useState({token:"",chatId:""});
-  const [telegramSaved,setTelegramSaved]=useState(false);
+  const [modal,setModal]=useState<"tasks"|"ask"|"automation"|"screen"|"alerts"|null>(null);
   const recognitionRef=useRef<any>(null);
   const screenRef=useRef<MediaStream|null>(null);
   const lastIntentRef=useRef("");
@@ -100,22 +98,32 @@ export default function Home(){
     {toast&&<div className="nx-toast">✓ {toast}</div>}
     <aside className="nx-side">
       <a className="nx-brand" href="#top"><span>ن</span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
-      <nav>
-        <a className="active" href="#top"><i>⌂</i> اليوم</a>
-        <a href="#assistant"><i>✦</i> مساعدي</a>
-        <button onClick={()=>setModal("tasks")}><i>✓</i> المهام <em>{tasks.filter(t=>!t.done).length}</em></button>
-        <a href="#focus"><i>◎</i> التركيز</a>
+      <nav aria-label="أقسام NAVIXA الرئيسية">
+        <a className="active" href="#today"><i>⌂</i> يومي</a>
+        <a href="#focus"><i>✓</i> إنتاجيتي <em>{tasks.filter(t=>!t.done).length}</em></a>
         <a href="/health"><i>♡</i> صحتي</a>
-        <a href="#automations"><i>⌘</i> الأتمتة</a>
-        <button onClick={()=>{setAlertPrefsState(getUserPrefs());setTelegramForm(getTelegramConfig()||{token:"",chatId:""});setModal("alerts")}}><i>🔔</i> تنبيهاتي</button>
+        <a href="/worship"><i>﷽</i> عبادتي</a>
+        <a href="#assistant"><i>✦</i> المساعد</a>
       </nav>
+      <div className="side-quick"><small>أدوات سريعة</small><button onClick={()=>setModal("tasks")}>المهام</button><button onClick={()=>setModal("alerts")}>التنبيهات</button></div>
       <details className="side-sound"><summary>♫ صوت التنبيهات</summary><div>{[["chime","رنين هادئ"],["bell","جرس واضح"],["pulse","نبض سريع"],["urgent","تنبيه مهم"],["silent","بدون صوت"]].map(([value,label])=><label key={value}><input type="radio" name="side-alert-sound" checked={alertSound===value} onChange={()=>setAlertSound(value)}/><span>{label}</span><button type="button" onClick={()=>playAlert(value)}>تجربة</button></label>)}</div></details>
       <a className="nx-user admin-user-entry" href="/admin/login"><span className="side-mark"><i/><i/></span><div><b>دخول الإدارة</b><small>مركز تحكم NAVIXA</small></div><i>←</i></a>
     </aside>
 
     <section className="nx-page" id="top">
-      <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("notifications")}>♢<i/></button></div></header>
+      <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("alerts")}>♢<i/></button></div></header>
       <PrayerStrip/>
+
+      <section className="navixa-today" id="today" aria-labelledby="today-title">
+        <div className="today-heading"><div><small>NAVIXA TODAY</small><h2 id="today-title">أهم ما يحتاج انتباهك اليوم</h2><p>ملخص واحد يجمع يومك قبل ما تنتقل للتفاصيل.</p></div><button onClick={()=>setModal("tasks")}>＋ إضافة مهمة</button></div>
+        <div className="today-grid">
+          <button onClick={()=>setModal("tasks")}><span className="today-icon green">✓</span><small>المهام</small><b>{tasks.filter(t=>!t.done).length} متبقية</b><em>{tasksDoneCount} مكتملة اليوم</em></button>
+          <button onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><span className="today-icon lavender">◎</span><small>التركيز</small><b>{todaySessions} جلسات</b><em>{running?`${time} متبقية`:"جلسة 25 دقيقة جاهزة"}</em></button>
+          <a href="/health"><span className="today-icon rose">♡</span><small>الصحة</small><b>{weekHydrationDays} أيام ترطيب</b><em>راجع الحركة والماء</em></a>
+          <a href="/worship"><span className="today-icon sand">﷽</span><small>العبادة</small><b>ورد اليوم</b><em>الصلاة والقرآن والأذكار</em></a>
+          <button onClick={()=>setModal("ask")}><span className="today-icon dark">✦</span><small>المساعد</small><b>جاهز لك</b><em>اسأله عن يومك</em></button>
+        </div>
+      </section>
 
       <section className="nx-hero showcase">
         <div className="arch one"/><div className="arch two"/><div className="saudi-pattern"/>
@@ -126,7 +134,7 @@ export default function Home(){
         <button className="focus-card" onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><b>تركيز</b><span>{time}</span><small>جلسة تركيز</small><i/></button>
       </section>
 
-      <section className="daily-strip"><div><small>إنجاز اليوم</small><b>72%</b><span><i style={{width:"72%"}}/></span></div><div><small>وقت التركيز</small><b>2س 15د</b><em>↑ 24 دقيقة</em></div><div><small>المهام المكتملة</small><b>{tasks.filter(t=>t.done).length} / {tasks.length}</b><em>ممتاز، كمّل</em></div><div><small>موعدك القادم</small><b>09:30</b><em>بعد 35 دقيقة</em></div></section>
+      <section className="daily-strip" id="productivity"><div><small>إنجاز اليوم</small><b>72%</b><span><i style={{width:"72%"}}/></span></div><div><small>وقت التركيز</small><b>2س 15د</b><em>↑ 24 دقيقة</em></div><div><small>المهام المكتملة</small><b>{tasks.filter(t=>t.done).length} / {tasks.length}</b><em>ممتاز، كمّل</em></div><div><small>موعدك القادم</small><b>09:30</b><em>بعد 35 دقيقة</em></div></section>
 
       <section className="insights-grid">
         <DailyReviewCard sessionsToday={todaySessions} tasksDone={tasksDoneCount} tasksTotal={tasks.length} bestHour={bestHour} onLogSession={logSession} onQuickTask={quickTask}/>
@@ -157,15 +165,8 @@ export default function Home(){
       <footer><div className="nx-brand"><span>ن</span><div><b>NAVIXA</b><small>ذكاء يفهم يومك</small></div></div><p>مصمم لحياة أكثر ترتيبًا للجميع.</p><div className="counters">{showCounter&&<div className="visit-counter"><small>المستخدمون والزوار</small><b>{visitCount.toLocaleString("en-US")}</b></div>}<div className="ehsan-counter"><small>متبرعين إحسان من هنا</small><b>{ehsanCount.toLocaleString("en-US")}</b></div></div><span>© 2026 NAVIXA</span></footer>
     </section>
 
-    {modal&&<div className="nx-modal-back" onClick={()=>setModal(null)}><section className="nx-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(null)}>×</button>{modal==="tasks"?<><small>مهامي</small><h2>خلّ يومك واضح</h2><div className="task-list">{tasks.map((t,i)=><label key={`${t.title}-${i}`}><input type="checkbox" checked={t.done} onChange={()=>{if(!t.done)sendTelegramAlert("task",`✅ تذكير NAVIXA: تم إنجاز مهمة — ${t.title}`);setTasks(tasks.map((x,j)=>j===i?{...x,done:!x.done}:x))}}/><span className={t.done?"done":""}>{t.title}</span><button onClick={()=>setTasks(tasks.filter((_,j)=>j!==i))}>حذف</button></label>)}</div><form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);setTasks([...tasks,{title:String(data.get("task")),done:false}]);e.currentTarget.reset()}}><input name="task" required placeholder="أضف مهمة جديدة..."/><button>إضافة</button></form></>:modal==="notifications"?<><small>التنبيهات</small><h2>آخر التنبيهات</h2><div className="notification-list"><article><b>اجتماع الفريق قريب</b><small>يبدأ بعد 35 دقيقة</small></article><article><b>مهمتان تحتاجان الإكمال</b><small>من قائمة اليوم</small></article><article><b>جلسة التركيز جاهزة</b><small>25 دقيقة مقترحة</small></article></div></>:modal==="automation"?<><small>أتمتة جديدة</small><h2>أنشئ قاعدة تتكرر تلقائيًا</h2><form className="stack-form" onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);setAutomations([...automations,{icon:"✦",name:String(d.get("name")),when:String(d.get("when")),action:String(d.get("action")),on:true}]);setModal(null);notify("تمت إضافة الأتمتة وتشغيلها")}}><input name="name" required placeholder="اسم الأتمتة"/><input name="when" required placeholder="متى تعمل؟ مثال: كل يوم 8 صباحًا"/><input name="action" required placeholder="ماذا تنفذ؟"/><button>حفظ وتشغيل</button></form></>:modal==="alerts"?<><small>تنبيهاتي</small><h2>تحكم بتنبيهاتك</h2>
-      <div className="telegram-setup"><small>بوت تلقرام الخاص فيك</small><p>كل مستخدم يربط بوته الشخصي — ما يوصل تنبيهك لغيرك. أنشئ بوت من <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">BotFather@</a> وخذ الـ Chat ID من <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer">userinfobot@</a>.</p>
-        <form onSubmit={e=>{e.preventDefault();setTelegramConfig(telegramForm);setTelegramSaved(true);setTimeout(()=>setTelegramSaved(false),1800)}}>
-          <input value={telegramForm.token} onChange={e=>setTelegramForm({...telegramForm,token:e.target.value})} placeholder="Bot Token" required/>
-          <input value={telegramForm.chatId} onChange={e=>setTelegramForm({...telegramForm,chatId:e.target.value})} placeholder="Chat ID" required/>
-          <button type="submit">{telegramSaved?"تم الحفظ":"حفظ بوتي"}</button>
-        </form>
-      </div>
-      <div className="alert-prefs-list">{alertPrefsState&&ALERT_TYPES.map(type=><div key={type} className="alert-prefs-row"><b>{ALERT_LABELS[type]}</b><label><input type="checkbox" checked={alertPrefsState[type].screen} onChange={()=>{const next={...alertPrefsState,[type]:{...alertPrefsState[type],screen:!alertPrefsState[type].screen}};setAlertPrefsState(next);setUserPrefs(next)}}/> شاشة</label><label><input type="checkbox" checked={alertPrefsState[type].telegram} onChange={()=>{const next={...alertPrefsState,[type]:{...alertPrefsState[type],telegram:!alertPrefsState[type].telegram}};setAlertPrefsState(next);setUserPrefs(next)}}/> تلقرام</label></div>)}</div></>:<><small>مساعد NAVIXA</small><h2>وش أقدر أسوي لك يا سلطان؟</h2><div className="suggestions"><button onClick={()=>notify("جهزت لك خطة يوم متوازنة")}>رتّب يومي</button><button onClick={()=>notify("أرسل النص وسألخصه لك")}>لخّص لي</button><button onClick={()=>notify("بدأ تجهيز قائمة الأولويات")}>حدّد أولوياتي</button></div><form onSubmit={e=>{e.preventDefault();notify("تم إرسال طلبك إلى NAVIXA");setModal(null)}}><input required placeholder="اكتب طلبك هنا..."/><button>إرسال</button></form></>}</section></div>}
+    {modal&&<div className="nx-modal-back" onClick={()=>setModal(null)}><section className="nx-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setModal(null)}>×</button>{modal==="tasks"?<><small>مهامي</small><h2>خلّ يومك واضح</h2><div className="task-list">{tasks.map((t,i)=><label key={`${t.title}-${i}`}><input type="checkbox" checked={t.done} onChange={()=>{if(!t.done)sendTelegramAlert("task",`✅ تذكير NAVIXA: تم إنجاز مهمة — ${t.title}`);setTasks(tasks.map((x,j)=>j===i?{...x,done:!x.done}:x))}}/><span className={t.done?"done":""}>{t.title}</span><button onClick={()=>setTasks(tasks.filter((_,j)=>j!==i))}>حذف</button></label>)}</div><form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);setTasks([...tasks,{title:String(data.get("task")),done:false}]);e.currentTarget.reset()}}><input name="task" required placeholder="أضف مهمة جديدة..."/><button>إضافة</button></form></>:modal==="automation"?<><small>أتمتة جديدة</small><h2>أنشئ قاعدة تتكرر تلقائيًا</h2><form className="stack-form" onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);setAutomations([...automations,{icon:"✦",name:String(d.get("name")),when:String(d.get("when")),action:String(d.get("action")),on:true}]);setModal(null);notify("تمت إضافة الأتمتة وتشغيلها")}}><input name="name" required placeholder="اسم الأتمتة"/><input name="when" required placeholder="متى تعمل؟ مثال: كل يوم 8 صباحًا"/><input name="action" required placeholder="ماذا تنفذ؟"/><button>حفظ وتشغيل</button></form></>:modal==="alerts"?<><small>مركز التنبيهات</small><h2>كل تنبيهاتك في مكان واحد</h2>
+      <NotificationCenter/></>:<><small>مساعد NAVIXA</small><h2>وش أقدر أسوي لك يا سلطان؟</h2><div className="suggestions"><button onClick={()=>notify("جهزت لك خطة يوم متوازنة")}>رتّب يومي</button><button onClick={()=>notify("أرسل النص وسألخصه لك")}>لخّص لي</button><button onClick={()=>notify("بدأ تجهيز قائمة الأولويات")}>حدّد أولوياتي</button></div><form onSubmit={e=>{e.preventDefault();notify("تم إرسال طلبك إلى NAVIXA");setModal(null)}}><input required placeholder="اكتب طلبك هنا..."/><button>إرسال</button></form></>}</section></div>}
     <FloatingAssistant onAddTask={title=>{setTasks(current=>[...current,{title,done:false,meta:"استنتجها مساعد NAVIXA"}]);setModal("tasks");notify("تمت إضافة المطلوب للمهام")}}/>
     <GameAdBox/>
     <HealthNudge/>

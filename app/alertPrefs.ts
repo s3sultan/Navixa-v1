@@ -33,10 +33,17 @@ export const getTelegramConfig=():TelegramConfig|null=>{try{const c=JSON.parse(l
 export const setTelegramConfig=(config:TelegramConfig)=>localStorage.setItem("navixa-telegram-config",JSON.stringify(config));
 export const clearTelegramConfig=()=>localStorage.removeItem("navixa-telegram-config");
 
+export const sendTelegramMessage=async(config:TelegramConfig,message:string):Promise<boolean>=>{
+  try{
+    const response=await fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:config.token,chatId:config.chatId,message})});
+    return response.ok;
+  }catch{return false}
+};
+
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
   if(!isTelegramEnabled(type))return;
   const config=getTelegramConfig();
   if(!config)return;
   const custom=getAdminMessages()[type];
-  void fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:config.token,chatId:config.chatId,message:custom||fallbackMessage})}).catch(()=>{});
+  void sendTelegramMessage(config,custom||fallbackMessage);
 };
