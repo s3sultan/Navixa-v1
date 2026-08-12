@@ -1,0 +1,51 @@
+name: Gemini Task Bridge
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: GitHub Issue number to send to Gemini
+        required: true
+        type: number
+      approved:
+        description: I approve sending this issue and its bounded repository context to Gemini
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: gemini-issue-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: >-
+      (github.event_name == 'issues' &&
+       github.event.action == 'labeled' &&
+       github.event.label.name == 'dispatch:gemini' &&
+       github.actor == github.repository_owner) ||
+      (github.event_name == 'workflow_dispatch' && inputs.approved == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the approved source snapshot
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Ask Gemini and return the report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.5-flash
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          NAVIXA_BASE_COMMIT: ${{ github.sha }}
+          NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
+        run: node scripts/gemini-task-runner.mjs
