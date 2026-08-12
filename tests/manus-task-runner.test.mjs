@@ -74,6 +74,7 @@ test("dispatches an approved issue and posts the stopped Manus result", async ()
   const createCall = calls.find((call) => call.url.endsWith("/task.create"));
   const createBody = JSON.parse(createCall.options.body);
   assert.equal(createBody.share_visibility, "private");
+  assert.equal(createBody.locale, "ar");
   assert.match(createBody.message.content[0].text, /Do not push, merge, deploy/);
 
   const commentCalls = calls.filter((call) => call.url.endsWith("/issues/3/comments"));

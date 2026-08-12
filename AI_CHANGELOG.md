@@ -4,6 +4,11 @@
 
 ## 2026-08-12 — Codex
 
+- صحح رمز لغة طلب Manus API من `ar-SA` غير المقبول إلى `ar` بعد اختبار الاتصال الحقيقي، وأضاف تحققًا يمنع رجوع الخطأ.
+- الملفات: `scripts/manus-task-runner.mjs`, `tests/manus-task-runner.test.mjs`, `AI_CHANGELOG.md`.
+
+## 2026-08-12 — Codex
+
 - أنشأ جسر GitHub Actions محكومًا لتوزيع Issues المعتمدة على Manus API v2 وإعادة التقرير إلى نفس المهمة دون تطبيق أو دمج أو نشر.
 - أضاف حراسة مالك المستودع، أقل صلاحيات GitHub، معالجة آمنة للمخرجات غير الموثوقة، واختبارًا معزولًا ناجحًا لمسار التنفيذ الكامل.
 - الملفات: `.github/workflows/manus-task.yml`, `scripts/manus-task-runner.mjs`, `tests/manus-task-runner.test.mjs`, `AI_AGENT_REGISTRY.md`, `PROJECT_MEMORY.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
