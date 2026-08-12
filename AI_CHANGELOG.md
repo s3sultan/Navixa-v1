@@ -4,6 +4,11 @@
 
 ## 2026-08-12 — Codex
 
+- حدّث إجراء نشر Cloudflare من `wrangler-action@v3` إلى الإصدار الرسمي `v4` دون تغيير الأسرار أو أمر النشر أو Worker المستهدف.
+- الملفات: `.github/workflows/deploy-navixa.yml`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
+## 2026-08-12 — Codex
+
 - استبدل اختبار قالب المعاينة القديم باختبار تصيير صفحة NAVIXA الحالية وبياناتها الوصفية العربية، وتحقق ببناء ناجح واختبار واحد ناجح دون فشل.
 - الملفات: `tests/rendered-html.test.mjs`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
 
