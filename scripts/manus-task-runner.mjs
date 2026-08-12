@@ -123,7 +123,7 @@ const created = await requestJson(
     headers: manusHeaders,
     body: JSON.stringify({
       message: { content: [{ type: "text", text: prompt }] },
-      locale: "ar-SA",
+      locale: "ar",
       interactive_mode: false,
       hide_in_task_list: false,
       share_visibility: "private",
