@@ -4,6 +4,12 @@
 
 ## 2026-08-12 — Codex
 
+- أنشأ جسر Gemini API محكومًا يعيد النتائج إلى الـIssue، مع بوابة اعتماد المالك وسياق مستودع نصي محدود بالعدد والحجم والمسارات المذكورة في المهمة.
+- حفظ مفتاح Gemini في GitHub Secret ضمن Free tier دون تفعيل فوترة، وأضاف اختبارًا معزولًا ناجحًا ومنعًا للمسارات غير الآمنة والإشارات النشطة.
+- الملفات: `.github/workflows/gemini-task.yml`, `scripts/gemini-task-runner.mjs`, `tests/gemini-task-runner.test.mjs`, `AI_AGENT_REGISTRY.md`, `PROJECT_MEMORY.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
+## 2026-08-12 — Codex
+
 - حسّن جسر Manus لنسخ المرفقات النصية الآمنة والمحدودة إلى تعليق GitHub، مع منع الروابط غير الآمنة والملفات الكبيرة وإبقاء المرفقات الأخرى داخل المهمة الخاصة.
 - أضاف اختبارًا معزولًا يثبت وصول ملخص Manus والتقرير Markdown الكامل دون تفعيل الإشارات للمستخدمين.
 - الملفات: `scripts/manus-task-runner.mjs`, `tests/manus-task-runner.test.mjs`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
