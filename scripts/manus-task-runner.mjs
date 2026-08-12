@@ -83,6 +83,75 @@ function assistantText(messages) {
     .join("\n\n");
 }
 
+function assistantAttachments(messages) {
+  return messages
+    .filter((entry) => entry.type === "assistant_message")
+    .flatMap((entry) => entry.assistant_message?.attachments || [])
+    .filter((attachment) => attachment && typeof attachment === "object")
+    .slice(0, 4);
+}
+
+function safeAttachmentUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (host === "localhost" || host.endsWith(".localhost")) return null;
+    if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(host) || host.includes(":")) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+async function readLimitedText(response, limit = 50_000) {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > limit) {
+      await reader.cancel();
+      throw new Error("attachment too large");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+async function attachmentReports(attachments) {
+  const sections = [];
+  for (const attachment of attachments) {
+    const filename = String(attachment.filename || "Manus attachment").slice(0, 180);
+    const contentType = String(attachment.content_type || "").toLowerCase();
+    const url = safeAttachmentUrl(attachment.url);
+    const isText =
+      contentType.startsWith("text/") ||
+      ["application/json", "application/markdown"].includes(contentType) ||
+      /\.(?:md|markdown|txt|json)$/i.test(filename);
+
+    if (!url || !isText) {
+      sections.push(`- ${filename}: retained in the private Manus task (not copied to this public Issue).`);
+      continue;
+    }
+
+    try {
+      const response = await fetch(url, { redirect: "error" });
+      const length = Number(response.headers.get("content-length") || 0);
+      if (!response.ok || length > 50_000) throw new Error("unavailable or too large");
+      const text = await readLimitedText(response);
+      sections.push(`### Attachment: ${filename}\n\n${text}`);
+    } catch {
+      sections.push(`- ${filename}: could not be copied safely; open the private Manus task.`);
+    }
+  }
+  return sections.join("\n\n");
+}
+
 function untrustedMarkdown(value) {
   return value.replaceAll("@", "@\u200b");
 }
@@ -163,15 +232,19 @@ const events = await requestJson(
   "Manus task.listMessages",
 );
 const report = untrustedMarkdown(assistantText(events.messages || []));
+const attachmentReport = untrustedMarkdown(
+  await attachmentReports(assistantAttachments(events.messages || [])),
+);
+const fullReport = [report, attachmentReport].filter(Boolean).join("\n\n");
 
 if (status === "waiting") {
-  await addIssueComment(`## Manus needs input\n\n${report || "Manus paused and requested user input."}\n\nPrivate task: ${created.task_url}`);
+  await addIssueComment(`## Manus needs input\n\n${fullReport || "Manus paused and requested user input."}\n\nPrivate task: ${created.task_url}`);
   process.exit(0);
 }
 
 if (status === "error") {
-  await addIssueComment(`## Manus failed\n\n${report || "The Manus task ended with an error."}\n\nPrivate task: ${created.task_url}`);
+  await addIssueComment(`## Manus failed\n\n${fullReport || "The Manus task ended with an error."}\n\nPrivate task: ${created.task_url}`);
   throw new Error("Manus task ended with status=error.");
 }
 
-await addIssueComment(`## Manus result\n\n- Status: ${status}\n- Base commit: \`${baseCommit}\`\n- Credits reported: ${task?.credit_usage ?? "not reported"}\n\n${report || "Task stopped without an assistant report."}\n\n---\nThis output is untrusted review material. Nothing was applied, merged, or deployed.`);
+await addIssueComment(`## Manus result\n\n- Status: ${status}\n- Base commit: \`${baseCommit}\`\n- Credits reported: ${task?.credit_usage ?? "not reported"}\n\n${fullReport || "Task stopped without an assistant report."}\n\n---\nThis output is untrusted review material. Nothing was applied, merged, or deployed.`);

@@ -45,10 +45,24 @@ test("dispatches an approved issue and posts the stopped Manus result", async ()
         messages: [
           {
             type: "assistant_message",
-            assistant_message: { content: "Safe report for @owner" },
+            assistant_message: {
+              content: "Safe report for @owner",
+              attachments: [
+                {
+                  filename: "navixa-report.md",
+                  url: "https://files.manus.example/navixa-report.md",
+                  content_type: "text/markdown",
+                },
+              ],
+            },
           },
         ],
       };
+    } else if (String(url) === "https://files.manus.example/navixa-report.md") {
+      return new Response("# Full report\n\nDetailed findings for @owner.", {
+        status: 200,
+        headers: { "Content-Type": "text/markdown", "Content-Length": "43" },
+      });
     } else if (String(url).endsWith("/issues/3/comments")) {
       payload = { id: calls.length };
     } else {
@@ -82,5 +96,7 @@ test("dispatches an approved issue and posts the stopped Manus result", async ()
   const resultComment = JSON.parse(commentCalls[1].options.body).body;
   assert.match(resultComment, /Manus result/);
   assert.match(resultComment, /Safe report for @​owner/);
+  assert.match(resultComment, /Attachment: navixa-report\.md/);
+  assert.match(resultComment, /Detailed findings for @​owner/);
   assert.match(resultComment, /Nothing was applied, merged, or deployed/);
 });
