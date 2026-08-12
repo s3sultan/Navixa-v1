@@ -1,0 +1,50 @@
+name: Manus Task Bridge
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: GitHub Issue number to send to Manus
+        required: true
+        type: number
+      approved:
+        description: I approve sending this issue to Manus (no code execution, merge, or deployment)
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: manus-issue-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: >-
+      (github.event_name == 'issues' &&
+       github.event.action == 'labeled' &&
+       github.event.label.name == 'dispatch:manus' &&
+       github.actor == github.repository_owner) ||
+      (github.event_name == 'workflow_dispatch' && inputs.approved == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out the approved source snapshot
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Dispatch to Manus and return the report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MANUS_API_KEY: ${{ secrets.MANUS_API_KEY }}
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          NAVIXA_BASE_COMMIT: ${{ github.sha }}
+          NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
+        run: node scripts/manus-task-runner.mjs
