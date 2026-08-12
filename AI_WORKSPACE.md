@@ -4,10 +4,10 @@
 
 ## حالة العمل
 
-- الوكيل النشط: لا يوجد
-- المهمة الحالية: لا توجد
-- الحالة: إصلاح اختبارات HTML جاهز للمراجعة عبر Pull Request
-- الملفات المحجوزة: لا يوجد
+- الوكيل النشط: Codex
+- المهمة الحالية: تحديث Cloudflare Wrangler Action إلى v4
+- الحالة: يعمل
+- الملفات المحجوزة: `.github/workflows/deploy-navixa.yml`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
