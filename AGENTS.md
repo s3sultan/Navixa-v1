@@ -1,6 +1,6 @@
 # NAVIXA shared-agent instructions
 
-Before every task, read `PROJECT_MEMORY.md` and `AI_WORKSPACE.md` completely.
+Before every task, read `AI_ONBOARDING.md`, `PROJECT_MEMORY.md`, and `AI_WORKSPACE.md` completely.
 
 Follow the coordination rules in `AI_WORKSPACE.md`. Do not edit files reserved by another active agent. Re-read `git status` and the target files immediately before editing because another assistant may have changed them.
 
