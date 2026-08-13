@@ -4,10 +4,10 @@
 
 ## حالة العمل
 
-- الوكيل النشط: لا يوجد
-- المهمة الحالية: لا توجد
-- الحالة: تحديث Cloudflare Wrangler Action إلى v4 جاهز للمراجعة
-- الملفات المحجوزة: لا يوجد
+- الوكيل النشط: Codex
+- المهمة الحالية: تحديث checkout في جسري Manus وGemini إلى v6 واختبارهما
+- الحالة: يعمل
+- الملفات المحجوزة: `.github/workflows/manus-task.yml`, `.github/workflows/gemini-task.yml`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
