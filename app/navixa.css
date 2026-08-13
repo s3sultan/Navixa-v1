@@ -71,3 +71,6 @@
 
 /* Use the real NAVIXA mark in the hero and footer */
 .hero-logo-mark{width:118px;height:102px;object-fit:contain;margin:0 0 12px;filter:drop-shadow(0 10px 14px rgba(8,127,131,.12))}.nx-brand>img{width:44px;height:38px;object-fit:contain;flex:none}.nx-brand{align-items:center}.mobile-brand img{width:33px;height:30px;object-fit:contain}.side-mark img{width:32px;height:30px;object-fit:contain}@media(max-width:650px){.hero-logo-mark{width:92px;height:82px;margin-bottom:6px}}
+
+/* Mobile performance and interaction polish */
+.nx{overflow-x:clip}.nx button,.nx a{touch-action:manipulation}.hero-logo-mark,.nx-brand>img,.mobile-brand img,.side-mark img{content-visibility:auto}.quick-prompts{flex-wrap:wrap;justify-content:center}@media(max-width:650px){.nx-page{overflow-x:clip}.hero-center{inset-inline:20px}.quick-prompts{gap:6px}.quick-prompts button{font-size:10px;padding:8px 10px}.main-ask{font-size:11px}.assistant-panel{max-height:calc(100dvh - 96px)}}
