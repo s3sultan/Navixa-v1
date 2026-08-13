@@ -100,10 +100,10 @@ export default function Home(){
   const moveWelcomeSwipe=(clientX:number)=>{const track=welcomeTrackRef.current;if(!track)return;const rect=track.getBoundingClientRect();const progress=Math.max(0,Math.min(1,(rect.right-clientX)/(rect.width-72)));setWelcomeSwipe(progress);if(progress>.93){setEntered(true);localStorage.setItem("navixa-entered","1")}};
   useEffect(()=>{if(localStorage.getItem("navixa-entered")==="1")setEntered(true)},[]);
   return <main className={`nx ${entered?"entered":"waiting"}`} dir="rtl">
-    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="welcome-orb one"/><div className="welcome-orb two"/><div className="navixa-mark"><i/><i/></div><small>{greeting}</small><h1>يفهم يومك <b>NAVIXA</b></h1><p className="type-welcome">{typedWelcome}<i>|</i></p><blockquote key={quoteIndex}>“{welcomeQuotes[quoteIndex]}”</blockquote><div className="welcome-benefits"><span>◉ متابعة ذكية</span><span>▣ مراقبة محلية</span><span>◎ تركيز وصحة</span></div><div ref={welcomeTrackRef} className="welcome-swipe" onPointerMove={e=>moveWelcomeSwipe(e.clientX)} onPointerUp={()=>setWelcomeSwipe(0)} onPointerLeave={()=>setWelcomeSwipe(0)}><b>اسحب للدخول</b><button aria-label="اسحب شعار NAVIXA من اليمين إلى اليسار" style={{right:`calc(6px + ${welcomeSwipe*100}% - ${welcomeSwipe*76}px)`}} onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId)}}><i/><i/></button><span>←</span></div><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
+    {!entered&&<section className="welcome"><div className="welcome-pattern"/><div className="welcome-orb one"/><div className="welcome-orb two"/><div className="navixa-logo-hero"><img src="/navixa-logo-clean.png" alt="NAVIXA" /></div><small>{greeting}</small><h1>يفهم يومك <b>NAVIXA</b></h1><p className="type-welcome">{typedWelcome}<i>|</i></p><blockquote key={quoteIndex}>“{welcomeQuotes[quoteIndex]}”</blockquote><div className="welcome-benefits"><span>◉ متابعة ذكية</span><span>▣ مراقبة محلية</span><span>◎ تركيز وصحة</span></div><div ref={welcomeTrackRef} className="welcome-swipe" onPointerMove={e=>moveWelcomeSwipe(e.clientX)} onPointerUp={()=>setWelcomeSwipe(0)} onPointerLeave={()=>setWelcomeSwipe(0)}><b>اسحب للدخول</b><button aria-label="اسحب شعار NAVIXA من اليمين إلى اليسار" style={{right:`calc(6px + ${welcomeSwipe*100}% - ${welcomeSwipe*76}px)`}} onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId)}}><i/><i/></button><span>←</span></div><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
     {toast&&<div className="nx-toast">✓ {toast}</div>}
     <aside className="nx-side">
-      <a className="nx-brand" href="#top"><span>ن</span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
+      <a className="nx-brand" href="#top"><span className="brand-logo"><img src="/navixa-mark.png" alt="" /></span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
       <nav aria-label="أقسام NAVIXA الرئيسية">
         <a className="active" href="#today"><i>⌂</i> يومي</a>
         <a href="#focus"><i>✓</i> إنتاجيتي <em>{tasks.filter(t=>!t.done).length}</em></a>
@@ -113,11 +113,11 @@ export default function Home(){
       </nav>
       <div className="side-quick"><small>أدوات سريعة</small><button onClick={()=>setModal("tasks")}>المهام</button><button onClick={()=>setModal("alerts")}>التنبيهات</button></div>
       <details className="side-sound"><summary>♫ صوت التنبيهات</summary><div>{[["chime","رنين هادئ"],["bell","جرس واضح"],["pulse","نبض سريع"],["urgent","تنبيه مهم"],["silent","بدون صوت"]].map(([value,label])=><label key={value}><input type="radio" name="side-alert-sound" checked={alertSound===value} onChange={()=>setAlertSound(value)}/><span>{label}</span><button type="button" onClick={()=>playAlert(value)}>تجربة</button></label>)}</div></details>
-      <a className="nx-user admin-user-entry" href="/admin/login"><span className="side-mark"><i/><i/></span><div><b>دخول الإدارة</b><small>مركز تحكم NAVIXA</small></div><i>←</i></a>
+      <a className="nx-user admin-user-entry" href="/admin/login"><span className="side-mark"><img src="/navixa-mark.png" alt="" /></span><div><b>دخول الإدارة</b><small>مركز تحكم NAVIXA</small></div><i>←</i></a>
     </aside>
 
     <section className="nx-page" id="top">
-      <header className="nx-head"><a className="mobile-brand" href="#top">N</a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("alerts")}>♢<i/></button></div></header>
+      <header className="nx-head"><a className="mobile-brand" href="#top"><img src="/navixa-mark.png" alt="NAVIXA" /></a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("alerts")}>♢<i/></button></div></header>
       <PrayerStrip/>
 
       <section className="navixa-today" id="today" aria-labelledby="today-title">

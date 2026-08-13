@@ -4,8 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NAVIXA | ذكاء يفهم يومك",
   description: "مساعد ذكي يجمع العمل والمشاريع والمهام والتركيز والأتمتة في مكان واحد.",
-  openGraph: {title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد ذكي لحياة أكثر ترتيبًا.",images:["/og.png"]},
-  twitter: {card:"summary_large_image",title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد ذكي لحياة أكثر ترتيبًا.",images:["/og.png"]},
+  icons: { icon: "/navixa-logo-clean.png", apple: "/navixa-logo-clean.png" },
+  openGraph: {title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد ذكي لحياة أكثر ترتيبًا.",images:["/navixa-logo-clean.png"]},
+  twitter: {card:"summary_large_image",title:"NAVIXA | ذكاء يفهم يومك",description:"مساعد ذكي لحياة أكثر ترتيبًا.",images:["/navixa-logo-clean.png"]},
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
