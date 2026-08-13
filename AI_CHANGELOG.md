@@ -2,6 +2,11 @@
 
 لا تُعدّل السجلات السابقة. أضف السجل الأحدث في الأعلى تحت هذا السطر.
 
+## 2026-08-14 — Codex
+
+- حدّث `actions/checkout` في جسري Manus وGemini من v4 إلى v6 دون تغيير الصلاحيات أو الأسرار أو منطق التشغيل.
+- الملفات: `.github/workflows/manus-task.yml`, `.github/workflows/gemini-task.yml`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
 ## 2026-08-12 — Codex
 
 - حدّث إجراء نشر Cloudflare من `wrangler-action@v3` إلى الإصدار الرسمي `v4` دون تغيير الأسرار أو أمر النشر أو Worker المستهدف.
