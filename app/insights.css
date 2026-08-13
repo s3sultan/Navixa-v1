@@ -3,12 +3,12 @@
 .insight-card>header{display:flex;align-items:start;gap:10px}
 .insight-card>header small{color:var(--lav);font-weight:700;font-size:10px}
 .insight-card>header h3{font-size:15px;margin:5px 0 0}
-.insight-badge{background:#edf6f1;color:var(--sa);font-size:9px;border-radius:20px;padding:5px 10px;white-space:nowrap;margin-left:auto}
+.insight-badge{background:#e6fbf7;color:var(--sa);font-size:9px;border-radius:20px;padding:5px 10px;white-space:nowrap;margin-left:auto}
 .card-explain-icon{width:32px;height:32px;border-radius:10px;background:var(--lav2);display:grid;place-items:center;font-size:15px;flex-shrink:0;animation:explainPulse 2.6s ease-in-out infinite}
 @keyframes explainPulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.08);opacity:1}}
 .insight-badge.points{background:var(--lav2);color:#684fb3}
 .review-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;text-align:center}
-.review-stats div{background:#f7f8f5;border-radius:12px;padding:10px 6px}
+.review-stats div{background:#f7fbfc;border-radius:12px;padding:10px 6px}
 .review-stats b{display:block;font-size:15px}
 .review-stats small{color:var(--muted);font-size:8px}
 .review-progress{display:grid;gap:5px}
@@ -74,7 +74,7 @@ footer>div.counters{display:flex;gap:24px}
 .prayer-edit-back>article{background:#fff;width:min(520px,100%);border-radius:22px;padding:26px;max-height:80vh;overflow:auto}
 .prayer-edit-back h3{margin:0 0 16px;font-size:16px}
 .prayer-edit-grid{display:grid;gap:12px}
-.prayer-edit-grid>div{display:grid;gap:6px;background:#f7f8f5;border-radius:12px;padding:12px}
+.prayer-edit-grid>div{display:grid;gap:6px;background:#f7fbfc;border-radius:12px;padding:12px}
 .prayer-edit-grid label{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted)}
 .prayer-edit-grid input{border:1px solid var(--line);border-radius:8px;padding:6px}
 .prayer-edit-actions{display:flex;gap:8px;margin-top:16px}
@@ -104,6 +104,6 @@ footer>div.counters{display:flex;gap:24px}
 .telegram-setup input{flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:9px}
 .telegram-setup button{border:0;background:var(--lav);color:#fff;border-radius:8px;padding:0 14px;font-size:10px;cursor:pointer}
 .alert-prefs-list{display:grid;gap:8px;margin:18px 0}
-.alert-prefs-row{display:flex;align-items:center;gap:14px;background:#f7f8f5;border-radius:10px;padding:11px}
+.alert-prefs-row{display:flex;align-items:center;gap:14px;background:#f7fbfc;border-radius:10px;padding:11px}
 .alert-prefs-row>b{flex:1;font-size:11px}
 .alert-prefs-row label{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
