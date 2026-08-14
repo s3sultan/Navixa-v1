@@ -117,6 +117,7 @@ export default function Home(){
     </aside>
 
     <section className="nx-page" id="top">
+      <div className="mobile-topbar"><a href="#top" className="mobile-topbar-brand"><img src="/navixa-mark.png" alt="NAVIXA" /><b>NAVIXA</b></a><a href="/admin/login" className="mobile-topbar-admin"><img src="/navixa-mark.png" alt="" /><span>دخول الإدارة</span></a></div>
       <header className="nx-head"><a className="mobile-brand" href="#top"><img src="/navixa-mark.png" alt="NAVIXA" /></a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("alerts")}>♢<i/></button></div></header>
       <PrayerStrip/>
 
