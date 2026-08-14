@@ -136,3 +136,14 @@ footer .counters b{font-size:22px;line-height:1;color:var(--ink);direction:ltr;t
 .screen-selection span{position:absolute;right:7px;top:6px;padding:5px 7px;border-radius:7px;background:#087f83;color:#fff;font-size:9px;font-weight:800;white-space:nowrap;pointer-events:none}
 .screen-selection i{position:absolute;left:-8px;bottom:-8px;width:18px;height:18px;border:3px solid #fff;border-radius:50%;background:#7656d6;cursor:nwse-resize;touch-action:none}
 @media(max-width:700px){.screen-preview-shell{margin-inline:-2px;border-radius:16px}.screen-preview-overlay>small{font-size:8px;right:8px;bottom:8px}.screen-selection span{font-size:8px}}
+.screen-analysis-canvas{display:none}
+.screen-monitor-status{display:grid;gap:8px;margin:10px 0 14px;padding:12px 14px;border:1px solid rgba(18,62,86,.12);border-radius:16px;background:rgba(255,255,255,.58);color:#17394c;font-size:11px}
+.screen-monitor-status b{font-size:13px;color:#087f83}
+.screen-monitor-status label{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.screen-monitor-status input[type=checkbox]{accent-color:#08b7b2}
+.screen-monitor-status input[type=range]{width:52%;accent-color:#7656d6;direction:ltr}
+.screen-monitor-status small{color:#617887;line-height:1.5}
+.screen-alert-active{border-color:#e47b72;background:linear-gradient(135deg,rgba(255,244,239,.96),rgba(255,255,255,.72));box-shadow:0 0 0 3px rgba(228,123,114,.12);animation:screenAlertPulse .8s ease-in-out 2}
+.screen-alert-active b{color:#b43d35}
+@keyframes screenAlertPulse{50%{transform:translateY(-2px);filter:brightness(1.05)}}
+@media(max-width:700px){.screen-monitor-status{font-size:10px;padding:10px 11px}.screen-monitor-status b{font-size:12px}.screen-monitor-status input[type=range]{width:48%}}
