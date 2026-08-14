@@ -1,46 +1,20 @@
 "use client";
 import {useEffect,useState} from "react";
-const phases=[{key:"inhale",label:"شهيق",seconds:5},{key:"hold",label:"حبس النفس",seconds:4},{key:"exhale",label:"زفير",seconds:5}] as const;
-const ROUND_CYCLE=5;
+const phases=[{key:"inhale",label:"شهيق",hint:"اسحب الهواء من الأنف بهدوء",seconds:5},{key:"hold",label:"ثبات",hint:"اثبت بدون شدّ أو ضغط",seconds:4},{key:"exhale",label:"زفير",hint:"أخرج الهواء ببطء من الفم",seconds:5}] as const;
 const mix=(t:number)=>{const a=[7,94,61],b=[141,120,207];const rgb=a.map((c,i)=>Math.round(c+(b[i]-c)*t));return `rgb(${rgb.join(",")})`};
 
 export default function BreathingExercise(){
-  const [running,setRunning]=useState(false);
-  const [phaseIndex,setPhaseIndex]=useState(0);
-  const [secondsLeft,setSecondsLeft]=useState<number>(phases[0].seconds);
-  const [rounds,setRounds]=useState(0);
-
-  useEffect(()=>{
-    if(!running)return;
-    const timer=setInterval(()=>setSecondsLeft(s=>s-1),1000);
-    return()=>clearInterval(timer);
-  },[running]);
-
-  useEffect(()=>{
-    if(!running||secondsLeft>0)return;
-    const nextIndex=(phaseIndex+1)%phases.length;
-    if(nextIndex===0)setRounds(r=>r+1);
-    setPhaseIndex(nextIndex);
-    setSecondsLeft(phases[nextIndex].seconds);
-  },[secondsLeft,running,phaseIndex]);
-
-  const toggle=()=>{
-    if(running){setRunning(false);return}
-    setRunning(true);setPhaseIndex(0);setSecondsLeft(phases[0].seconds);
-  };
-
-  const phase=phases[phaseIndex];
-  const progress=1-(secondsLeft/phase.seconds);
-  const scale=phase.key==="inhale"?1+progress*.35:phase.key==="exhale"?1.35-progress*.35:1.35;
-  const color=mix((rounds%ROUND_CYCLE)/ROUND_CYCLE);
-
+  const [running,setRunning]=useState(false),[phaseIndex,setPhaseIndex]=useState(0),[secondsLeft,setSecondsLeft]=useState(phases[0].seconds),[rounds,setRounds]=useState(0);
+  useEffect(()=>{if(!running)return;const timer=window.setInterval(()=>setSecondsLeft(s=>s-1),1000);return()=>window.clearInterval(timer)},[running]);
+  useEffect(()=>{if(!running||secondsLeft>0)return;const next=(phaseIndex+1)%phases.length;if(next===0)setRounds(r=>r+1);setPhaseIndex(next);setSecondsLeft(phases[next].seconds)},[secondsLeft,running,phaseIndex]);
+  const toggle=()=>{if(running){setRunning(false);return}setRunning(true);setPhaseIndex(0);setSecondsLeft(phases[0].seconds)};
+  const reset=()=>{setRunning(false);setPhaseIndex(0);setSecondsLeft(phases[0].seconds);setRounds(0)};
+  const phase=phases[phaseIndex], progress=1-(secondsLeft/phase.seconds), scale=phase.key==="inhale"?1+progress*.35:phase.key==="exhale"?1.35-progress*.35:1.35, color=mix((rounds%5)/5);
   return <article className="breathing-card">
-    <header><span className="breathing-icon">🫁</span><div><small>تمرين تنفس</small><h3>شهيق · حبس · زفير</h3></div></header>
-    <div className="breathing-circle" style={{transform:`scale(${running?scale:1})`,background:running?color:"#075e3d"}}>
-      <b>{running?phase.label:"ابدأ"}</b>
-      {running&&<span>{secondsLeft}</span>}
-    </div>
-    <p>{running?`الجولة ${rounds+1}`:"شهيق 5ث، حبس 4ث، زفير 5ث"}</p>
-    <button type="button" onClick={toggle}>{running?"إيقاف":"ابدأ التمرين"}</button>
+    <header><span className="breathing-icon">🫁</span><div><small>تنفّس ببطء</small><h3>دورة تنفّس واقعية</h3></div><span className="breathing-status">{running?"جلسة نشطة":"جاهز"}</span></header>
+    <div className={`breathing-orbit ${running?"active":""}`}><div className="breathing-circle" style={{transform:`scale(${running?scale:1})`,background:running?color:"linear-gradient(145deg,#087f83,#7656d6)"}}><b>{running?phase.label:"ابدأ"}</b>{running&&<span>{secondsLeft}</span>}</div></div>
+    <p className="breathing-hint">{running?phase.hint:"ضع كتفيك مرتاحين، واجعل الزفير أطول من الشهيق قدر الإمكان."}</p>
+    <div className="breathing-meta"><span>النمط <b>5 · 4 · 5</b></span><span>الجولة <b>{rounds+1}</b></span></div>
+    <div className="breathing-actions"><button type="button" onClick={toggle}>{running?"إيقاف مؤقت":"ابدأ الجلسة"}</button><button className="breathing-reset" type="button" onClick={reset}>إعادة</button></div>
   </article>
 }
