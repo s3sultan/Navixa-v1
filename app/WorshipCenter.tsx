@@ -88,6 +88,8 @@ export default function WorshipCenter(){
   const clickEhsan=()=>{
     const next=Number(localStorage.getItem("navixa-ehsan-clicks")||1200)+1;
     localStorage.setItem("navixa-ehsan-clicks",String(next));
+    const stored=localStorage.getItem("navixa-stats-visitor-key");const visitorKey=stored||((crypto as any).randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);if(!stored)localStorage.setItem("navixa-stats-visitor-key",visitorKey);
+    fetch("/api/stats",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({event:"ehsan",visitorKey})}).catch(()=>{});
     setEhsanThanks(true);
     window.open("https://ehsan.sa","_blank","noopener,noreferrer");
   };
