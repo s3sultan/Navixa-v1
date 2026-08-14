@@ -4,10 +4,12 @@ type D1Result={meta?:{changes?:number}};
 type D1Statement={bind:(...values:unknown[])=>D1Statement;run:()=>Promise<D1Result>;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>};
 type D1Database={prepare:(sql:string)=>D1Statement};
 
-const getDb=():D1Database|null=>{
+const getDb=async():Promise<D1Database|null>=>{
+  let bound=null;
+  try{bound=(await import("cloudflare:workers") as any).env?.DB||null}catch{}
   const runtime=(globalThis as any).DB;
   const processEnv=(typeof process!=="undefined"?(process as any).env?.DB:null);
-  return runtime||processEnv||null;
+  return bound||runtime||processEnv||null;
 };
 const safeDay=()=>new Date().toISOString().slice(0,10);
 
@@ -25,7 +27,7 @@ async function readStats(db:D1Database){
 
 export async function GET(){
   try{
-    const db=getDb();
+    const db=await getDb();
     if(!db)return NextResponse.json({ok:false,configured:false,stats:{visits:0,ehsan:0}});
     await ensureSchema(db);
     return NextResponse.json({ok:true,configured:true,stats:await readStats(db)});
@@ -34,7 +36,7 @@ export async function GET(){
 
 export async function POST(request:Request){
   try{
-    const db=getDb();
+    const db=await getDb();
     if(!db)return NextResponse.json({ok:false,configured:false},{status:503});
     const body=await request.json().catch(()=>({}));
     const event=body?.event==="ehsan"?"ehsan":body?.event==="visit"?"visit":null;
