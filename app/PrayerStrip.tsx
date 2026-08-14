@@ -56,14 +56,20 @@ export default function PrayerStrip(){
     }catch{}
   };
 
+  const notifySystem=(type:"adhan"|"iqama",name:string)=>{
+    const title=type==="adhan"?`حان أذان ${prayerLabels[name]}`:`حانت إقامة ${prayerLabels[name]}`;
+    if(typeof window!=="undefined"&&"Notification" in window&&Notification.permission==="granted")new Notification(title,{body:"تنبيه NAVIXA للصلاة"});
+    const previous=document.title;document.title=`${title} — NAVIXA`;setTimeout(()=>{document.title=previous},6000);
+  };
+
   useEffect(()=>{
     if(!timings)return;
     const check=()=>{
       const hhmm=to24(new Date());
       prayerOrder.forEach(name=>{
         const adhanKey=`navixa-alerted-adhan-${today()}-${name}`,iqamaKey=`navixa-alerted-iqama-${today()}-${name}`;
-        if(cleanTime(timings[name])===hhmm&&!localStorage.getItem(adhanKey)){localStorage.setItem(adhanKey,"1");if(isScreenEnabled("adhan")){setAlertInfo({type:"adhan",name});playChime()}sendTelegramAlert("adhan",`🕌 حان الآن أذان ${prayerLabels[name]} — ${fmt12(timings[name])}`)}
-        if(iqamaTime(name)===hhmm&&!localStorage.getItem(iqamaKey)){localStorage.setItem(iqamaKey,"1");if(isScreenEnabled("iqama")){setAlertInfo({type:"iqama",name});playChime()}sendTelegramAlert("iqama",`🕌 حانت الآن إقامة ${prayerLabels[name]} — ${fmt12(iqamaTime(name))}`)}
+        if(cleanTime(timings[name])===hhmm&&!localStorage.getItem(adhanKey)){localStorage.setItem(adhanKey,"1");if(isScreenEnabled("adhan")){setAlertInfo({type:"adhan",name});playChime();notifySystem("adhan",name)}sendTelegramAlert("adhan",`🕌 حان الآن أذان ${prayerLabels[name]} — ${fmt12(timings[name])}`)}
+        if(iqamaTime(name)===hhmm&&!localStorage.getItem(iqamaKey)){localStorage.setItem(iqamaKey,"1");if(isScreenEnabled("iqama")){setAlertInfo({type:"iqama",name});playChime();notifySystem("iqama",name)}sendTelegramAlert("iqama",`🕌 حانت الآن إقامة ${prayerLabels[name]} — ${fmt12(iqamaTime(name))}`)}
       });
     };
     const timer=setInterval(check,10000);
