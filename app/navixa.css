@@ -252,3 +252,6 @@ footer .counters b{font-size:22px;line-height:1;color:var(--ink);direction:ltr;t
   .today-grid.primary-paths b{grid-row:3!important;align-self:start!important;display:block!important;height:34px!important;min-height:34px!important;margin:0!important;padding:0!important;line-height:17px!important;overflow:hidden!important}
   .today-grid.primary-paths em{grid-row:4!important;align-self:end!important;display:block!important;height:24px!important;min-height:24px!important;margin:0!important;padding:0!important;line-height:12px!important;overflow:hidden!important}
 }
+
+/* Gentle, occasional dhikr companion for focus sessions. */
+.focus-dhikr{margin-top:14px;min-height:30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.focus-dhikr p{margin:0;color:#0d746d;font-size:12px;font-weight:800;line-height:1.6;animation:focusDhikrIn .45s ease}.focus-dhikr p span{color:#7d61d7;margin-left:5px}.focus-dhikr button{border:0;background:transparent;color:#82918e;font:inherit;font-size:10px;padding:3px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}@keyframes focusDhikrIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}@media(max-width:650px){.focus-dhikr{margin-top:11px;min-height:25px}.focus-dhikr p{font-size:11px}.focus-dhikr button{font-size:9px}}
