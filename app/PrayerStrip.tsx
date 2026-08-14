@@ -17,12 +17,14 @@ export default function PrayerStrip(){
   const [timings,setTimings]=useState<Record<string,string>|null>(null);
   const [iqamaManual,setIqamaManual]=useState<Record<string,string>|null>(null);
   const [editing,setEditing]=useState(false);
+  const [expanded,setExpanded]=useState(false);
   const [draft,setDraft]=useState<Record<string,string>>({});
   const [alertInfo,setAlertInfo]=useState<{type:"adhan"|"iqama";name:string}|null>(null);
   const [now,setNow]=useState(new Date());
   const audioRef=useRef<AudioContext|null>(null);
 
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>{if(!expanded)return;const t=setTimeout(()=>setExpanded(false),7000);return()=>clearTimeout(t)},[expanded]);
 
   useEffect(()=>{
     const manual=JSON.parse(localStorage.getItem("navixa-prayer-manual")||"null");
@@ -118,9 +120,9 @@ export default function PrayerStrip(){
     return {kind:"next",name:next.name,adhan:next.adhan,iqama:next.iqama,remainMs:Math.max(0,next.adhan.getTime()-now.getTime())};
   })();
   if(!timings)return null;
-  return <div className="prayer-strip">
-    <div key={mobileTarget ? `${mobileTarget.kind}-${mobileTarget.name}` : "mobile-prayer"} className="prayer-mobile-current">{mobileTarget&&<><div><small>{mobileTarget.kind==="active"?"الصلاة الحالية":"الصلاة القادمة"}</small><b>{prayerLabels[mobileTarget.name]}</b></div><div><small>{mobileTarget.kind==="active"?"الإقامة":"الأذان"}</small><strong>{fmt12(mobileTarget.kind==="active"?to24(mobileTarget.iqama):to24(mobileTarget.adhan))}</strong></div><div><small>المتبقي</small><strong>{formatRemain(mobileTarget.remainMs)}</strong></div></>}</div>
-    <div className="prayer-strip-list">{prayerOrder.map(name=><div key={name}><b>{prayerLabels[name]}</b><span>{fmt12(timings[name])}</span><small>إقامة {fmt12(iqamaTime(name))}</small></div>)}</div>
+  return <div className={`prayer-strip ${expanded?"is-expanded":""}`}>
+    <button type="button" key={mobileTarget ? `${mobileTarget.kind}-${mobileTarget.name}` : "mobile-prayer"} className="prayer-mobile-current" onClick={()=>setExpanded(value=>!value)} aria-expanded={expanded} aria-label={expanded?"إخفاء جميع مواقيت الصلاة":"عرض جميع مواقيت الصلاة"}>{mobileTarget&&<><div><small>{mobileTarget.kind==="active"?"الصلاة الحالية":"الصلاة القادمة"}</small><b>{prayerLabels[mobileTarget.name]}</b></div><div><small>{mobileTarget.kind==="active"?"الإقامة":"الأذان"}</small><strong>{fmt12(mobileTarget.kind==="active"?to24(mobileTarget.iqama):to24(mobileTarget.adhan))}</strong></div><div><small>المتبقي</small><strong>{formatRemain(mobileTarget.remainMs)}</strong></div></>}</button>
+    {expanded&&<div className="prayer-strip-list">{prayerOrder.map(name=><div key={name}><b>{prayerLabels[name]}</b><span>{fmt12(timings[name])}</span><small>إقامة {fmt12(iqamaTime(name))}</small></div>)}</div>}
     {nextTarget&&<div className="prayer-strip-next">
       <small>{nextTarget.phase==="adhan"?"الأذان القادم":"الإقامة القادمة"} · {prayerLabels[nextTarget.name]}</small>
       <b>{formatRemain(nextTarget.remainMs)}</b>
