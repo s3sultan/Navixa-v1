@@ -21,12 +21,29 @@ type HomeModal="tasks"|"ask"|"automation"|"screen"|"alerts"|"backup";
 type SavedLink={id:string;title:string;url:string;description:string;icon:string};
 const starters:Task[]=[{title:"مراجعة خطة المشروع",done:false},{title:"تأكيد موعد الفريق",done:true},{title:"إنهاء ملخص الاجتماع",done:false}];
 const today=()=>new Date().toISOString().slice(0,10);
+const FOCUS_DURATION=25*60;
 const computeBestHour=(hours:string[])=>{const counts:Record<number,number>={};hours.forEach(iso=>{const h=new Date(iso).getHours();counts[h]=(counts[h]||0)+1});const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];return top?`${top[0]}:00`:null};
+
+type FocusTimerProps={time:string;progress:number;running:boolean;status:string;className?:string};
+function FocusTimer({time,progress,running,status,className=""}:FocusTimerProps){
+  const value=Math.max(0,Math.min(1,progress)),dashOffset=100-(value*100),angle=(value*360)-90,radians=angle*Math.PI/180;
+  const handX=50+(40*Math.cos(radians)),handY=50+(40*Math.sin(radians));
+  return <div className={`timer focus-svg-timer ${running?"running":""} ${className}`} role="timer" aria-label={`الوقت المتبقي ${time}`}>
+    <svg className="focus-timer-ring" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <defs><linearGradient id="focus-ring-gradient" x1="8%" y1="92%" x2="92%" y2="8%"><stop offset="0%" stopColor="#70e5d7"/><stop offset="55%" stopColor="#c2b2ff"/><stop offset="100%" stopColor="#fff3ff"/></linearGradient></defs>
+      <circle className="focus-ring-track" cx="50" cy="50" r="44" pathLength="100"/>
+      <circle className="focus-ring-progress" cx="50" cy="50" r="44" pathLength="100" strokeDasharray="100" strokeDashoffset={dashOffset} transform="rotate(-90 50 50)"/>
+      {running&&<line className="focus-ring-hand" x1="50" y1="50" x2={handX} y2={handY}/>}<circle className="focus-ring-head-glow" cx={handX} cy={handY} r="5"/><circle className="focus-ring-head" cx={handX} cy={handY} r="2.7"/>
+    </svg>
+    <div className="focus-timer-content"><span>{time}</span><small>{status}</small></div>
+  </div>
+}
 
 export default function Home(){
   const [tasks,setTasks]=useState<Task[]>(starters);
   const [ready,setReady]=useState(false);
-  const [seconds,setSeconds]=useState(25*60);
+  const [seconds,setSeconds]=useState(FOCUS_DURATION);
+  const [focusProgress,setFocusProgress]=useState(0);
   const [running,setRunning]=useState(false);
   const [focusMode,setFocusMode]=useState(false);
   const [listening,setListening]=useState(false);
@@ -79,6 +96,7 @@ export default function Home(){
   const welcomeTrackRef=useRef<HTMLDivElement>(null);
   const welcomeDragRef=useRef(false);
   const backupInputRef=useRef<HTMLInputElement>(null);
+  const focusDeadlineRef=useRef<number|null>(null);
   const playAlert=(sound=alertSound)=>{if(sound==="silent")return;try{const AudioCtx=(window as any).AudioContext||(window as any).webkitAudioContext;const ctx=new AudioCtx();const patterns:Record<string,number[]>={chime:[659,880],bell:[784,659,784],pulse:[440,440,660],urgent:[880,660,880,660]};const notes=patterns[sound]||patterns.chime;notes.forEach((frequency,index)=>{const oscillator=ctx.createOscillator();const gain=ctx.createGain();const start=ctx.currentTime+index*.18;oscillator.type=sound==="urgent"?"square":"sine";oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(sound==="urgent"?.13:.2,start+.02);gain.gain.exponentialRampToValueAtTime(.001,start+.16);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start);oscillator.stop(start+.18)});setTimeout(()=>ctx.close(),notes.length*180+300)}catch{}}
   const notify=(message:string)=>{playAlert();setToast(message);setTimeout(()=>setToast(""),2200)};
   const backupKeys=()=>Object.keys(localStorage).filter(key=>key.startsWith("navixa-")||key.startsWith("navixa_"));
@@ -111,12 +129,12 @@ export default function Home(){
   useEffect(()=>{const timer=setInterval(()=>setQuoteIndex(i=>(i+1)%4),3200);return()=>clearInterval(timer)},[]);
   useEffect(()=>{const copy="مساعدك الذكي يرتب يومك، يلتقط المواعيد والملاحظات، يساعدك على التركيز والصحة—مع خصوصيتك أولًا.";let i=0;const timer=setInterval(()=>{i++;setTypedWelcome(copy.slice(0,i));if(i>=copy.length)clearInterval(timer)},28);const settings=JSON.parse(localStorage.getItem("navixa-counter-settings")||'{"enabled":true,"start":12840}');setShowCounter(settings.enabled!==false);const next=Number(localStorage.getItem("navixa-visit-count")||settings.start||12840)+1;localStorage.setItem("navixa-visit-count",String(next));setVisitCount(next);setEhsanCount(Number(localStorage.getItem("navixa-ehsan-clicks")||1200));return()=>clearInterval(timer)},[]);
   useEffect(()=>{const stored=localStorage.getItem("navixa-stats-visitor-key");const visitorKey=stored||((crypto as any).randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);if(!stored)localStorage.setItem("navixa-stats-visitor-key",visitorKey);fetch("/api/stats",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({event:"visit",visitorKey})}).then(response=>response.json()).then(data=>{if(data?.configured&&data?.stats){setVisitCount(Number(data.stats.visits)||0);setEhsanCount(Number(data.stats.ehsan)||0)}}).catch(()=>{});},[]);
-  const endFocusMode=()=>{setRunning(false);setFocusMode(false);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
-  const beginFocusMode=()=>{setRunning(true);setFocusMode(true);if(typeof document!=="undefined"&&document.documentElement.requestFullscreen)void document.documentElement.requestFullscreen().catch(()=>{})};
+  const endFocusMode=()=>{const remaining=Math.max(0,(focusDeadlineRef.current??Date.now())-Date.now());focusDeadlineRef.current=null;setSeconds(Math.ceil(remaining/1000));setFocusProgress(Math.max(0,Math.min(1,(FOCUS_DURATION*1000-remaining)/(FOCUS_DURATION*1000))));setRunning(false);setFocusMode(false);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
+  const resetFocusSession=()=>{focusDeadlineRef.current=null;setRunning(false);setFocusMode(false);setSeconds(FOCUS_DURATION);setFocusProgress(0);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
+  const beginFocusMode=()=>{focusDeadlineRef.current=Date.now()+(seconds*1000);setRunning(true);setFocusMode(true);if(typeof document!=="undefined"&&document.documentElement.requestFullscreen)void document.documentElement.requestFullscreen().catch(()=>{})};
   useEffect(()=>{const onChange=()=>{if(typeof document!=="undefined"&&!document.fullscreenElement)setFocusMode(false)};document.addEventListener("fullscreenchange",onChange);return()=>document.removeEventListener("fullscreenchange",onChange)},[]);
-  useEffect(()=>{if(!running)return;const timer=setInterval(()=>setSeconds(s=>{if(s<=1){setRunning(false);setFocusMode(false);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{});if(isScreenEnabled("focus"))notify("أحسنت! انتهت جلسة التركيز");sendTelegramAlert("focus","🎯 تذكير NAVIXA: انتهت جلسة تركيز (25 دقيقة)");logSession();return 25*60}return s-1}),1000);return()=>clearInterval(timer)},[running]);
+  useEffect(()=>{if(!running)return;const deadline=focusDeadlineRef.current??(Date.now()+(seconds*1000));focusDeadlineRef.current=deadline;let frame=0;const tick=()=>{const remaining=Math.max(0,deadline-Date.now()),nextSeconds=Math.ceil(remaining/1000),nextProgress=Math.max(0,Math.min(1,(FOCUS_DURATION*1000-remaining)/(FOCUS_DURATION*1000)));setSeconds(current=>current===nextSeconds?current:nextSeconds);setFocusProgress(nextProgress);if(remaining<=0){focusDeadlineRef.current=null;setRunning(false);setFocusMode(false);setSeconds(FOCUS_DURATION);setFocusProgress(0);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{});if(isScreenEnabled("focus"))notify("أحسنت! انتهت جلسة التركيز");sendTelegramAlert("focus","🎯 تذكير NAVIXA: انتهت جلسة تركيز (25 دقيقة)");logSession();return}frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[running]);
   const time=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
-  const focusProgress=Math.max(0,Math.min(1,(25*60-seconds)/(25*60)));
   void insightsTick;
   const last7=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d.toISOString().slice(0,10)});
   const last30=Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(29-i));return d.toISOString().slice(0,10)});
@@ -238,8 +256,8 @@ export default function Home(){
 
       <section hidden={!showMore} className="health-gateway"><div><span>♡</span><div><small>مركز NAVIXA الصحي</small><h2>جلستك، حركتك وماءك في صفحة واحدة</h2><p>مراقبة محلية للجلوس، تمارين سريعة وتذكيرات واضحة.</p></div></div><a href="/health">فتح صحتي ←</a></section>
       <section hidden={!showMore} className="worship-gateway"><div><span>﷽</span><div><small>مركز NAVIXA للورد اليومي</small><h2>مواقيت الصلاة، الأذكار وورد القرآن</h2><p>ورد يومي بسيط يدخل ضمن إنجازاتك وتقاريرك.</p></div></div><a href="/worship">فتح الورد اليومي ←</a></section>
-      {focusMode&&<section className="focus-fullscreen" role="dialog" aria-label="وضع التركيز الكامل"><button className="focus-fullscreen-exit" onClick={endFocusMode}>× العودة للواجهة</button><small>وضع التركيز</small><h2>خذ وقتك. خلّ الباقي علينا.</h2><div className="timer focus-fullscreen-timer running" style={{"--focus-progress":`${focusProgress*360}deg`} as React.CSSProperties}><span>{time}</span><small>أنت الآن في وضع التركيز</small></div><FocusTasbihNudge running={running} elapsedSeconds={25*60-seconds}/><div className="focus-fullscreen-actions"><button onClick={endFocusMode}>إيقاف مؤقت</button><button onClick={()=>{endFocusMode();setSeconds(25*60)}}>إنهاء وإعادة</button></div></section>}
-      <section className="focus-zone" id="focus"><div><small>جلسة تركيز</small><h2>خذ وقتك. خلّ الباقي علينا.</h2><p>مؤقت بسيط يساعدك تنجز بعيدًا عن التشتت.</p><div className="focus-actions"><button onClick={running?endFocusMode:beginFocusMode}>{running?"إيقاف مؤقت":seconds<25*60?"متابعة الجلسة":"ابدأ 25 دقيقة"}</button><button className="ghost" onClick={()=>{endFocusMode();setSeconds(25*60)}}>إعادة</button></div><FocusTasbihNudge running={running} elapsedSeconds={25*60-seconds}/></div><div className={`timer ${running?"running":""}`} style={{"--focus-progress":`${focusProgress*360}deg`} as React.CSSProperties}><span>{time}</span><small>{running?"أنت الآن في وضع التركيز":seconds<25*60?"الجلسة متوقفة مؤقتًا":"جاهز متى ما كنت"}</small></div><div className="lavender-stem">✦</div></section>
+      {focusMode&&<section className="focus-fullscreen" role="dialog" aria-label="وضع التركيز الكامل"><button className="focus-fullscreen-exit" onClick={endFocusMode}>× العودة للواجهة</button><small>وضع التركيز</small><h2>خذ وقتك. خلّ الباقي علينا.</h2><FocusTimer className="focus-fullscreen-timer" time={time} progress={focusProgress} running={running} status="أنت الآن في وضع التركيز"/><FocusTasbihNudge running={running} elapsedSeconds={FOCUS_DURATION-seconds}/><div className="focus-fullscreen-actions"><button onClick={endFocusMode}>إيقاف مؤقت</button><button onClick={resetFocusSession}>إنهاء وإعادة</button></div></section>}
+      <section className="focus-zone" id="focus"><div><small>جلسة تركيز</small><h2>خذ وقتك. خلّ الباقي علينا.</h2><p>مؤقت بسيط يساعدك تنجز بعيدًا عن التشتت.</p><div className="focus-actions"><button onClick={running?endFocusMode:beginFocusMode}>{running?"إيقاف مؤقت":seconds<FOCUS_DURATION?"متابعة الجلسة":"ابدأ 25 دقيقة"}</button><button className="ghost" onClick={resetFocusSession}>إعادة</button></div><FocusTasbihNudge running={running} elapsedSeconds={FOCUS_DURATION-seconds}/></div><FocusTimer time={time} progress={focusProgress} running={running} status={running?"أنت الآن في وضع التركيز":seconds<FOCUS_DURATION?"الجلسة متوقفة مؤقتًا":"جاهز متى ما كنت"}/><div className="lavender-stem">✦</div></section>
 
       <section hidden={!showMore} className="nx-section automation" id="automations"><div className="section-head"><div><small>الأتمتة</small><h2>NAVIXA يختصر الخطوات عنك</h2><p>قواعد بسيطة تتكرر تلقائيًا في وقتها.</p></div><button onClick={()=>setModal("automation")}>＋ أتمتة جديدة</button></div><div className="automation-list">{automations.map((x,i)=><article key={`${x.name}-${i}`}><span>{x.icon}</span><div><b>{x.name}</b><small>{x.when}</small></div><p>{x.action}</p><label><input aria-label={`تفعيل ${x.name}`} type="checkbox" checked={x.on} onChange={()=>setAutomations(automations.map((a,j)=>j===i?{...a,on:!a.on}:a))}/><i/></label></article>)}</div></section>
 
