@@ -137,3 +137,18 @@ footer>div.counters{display:flex;gap:24px}
 
 /* Mobile prayer editor clarity pass */
 @media(max-width:650px){.prayer-edit-grid>div{display:block!important;padding:12px!important}.prayer-edit-grid>div>b{display:block!important;margin:0 0 8px!important;padding-bottom:7px;border-bottom:1px solid rgba(20,184,170,.14);font-size:14px!important}.prayer-edit-grid label{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important;min-height:38px!important;font-size:11px!important}.prayer-edit-grid input{width:145px!important;flex:0 0 145px!important;height:38px!important}}
+
+/* Desktop prayer summary — keep the compact mobile interaction on large screens */
+@media(min-width:651px){
+  .prayer-strip{position:relative!important;display:block!important;width:min(100%,1180px);margin:14px auto!important;padding:12px 14px!important;min-height:78px;border-radius:22px!important}
+  .prayer-mobile-current{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:24px;min-height:62px;padding:8px 18px;border-radius:16px;background:linear-gradient(110deg,rgba(230,251,247,.96),rgba(255,255,255,.88) 58%,rgba(238,233,255,.9));border:1px solid rgba(20,184,170,.2);text-align:right}
+  .prayer-mobile-current>div{display:grid;gap:4px}
+  .prayer-mobile-current>div:not(:first-child){padding-right:22px;border-right:1px solid rgba(71,106,111,.16)}
+  .prayer-mobile-current small{font-size:10px;color:#6c8187}
+  .prayer-mobile-current b{font-size:21px;color:#0d6d72}
+  .prayer-mobile-current strong{font-size:18px;color:#183b4a;direction:ltr}
+  .prayer-strip-list,.prayer-strip-next{display:none!important}
+  .prayer-strip.is-expanded .prayer-strip-list{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(71,106,111,.12)}
+  .prayer-strip.is-expanded .prayer-strip-next{display:grid!important;margin-top:10px}
+  .prayer-strip-edit{position:absolute!important;top:8px;left:9px;z-index:2;width:36px!important;height:36px;border-radius:11px!important;opacity:.78}
+}
