@@ -5,6 +5,7 @@ import AdminHealthSettings from "./settings/AdminHealthSettings";
 import AdminCounterSettings from "./settings/AdminCounterSettings";
 import AdminAssistantSettings from "./settings/AdminAssistantSettings";
 import AdminAlertSettings from "./settings/AdminAlertSettings";
+import { useAdminAuth } from "./useAdminAuth";
 
 const features=[
   ["متابعة الأسماء والكلمات","الاستماع والتنبيه وإضافة المهام","◉","1,284"],
@@ -19,10 +20,12 @@ const permissions=[
 ];
 
 export default function AdminPage(){
+  const { allowed, checking } = useAdminAuth();
   const [enabled,setEnabled]=useState(features.map(()=>true));const [active,setActive]=useState("نظرة عامة");const [toast,setToast]=useState("");
   const tell=(m:string)=>{setToast(m);setTimeout(()=>setToast(""),2200)};
   const toggle=(i:number)=>{const n=[...enabled];n[i]=!n[i];setEnabled(n);tell(`${features[i][0]}: ${n[i]?"مفعّلة":"متوقفة"}`)};
   const go=(name:string,id:string)=>{setActive(name);document.getElementById(id)?.scrollIntoView({behavior:"smooth"})};
+  if (checking || !allowed) return null;
   return <main dir="rtl" className="admin-shell">{toast&&<div className="toast">✓ {toast}</div>}
     <aside className="admin-side"><div className="logo"><span className="admin-logo-mark"><img src="/navixa-mark.png" alt="" /></span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></div><div className="admin-badge">صلاحيات المدير الكاملة</div><nav>
       {[["نظرة عامة","overview","⌂"],["المميزات","features","✦"],["المستخدمون","users","♙"],["الصلاحيات","permissions","⌘"],["المحتوى","content","▤"],["التكاملات","integrations","⌁"],["الإعدادات","settings","⚙"],["السجل","activity","▤"]].map(x=><button key={x[0]} className={active===x[0]?"on":""} onClick={()=>go(x[0],x[1])}><i>{x[2]}</i>{x[0]}</button>)}

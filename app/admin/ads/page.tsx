@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import "./ads.css";
+import { useAdminAuth } from "../useAdminAuth";
 
 const initialCampaigns = [
   {name:"كرسي مكتبي صحي",client:"مساحة العمل",place:"بطاقة الصحة",views:"184,240",clicks:"4.8%",budget:"3,200 ر.س",status:"نشطة",on:true,color:"green"},
@@ -11,6 +12,7 @@ const initialCampaigns = [
 ];
 
 export default function AdsPage(){
+  const { allowed, checking } = useAdminAuth();
   const [campaigns,setCampaigns]=useState(initialCampaigns);
   const [filter,setFilter]=useState("الكل");
   const [toast,setToast]=useState("");
@@ -30,6 +32,7 @@ export default function AdsPage(){
   };
   const toggle=(i:number)=>{const n=[...campaigns];n[i]={...n[i],on:!n[i].on,status:!n[i].on?"نشطة":"متوقفة"};setCampaigns(n);say(`${n[i].name}: ${n[i].status}`)};
   const visible=filter==="الكل"?campaigns:campaigns.filter(c=>c.status===filter);
+  if (checking || !allowed) return null;
   return <main dir="rtl" className="ads-shell">
     {toast&&<div className="toast">✓ {toast}</div>}
     <aside className="admin-side ads-side"><div className="logo"><span className="admin-logo-mark"><img src="/navixa-mark.png" alt="" /></span><div><b>NAVIXA</b><small>ADMIN CENTER</small></div></div><div className="admin-badge">لوحة الإدارة</div><nav><a href="/admin"><i>⌂</i>نظرة عامة</a><a href="/admin"><i>✦</i>المميزات</a><a href="/admin"><i>♙</i>المستخدمون</a><a href="/admin"><i>⌁</i>الأجهزة</a><a href="/admin"><i>⚙</i>الأتمتة</a><a className="on" href="/admin/ads"><i>▣</i>الإعلانات<em>4</em></a><a href="/admin"><i>!</i>التنبيهات</a><a href="/admin"><i>▤</i>سجل النظام</a></nav><div className="admin-side-bottom"><a href="/">← العودة إلى NAVIXA</a><div><span>م</span><p><b>محمد</b><small>مدير النظام</small></p></div></div></aside>
