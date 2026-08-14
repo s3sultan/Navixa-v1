@@ -1,2 +1,21 @@
-"use client";import {useEffect,useState} from "react";import HealthMonitor from "../HealthMonitor";import "../navixa.css";import "../health-page.css";
-export default function HealthPage(){const [alerts,setAlerts]=useState(true);useEffect(()=>{localStorage.setItem("navixa-health-visited",new Date().toISOString().slice(0,10));setAlerts(localStorage.getItem("navixa-health-muted")!=="true")},[]);const toggle=()=>{const next=!alerts;setAlerts(next);localStorage.setItem("navixa-health-muted",String(!next))};return <main className="health-page" dir="rtl"><header><a href="/">← العودة للرئيسية</a><div><button onClick={toggle} aria-label="تفعيل أو إلغاء تنبيهات الصحة">{alerts?"🔔":"🔕"}</button><span>♡</span><div><small>NAVIXA HEALTH</small><h1>مركز صحتي</h1><p>الجلوس والحركة والماء والخصوصية في مكان واحد.</p></div></div></header><HealthMonitor/></main>}
+"use client";
+import {useEffect,useState} from "react";
+import Link from "next/link";
+import HealthMonitor from "../HealthMonitor";
+import "../navixa.css";
+import "../health-page.css";
+
+export default function HealthPage(){
+  const [alerts,setAlerts]=useState(()=>typeof window==="undefined"?true:localStorage.getItem("navixa-health-muted")!=="true");
+  useEffect(()=>{localStorage.setItem("navixa-health-visited",new Date().toISOString().slice(0,10))},[]);
+  const toggle=()=>{const next=!alerts;setAlerts(next);localStorage.setItem("navixa-health-muted",String(!next))};
+  return <main className="health-page" dir="rtl">
+    <header className="health-topbar">
+      <Link className="health-back" href="/" aria-label="العودة إلى الرئيسية"><span>←</span> العودة للرئيسية</Link>
+      <div className="health-identity"><span className="health-mark"><img src="/navixa-mark.png" alt="" /></span><div><small>NAVIXA HEALTH</small><h1>مركز صحتي</h1><p>مساحة هادئة لجسم أكثر توازنًا ويوم أكثر نشاطًا.</p></div></div>
+      <button className={`health-alert-toggle ${alerts?"enabled":"muted"}`} onClick={toggle} aria-label="تفعيل أو إلغاء تنبيهات الصحة"><span>{alerts?"🔔":"🔕"}</span><b>{alerts?"التنبيهات مفعّلة":"التنبيهات متوقفة"}</b></button>
+    </header>
+    <section className="health-hero" aria-labelledby="health-hero-title"><div className="health-hero-copy"><small>صحة NAVIXA · محليًا وخصوصيًا</small><h2 id="health-hero-title">اجلس بوعي، وتحرك في وقتك</h2><p>راقب وضعية جلوسك، سجّل ماءك، وخذ استراحة قصيرة عندما يحتاجها جسدك — بدون رفع صور الكاميرا إلى أي خادم.</p><div className="health-hero-pills"><span>خصوصية أولًا</span><span>مراقبة محلية</span><span>خطوات بسيطة</span></div></div><div className="health-hero-orb"><img src="/navixa-mark.png" alt="" /><span>جسمك<br/><b>يستحق العناية</b></span></div></section>
+    <HealthMonitor/>
+  </main>
+}
