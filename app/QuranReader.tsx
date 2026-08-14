@@ -1,9 +1,9 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 
-type QuranAyah={number:number;text:string;numberInSurah:number;surah:{name:string}};
+type QuranAyah={number:number;text:string;numberInSurah:number;surah:{name:string};juz?:number;hizbQuarter?:number};
 
-const dayPage=()=>(Math.floor(Date.now()/86400000)%604)+1;
+const dayPage=()=>{const now=new Date();const start=new Date(2026,0,1);start.setHours(0,0,0,0);const current=new Date(now.getFullYear(),now.getMonth(),now.getDate());const days=Math.floor((current.getTime()-start.getTime())/86400000);return ((days%604)+604)%604+1};
 
 export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onComplete:()=>void}){
   const [quranAyahs,setQuranAyahs]=useState<QuranAyah[]|null>(null);
@@ -37,6 +37,9 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
     setLensWidth(quranRef.current.clientWidth);
   };
 
+  const firstAyah=quranAyahs?.[0];
+  const currentJuz=firstAyah?.juz;
+  const currentHizb=firstAyah?.hizbQuarter?Math.ceil(firstAyah.hizbQuarter/4):undefined;
   const groupedAyahs:{surah:string;ayahs:QuranAyah[]}[]=[];
   (quranAyahs||[]).forEach(ayah=>{
     const last=groupedAyahs[groupedAyahs.length-1];
@@ -45,7 +48,7 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
   const renderQuranContent=()=>groupedAyahs.map(group=><div key={group.surah}><small>سورة {group.surah}</small><p>{group.ayahs.map(a=><span key={a.number} className={marks.includes(a.number)?"marked":""} onClick={()=>toggleMark(a.number)}>{a.text} <em>﴿{a.numberInSurah}﴾</em> </span>)}</p></div>);
 
   return <article className="quran-card mushaf-frame">
-    <header><span className="card-explain-icon">📗</span><div><small>ورد اليوم — صفحة {dayPage()}</small><h3>{groupedAyahs[0]?.surah||"جارٍ التحميل…"}</h3></div></header>
+    <header><span className="card-explain-icon">📗</span><div><small>ورد اليوم — صفحة {dayPage()}</small><h3>{groupedAyahs[0]?.surah||"جارٍ التحميل…"}</h3><div className="quran-meta"><span>السورة: {groupedAyahs[0]?.surah||"—"}</span><span>الجزء: {currentJuz||"—"}</span><span>الحزب: {currentHizb||"—"}</span></div></div></header>
     <div className="quran-toolbar">
       <div className="zoom-group"><button type="button" onClick={()=>setFontSize(f=>Math.max(14,f-2))}>A-</button><span>{fontSize}</span><button type="button" onClick={()=>setFontSize(f=>Math.min(30,f+2))}>A+</button></div>
       <button type="button" className={lensOn?"tool-toggle on":"tool-toggle"} onClick={()=>setLensOn(v=>!v)}>🔍 عدسة القراءة</button>
@@ -59,6 +62,7 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
       </div>}
     </div>
     <p className="quran-hint">💡 اضغط على أي آية لتمييزها بخط تحتها أثناء القراءة.</p>
+    <a className="quran-full-link" href="https://qurancomplex.gov.sa/quran-hafs/" target="_blank" rel="noreferrer">فتح المصحف الكامل بالرسم الحفصي ↗</a>
     {!wirdDone?<button type="button" className="wird-done" onClick={onComplete} disabled={!quranAyahs}>تم — أنجزت ورد اليوم</button>:<p className="wird-complete">✓ أنجزت ورد اليوم — بارك الله فيك</p>}
   </article>;
 }
