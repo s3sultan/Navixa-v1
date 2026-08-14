@@ -10,7 +10,6 @@ import GameAdBox from "./GameAdBox";
 import HealthNudge from "./HealthNudge";
 import DailyReviewCard from "./DailyReviewCard";
 import WeeklyChallengeCard from "./WeeklyChallengeCard";
-import BehaviorAnalysisCard from "./BehaviorAnalysisCard";
 import FocusTasbihNudge from "./FocusTasbihNudge";
 import PrayerStrip from "./PrayerStrip";
 import NotificationCenter from "./NotificationCenter";
@@ -216,8 +215,7 @@ export default function Home(){
       <section className="insights-grid">
         <DailyReviewCard sessionsToday={todaySessions} tasksDone={tasksDoneCount} tasksTotal={tasks.length} bestHour={bestHour} onLogSession={logSession} onQuickTask={quickTask}/>
         <WeeklyChallengeCard weekSessions={weekSessionsTotal} weekHydrationDays={weekHydrationDays} tasksDone={tasksDoneCount}/>
-        <BehaviorAnalysisCard weekly={weeklySessions} sessionHours={sessionHours}/>
-        <article className="insight-card habit-insight-card"><div className="habit-insight-head"><div><small>تحليل NAVIXA</small><h3>عاداتك الصحية والإنتاجية</h3></div><span>↗</span></div><div className="habit-range-tabs"><b>هذا الأسبوع</b><em>آخر 30 يومًا</em></div><div className="habit-stats-grid"><div><span>◎</span><b>{weekSessionsTotal}</b><small>جلسات تركيز</small></div><div><span>◷</span><b>{weekSittingMinutes}د</b><small>جلوس مسجّل</small></div><div><span>💧</span><b>{weekHydrationDays}/7</b><small>أيام ترطيب</small></div></div><div className="habit-month-summary"><span>الشهر: <b>{monthSessionsTotal} جلسة · {monthSittingMinutes} دقيقة جلوس · {monthWaterCups} كوب</b></span><span>{monthHydrationDays}/30 يوم ترطيب</span></div></article>
+        <article className="insight-card habit-insight-card"><div className="habit-insight-head"><div><small>ملخص NAVIXA</small><h3>عاداتك الصحية والإنتاجية</h3></div><span>↗</span></div><div className="habit-range-tabs"><b>هذا الأسبوع</b><em>آخر 30 يومًا</em></div><div className="habit-stats-grid"><div><span>◎</span><b>{weekSessionsTotal}</b><small>جلسات تركيز</small></div><div><span>◷</span><b>{weekSittingMinutes}د</b><small>جلوس مسجّل</small></div><div><span>💧</span><b>{weekHydrationDays}/7</b><small>أيام ترطيب</small></div></div><div className="habit-month-summary"><span>الشهر: <b>{monthSessionsTotal} جلسة · {monthSittingMinutes} دقيقة جلوس · {monthWaterCups} كوب</b></span><span>{monthHydrationDays}/30 يوم ترطيب</span></div></article>
       </section>
 
       <section className="nx-section" id="assistant"><div className="section-head"><div><small>مساعدك الذكي</small><h2>كل ما تحتاجه ليوم أوضح</h2><p>أدوات مرنة تساعدك في العمل والمشاريع والمواعيد والحياة اليومية.</p></div></div>
