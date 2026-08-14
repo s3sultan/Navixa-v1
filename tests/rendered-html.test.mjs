@@ -33,7 +33,7 @@ test("server-renders the NAVIXA landing page and metadata", async () => {
   assert.match(html, /<title>NAVIXA \| ذكاء يفهم يومك<\/title>/i);
   assert.match(
     html,
-    /<meta(?=[^>]*\bname=["']description["'])(?=[^>]*\bcontent=["']مساعد ذكي يجمع العمل والمشاريع والمهام والتركيز والأتمتة في مكان واحد\.["'])[^>]*>/i,
+    /<meta(?=[^>]*\bname=["']description["'])(?=[^>]*\bcontent=["']NAVIXA مساعد ذكي يرتب يومك، يساعدك على التركيز والصحة والمهام والأتمتة مع خصوصية محلية.["'])[^>]*>/i,
   );
   assert.match(
     html,
