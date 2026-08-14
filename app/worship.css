@@ -70,3 +70,5 @@
 /* Daily Quran wird metadata and full mushaf link */
 .quran-card>header>div{min-width:0}.quran-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.quran-meta span{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#e6fbf7;color:#087f83;font-size:9px;white-space:nowrap}.quran-meta span:nth-child(2),.quran-meta span:nth-child(3){background:#f0ebff;color:#684fb3}.quran-full-link{display:block;margin-top:10px;text-align:center;text-decoration:none;background:linear-gradient(110deg,#087f83,#7656d6);color:#fff;border-radius:12px;padding:11px 14px;font-size:11px;font-weight:700;box-shadow:0 10px 20px rgba(8,127,131,.14)}.quran-full-link:hover{filter:brightness(1.04)}
 @media(max-width:650px){.quran-meta{gap:5px}.quran-meta span{font-size:8px;padding:4px 7px}.quran-full-link{font-size:10px;padding:10px}.quran-card .wird-done{margin-top:10px}}
+
+.donation-reason{display:block;color:var(--lav);font-size:10px;margin-top:-3px}.sadaqah-back .ehsan-link{background:linear-gradient(110deg,#087f83,#7656d6)}

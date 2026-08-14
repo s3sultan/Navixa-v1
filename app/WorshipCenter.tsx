@@ -30,6 +30,7 @@ export default function WorshipCenter(){
   const [showSadaqah,setShowSadaqah]=useState(false);
   const [tipText,setTipText]=useState("");
   const [ehsanThanks,setEhsanThanks]=useState(false);
+  const [donationReason,setDonationReason]=useState("وردك اليومي");
 
   useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[]);
   useEffect(()=>{setWirdDone(localStorage.getItem(`navixa-wird-${today()}`)==="1")},[]);
@@ -74,11 +75,12 @@ export default function WorshipCenter(){
     if(!nextPrayer)nextPrayer={name:"Fajr",time:addMinutes(parseToday(timings.Fajr),24*60)};
   }
 
+  const showDonation=(reason:string)=>{setDonationReason(reason);setTipText("أحسنت، تقبّل الله وردك — صدقة يسيرة قد تفتح باب خير كبير.");setShowSadaqah(true);sendTelegramAlert("sadaqah",`🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام ${reason}`)};
   const completeWird=()=>{
     localStorage.setItem(`navixa-wird-${today()}`,"1");
     const streak=Number(localStorage.getItem("navixa-wird-streak")||0)+1;
     localStorage.setItem("navixa-wird-streak",String(streak));
-    setWirdDone(true);setShowSadaqah(true);setTipText(tips[Math.floor(Math.random()*tips.length)]);
+    setWirdDone(true);showDonation("ورد القرآن");
     sendTelegramAlert("wird",`📖 تذكير NAVIXA: أنجز ورد اليوم (صفحة ${dayPage()}) — سلسلة ${streak} يوم`);
     sendTelegramAlert("sadaqah","🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام الورد");
   };
@@ -114,17 +116,17 @@ export default function WorshipCenter(){
 
     {azkarPeriod&&azkarList&&<article className="azkar-card">
       <header><span className="card-explain-icon">{azkarPeriod==="sabah"?"🌅":"🌙"}</span><div><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>حصّن يومك بالذكر</h3></div></header>
-      <div className="azkar-list">{azkarList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div>
+      <div className="azkar-list">{azkarList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div><button type="button" className="wird-done" onClick={()=>showDonation("أذكار اليوم")}>تم إتمام الأذكار — تذكير بالصدقة</button>
     </article>}
 
     {afterPrayerName&&afterPrayerList&&<article className="azkar-card after-prayer">
       <header><span className="card-explain-icon">🤲</span><div><small>أذكار بعد الصلاة</small><h3>بعد صلاة {prayerLabels[afterPrayerName]}</h3></div></header>
-      <div className="azkar-list">{afterPrayerList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div>
+      <div className="azkar-list">{afterPrayerList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div><button type="button" className="wird-done" onClick={()=>showDonation(`أذكار بعد صلاة ${prayerLabels[afterPrayerName]}`)}>تم إتمام الأذكار — تذكير بالصدقة</button>
     </article>}
 
     <article className="tasbih-card">
       <header><span className="card-explain-icon">📿</span><div><small>سبّح واستغفر</small><h3>عداد التسبيح اليومي</h3></div></header>
-      <TasbihCounter/>
+      <TasbihCounter onComplete={()=>showDonation("ورد التسبيح")}/>
     </article>
 
     <QuranReader wirdDone={wirdDone} onComplete={completeWird}/>
@@ -132,7 +134,7 @@ export default function WorshipCenter(){
     {showSadaqah&&<div className="sadaqah-back" onClick={()=>setShowSadaqah(false)}><article onClick={e=>e.stopPropagation()}>
       <button className="sadaqah-close" onClick={()=>setShowSadaqah(false)}>×</button>
       <span>🤲</span>
-      <h3>{tipText}</h3>
+      <h3>{tipText}</h3><small className="donation-reason">بعد إتمام {donationReason}</small>
       <p>الصدقة ولو يسيرة تجلب البركة وتفرّح قلبك — جرّب تتصدق اليوم عبر منصة إحسان الموثوقة.</p>
       <button type="button" className="ehsan-link" onClick={clickEhsan}>تصدق عبر منصة إحسان ↗</button>
       {ehsanThanks&&<small>جزاك الله خيرًا 🌱</small>}
