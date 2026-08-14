@@ -190,15 +190,15 @@ export default function Home(){
       <header className="nx-head"><a className="mobile-brand" href="#top"><img src="/navixa-mark.png" alt="NAVIXA" /></a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("alerts")}>♢<i/></button></div></header>
       <PrayerStrip/>
 
-      <section className="navixa-today" id="today" aria-labelledby="today-title">
-        <div className="today-heading"><div><small>NAVIXA TODAY</small><h2 id="today-title">أهم ما يحتاج انتباهك اليوم</h2><p>ملخص واحد يجمع يومك قبل ما تنتقل للتفاصيل.</p></div><button onClick={()=>setModal("tasks")}>＋ إضافة مهمة</button></div>
-        <div className="today-grid">
-          <button onClick={()=>setModal("tasks")}><span className="today-icon green">✓</span><small>المهام</small><b>{tasks.filter(t=>!t.done).length} متبقية</b><em>{tasksDoneCount} مكتملة اليوم</em></button>
-          <button onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><span className="today-icon lavender">◎</span><small>التركيز</small><b>{todaySessions} جلسات</b><em>{running?`${time} متبقية`:"جلسة 25 دقيقة جاهزة"}</em></button>
-          <a href="/health"><span className="today-icon rose">♡</span><small>الصحة</small><b>{weekHydrationDays} أيام ترطيب</b><em>راجع الحركة والماء</em></a>
-          <a href="/worship"><span className="today-icon sand">﷽</span><small>العبادة</small><b>ورد اليوم</b><em>الصلاة والقرآن والأذكار</em></a>
-          <button onClick={()=>setModal("ask")}><span className="today-icon dark">✦</span><small>المساعد</small><b>جاهز لك</b><em>اسأله عن يومك</em></button>
+      <section className="navixa-today simplified-today" id="today" aria-labelledby="today-title">
+        <div className="today-heading"><div><small>NAVIXA TODAY</small><h2 id="today-title">أربع مسارات ليوم أوضح</h2><p>ابدأ بما تحتاجه الآن، واترك الأدوات المتقدمة داخل المساعد وقت الحاجة.</p></div><button onClick={()=>setModal("tasks")}>✓ مهامي {tasks.filter(t=>!t.done).length}</button></div>
+        <div className="today-grid primary-paths">
+          <button onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><span className="today-icon lavender">◎</span><small>ابدأ الآن</small><b>جلسة التركيز</b><em>{running?`${time} متبقية`:"25 دقيقة بلا تشتت"}</em></button>
+          <a href="/health"><span className="today-icon rose">♡</span><small>مركز صحتي</small><b>متابعة الصحة</b><em>{weekHydrationDays} أيام ترطيب هذا الأسبوع</em></a>
+          <a href="/worship"><span className="today-icon sand">﷽</span><small>وقتك محفوظ</small><b>مواقيت الصلاة</b><em>الأذان والورد والقرآن</em></a>
+          <button onClick={()=>setModal("ask")}><span className="today-icon dark">✦</span><small>أدواتك عند الحاجة</small><b>مساعدك الذكي</b><em>اسأل، رتّب، واستكشف</em></button>
         </div>
+        <aside className="privacy-promise"><span className="privacy-promise-icon">⌁</span><div><b>خصوصيتك أولًا</b><p>المعالجة الافتراضية محلية على جهازك. الكاميرا والميكروفون ومشاركة الشاشة لا تبدأ إلا بعد إذنك الصريح.</p></div><button onClick={()=>setModal("backup")}>البيانات والخصوصية ←</button></aside>
       </section>
 
       <section className="nx-hero showcase">

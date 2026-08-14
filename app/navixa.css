@@ -191,3 +191,17 @@ footer .counters b{font-size:22px;line-height:1;color:var(--ink);direction:ltr;t
 .today-grid b,.today-grid small,.today-grid em{min-width:0;max-width:100%;overflow-wrap:anywhere}
 .today-grid em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:650px){.today-grid b{line-height:1.45}.today-grid small{line-height:1.5}}
+
+/* Simplified first-screen paths and privacy promise */
+.simplified-today .today-heading{align-items:end}
+.primary-paths{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.primary-paths>a,.primary-paths>button{min-height:188px;text-align:right;justify-content:flex-start;padding:22px 18px;position:relative}
+.primary-paths .today-icon{width:45px;height:45px;margin-bottom:14px;font-size:22px}
+.primary-paths small{font-size:12px;opacity:.72;margin-bottom:4px}
+.primary-paths b{font-size:18px;line-height:1.35}
+.primary-paths em{font-size:12px;line-height:1.65;margin-top:7px}
+.privacy-promise{margin:16px 0 0;display:flex;align-items:center;gap:14px;padding:15px 18px;border:1px solid rgba(40,202,177,.26);border-radius:18px;background:linear-gradient(110deg,rgba(12,93,99,.10),rgba(136,87,233,.09));box-shadow:0 14px 40px rgba(11,64,79,.07)}
+.privacy-promise-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:14px;background:rgba(15,140,137,.14);color:#087f7d;font-weight:900;font-size:23px;flex:0 0 auto}
+.privacy-promise>div{min-width:0;flex:1}.privacy-promise b{display:block;color:#133f4b;font-size:14px}.privacy-promise p{margin:4px 0 0;color:#4d6871;font-size:12px;line-height:1.65}.privacy-promise button{border:0;border-radius:12px;padding:10px 12px;background:#123d50;color:#fff;white-space:nowrap;font:inherit;font-size:12px;cursor:pointer}
+@media(max-width:1050px){.primary-paths{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.simplified-today .today-heading{align-items:flex-start}.primary-paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.primary-paths>a,.primary-paths>button{min-height:154px;padding:16px 13px}.primary-paths .today-icon{width:38px;height:38px;margin-bottom:10px;font-size:19px}.primary-paths b{font-size:15px}.primary-paths em{font-size:11px;line-height:1.55}.privacy-promise{align-items:flex-start;flex-wrap:wrap;padding:14px}.privacy-promise p{font-size:11px}.privacy-promise button{width:100%;margin-top:2px}}
