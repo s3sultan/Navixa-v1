@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import "./worship.css";
 import TasbihCounter from "./TasbihCounter";
+import AzkarList from "./AzkarList";
 import QuranReader,{dayPage} from "./QuranReader";
 import {sendTelegramAlert} from "./alertPrefs";
 
@@ -116,12 +117,12 @@ export default function WorshipCenter(){
 
     {azkarPeriod&&azkarList&&<article className="azkar-card">
       <header><span className="card-explain-icon">{azkarPeriod==="sabah"?"🌅":"🌙"}</span><div><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>حصّن يومك بالذكر</h3></div></header>
-      <div className="azkar-list">{azkarList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div><button type="button" className="wird-done" onClick={()=>showDonation("أذكار اليوم")}>تم إتمام الأذكار — تذكير بالصدقة</button>
+      <AzkarList items={azkarList}/><button type="button" className="wird-done" onClick={()=>showDonation("أذكار اليوم")}>تم إتمام الأذكار — تذكير بالصدقة</button>
     </article>}
 
     {afterPrayerName&&afterPrayerList&&<article className="azkar-card after-prayer">
       <header><span className="card-explain-icon">🤲</span><div><small>أذكار بعد الصلاة</small><h3>بعد صلاة {prayerLabels[afterPrayerName]}</h3></div></header>
-      <div className="azkar-list">{afterPrayerList.map(item=><p key={item.ID}>{item.ARABIC_TEXT}{item.REPEAT>1&&<em> — تُقال {item.REPEAT} مرات</em>}</p>)}</div><button type="button" className="wird-done" onClick={()=>showDonation(`أذكار بعد صلاة ${prayerLabels[afterPrayerName]}`)}>تم إتمام الأذكار — تذكير بالصدقة</button>
+      <AzkarList items={afterPrayerList}/><button type="button" className="wird-done" onClick={()=>showDonation(`أذكار بعد صلاة ${prayerLabels[afterPrayerName]}`)}>تم إتمام الأذكار — تذكير بالصدقة</button>
     </article>}
 
     <article className="tasbih-card">
