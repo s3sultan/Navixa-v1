@@ -185,3 +185,9 @@ footer .counters b{font-size:22px;line-height:1;color:var(--ink);direction:ltr;t
 .focus-zone .timer .focus-tasbih-nudge{max-width:150px;margin:0!important}
 @media(max-width:900px) and (min-width:651px){.focus-zone{grid-template-columns:minmax(0,1fr) 190px!important;padding:30px 28px!important;gap:22px!important}.focus-zone .timer{width:180px;height:180px}.focus-zone .timer span{font-size:30px}}
 @media(max-width:650px){.focus-zone{grid-template-columns:1fr!important;gap:20px!important;padding:26px 18px!important;text-align:right!important;justify-items:stretch!important}.focus-zone>div:first-child{justify-items:stretch}.focus-zone>div:first-child>small{width:max-content}.focus-zone h2{font-size:22px!important}.focus-zone p{font-size:10px}.focus-zone .timer{width:184px;height:184px;justify-self:center}.focus-zone .timer span{font-size:30px}.focus-actions{max-width:none;grid-template-columns:minmax(0,1fr) 96px!important}.focus-zone .timer .focus-tasbih-nudge{max-width:132px}}
+
+/* Responsive card overflow guard */
+.today-grid>a,.today-grid>button{min-width:0;max-width:100%;overflow:hidden}
+.today-grid b,.today-grid small,.today-grid em{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.today-grid em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:650px){.today-grid b{line-height:1.45}.today-grid small{line-height:1.5}}
