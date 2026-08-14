@@ -103,8 +103,17 @@ export default function PrayerStrip(){
     return {name:target.name,phase,progress:Math.round((elapsedMs/totalMs)*100),remainMs:Math.max(0,phaseEnd.getTime()-now.getTime())};
   })();
 
+  const mobileTarget=(()=>{
+    if(!timings)return null;
+    const events=prayerOrder.map(name=>({name,adhan:parseToday(timings[name]),iqama:parseToday(iqamaTime(name))}));
+    const active=events.find(event=>now>=event.adhan&&now<event.iqama);
+    if(active)return {kind:"active",name:active.name,adhan:active.adhan,iqama:active.iqama,remainMs:Math.max(0,active.iqama.getTime()-now.getTime())};
+    const next=events.find(event=>event.adhan>now)||{...events[0],adhan:addMinutes(events[0].adhan,1440),iqama:addMinutes(events[0].iqama,1440)};
+    return {kind:"next",name:next.name,adhan:next.adhan,iqama:next.iqama,remainMs:Math.max(0,next.adhan.getTime()-now.getTime())};
+  })();
   if(!timings)return null;
   return <div className="prayer-strip">
+    <div className="prayer-mobile-current">{mobileTarget&&<><div><small>{mobileTarget.kind==="active"?"الصلاة الحالية":"الصلاة القادمة"}</small><b>{prayerLabels[mobileTarget.name]}</b></div><div><small>{mobileTarget.kind==="active"?"الإقامة":"الأذان"}</small><strong>{fmt12(mobileTarget.kind==="active"?to24(mobileTarget.iqama):to24(mobileTarget.adhan))}</strong></div><div><small>المتبقي</small><strong>{formatRemain(mobileTarget.remainMs)}</strong></div></>}</div>
     <div className="prayer-strip-list">{prayerOrder.map(name=><div key={name}><b>{prayerLabels[name]}</b><span>{fmt12(timings[name])}</span><small>إقامة {fmt12(iqamaTime(name))}</small></div>)}</div>
     {nextTarget&&<div className="prayer-strip-next">
       <small>{nextTarget.phase==="adhan"?"الأذان القادم":"الإقامة القادمة"} · {prayerLabels[nextTarget.name]}</small>
