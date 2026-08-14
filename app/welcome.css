@@ -7,3 +7,10 @@
 .welcome h1{margin-top:8px!important}
 .welcome-swipe>b{font-size:clamp(12px,1.1vw,15px)!important;font-weight:800;color:#234d58!important}
 @media(max-width:650px){.welcome{padding-top:22px!important;padding-bottom:28px!important}.navixa-logo-hero{margin-bottom:10px!important}.welcome h1{margin-top:6px!important}}
+
+/* Reliable mobile entry: allow both drag and direct tap */
+.welcome-swipe,.welcome-swipe button{touch-action:none;-webkit-user-select:none;user-select:none}
+.welcome-swipe button{cursor:grab}.welcome-swipe button:active{cursor:grabbing;transform:translateY(-50%) scale(.96)}
+.welcome-direct-enter{position:relative;z-index:2;display:block;margin:10px auto 0;padding:8px 16px;border:1px solid rgba(15,116,117,.22);border-radius:999px;background:rgba(255,255,255,.74);color:#0a666b;font:700 12px/1.2 inherit;cursor:pointer;box-shadow:0 8px 20px rgba(11,69,78,.08)}
+.welcome-direct-enter:active{transform:scale(.98)}
+@media(max-width:650px){.welcome-swipe{touch-action:none}.welcome-direct-enter{padding:9px 18px;font-size:13px}}
