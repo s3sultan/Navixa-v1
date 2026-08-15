@@ -31,8 +31,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Google OAuth configuration
+        run: test -n "$GOOGLE_CLIENT_ID" || (echo "Missing GOOGLE_CLIENT_ID repository secret" >&2; exit 1)
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+
       - name: Build NAVIXA
         run: npm run build
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
 
       - name: Deploy the navixa Worker
         uses: cloudflare/wrangler-action@v4
@@ -40,3 +47,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config dist/server/wrangler.json
+          secrets: |
+            GOOGLE_CLIENT_ID
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}

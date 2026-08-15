@@ -3,8 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import "./login.css";
-
-const GOOGLE_CLIENT_ID="876266145464-51o36n0s7jkgrtd0vhqh2cai1koo05r6.apps.googleusercontent.com";
+import {GOOGLE_CLIENT_ID} from "../../googleOAuthClient";
 type GoogleIdentity={accounts:{id:{initialize:(options:{client_id:string;callback:(result:{credential:string})=>void})=>void;renderButton:(element:HTMLElement,options:Record<string,string|number>)=>void}}};
 
 export default function AdminLogin(){
@@ -27,6 +26,7 @@ export default function AdminLogin(){
     const render=()=>{
       const google=(window as Window&{google?:GoogleIdentity}).google;
       if(!google||!googleButton.current)return;
+      if(!GOOGLE_CLIENT_ID){setError("لم تكتمل تهيئة تسجيل الدخول الآمن بعد");setLoading(false);return}
       google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:async({credential}:{credential:string})=>{
         setLoading(true);setError("");
         try{

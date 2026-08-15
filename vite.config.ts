@@ -45,6 +45,9 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    define: {
+      __NAVIXA_GOOGLE_CLIENT_ID__: JSON.stringify(process.env.GOOGLE_CLIENT_ID||""),
+    },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,

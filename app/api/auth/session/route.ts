@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { getGoogleClientId } from "../../../googleOAuthServer";
 
-const GOOGLE_CLIENT_ID = "876266145464-51o36n0s7jkgrtd0vhqh2cai1koo05r6.apps.googleusercontent.com";
 const ADMIN_EMAIL = "s2shug@gmail.com";
 
 function getCookie(request: Request, name: string) {
@@ -13,12 +13,14 @@ export async function GET(request: Request) {
   const token = getCookie(request, "navixa_google_token");
   if (!token) return NextResponse.json({ authenticated: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
   try {
+    const googleClientId = await getGoogleClientId();
+    if (!googleClientId) throw new Error("oauth-not-configured");
     const check = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`, { cache: "no-store" });
     if (!check.ok) throw new Error("invalid-token");
     const profile = await check.json() as { aud?: string; email?: string; email_verified?: string | boolean; iss?: string; sub?: string };
     const verified = profile.email_verified === true || profile.email_verified === "true";
     const validIssuer = profile.iss === "accounts.google.com" || profile.iss === "https://accounts.google.com";
-    const valid = profile.aud === GOOGLE_CLIENT_ID && verified && validIssuer && !!profile.sub && profile.email?.toLowerCase() === ADMIN_EMAIL;
+    const valid = profile.aud === googleClientId && verified && validIssuer && !!profile.sub && profile.email?.toLowerCase() === ADMIN_EMAIL;
     if (!valid) throw new Error("invalid-profile");
     return NextResponse.json({ authenticated: true, email: ADMIN_EMAIL }, { headers: { "Cache-Control": "no-store" } });
   } catch {
