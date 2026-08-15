@@ -52,5 +52,5 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl"><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />{children}</body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />{children}</body></html>;
 }
