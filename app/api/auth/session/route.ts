@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const GOOGLE_CLIENT_ID = "876266145464-51o36n0s7jkgrtd0vhqh2cai1koo05r6.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.googleusercontent.com";
 const ADMIN_EMAIL = "s2shug@gmail.com";
 
 function getCookie(request: Request, name: string) {
