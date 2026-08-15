@@ -36,6 +36,8 @@ export const metadata: Metadata = {
   },
 };
 
+const appearanceBootstrap=`(()=>{try{const mode=localStorage.getItem("navixa-appearance-mode")||"system";const palette=localStorage.getItem("navixa-appearance-palette")||"oasis";const dark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;const theme=mode==="system"?(dark?"dark":"light"):(mode==="dark"?"dark":"light");document.documentElement.dataset.navixaTheme=theme;document.documentElement.dataset.navixaPalette=["oasis","lilac","midnight","sand"].includes(palette)?palette:"oasis";document.documentElement.style.colorScheme=theme}catch{}})()`;
+
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
@@ -50,5 +52,5 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl"><body><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />{children}</body></html>;
+  return <html lang="ar" dir="rtl"><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />{children}</body></html>;
 }
