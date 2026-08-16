@@ -30,10 +30,12 @@ export default function AdminLogin(){
       google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:async({credential}:{credential:string})=>{
         setLoading(true);setError("");
         try{
-          const response=await fetch("/api/auth/google",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({credential})});
+          const response=await fetch("/api/auth/google",{method:"POST",headers:{"content-type":"application/json"},credentials:"include",cache:"no-store",body:JSON.stringify({credential})});
           const data=await response.json();
           if(!response.ok){setError(data.error||"تعذر تسجيل الدخول بهذا الحساب");setLoading(false);return}
-          window.location.href="/admin";
+          const session=await fetch("/api/auth/session",{credentials:"include",cache:"no-store"});
+          if(!session.ok){setError("تم التحقق من الحساب، لكن لم تُحفظ جلسة الإدارة. حاول مرة أخرى.");setLoading(false);return}
+          window.location.assign("/admin");
         }catch{setError("تعذر الاتصال بخدمة تسجيل الدخول");setLoading(false)}
       }});
       google.accounts.id.renderButton(googleButton.current,{type:"standard",theme:"outline",size:"large",text:"continue_with",shape:"rectangular",logo_alignment:"left",width:360,locale:"ar"});

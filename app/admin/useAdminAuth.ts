@@ -8,18 +8,52 @@ export function useAdminAuth() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
-      .then((response) => {
-        if (!response.ok) throw new Error("unauthorized");
-        if (active) setAllowed(true);
-      })
-      .catch(() => {
-        window.location.replace("/admin/login");
-      })
-      .finally(() => {
-        if (active) setChecking(false);
-      });
-    return () => { active = false; };
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+
+    const deny = () => {
+      if (!active) return;
+      setChecking(false);
+      window.location.replace("/admin/login?reason=session");
+    };
+
+    const verify = async () => {
+      try {
+        const response = await fetch("/api/auth/session", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (response.ok) {
+          if (active) {
+            setAllowed(true);
+            setChecking(false);
+          }
+          return;
+        }
+
+        if (response.status === 503 && attempts < 2) {
+          attempts += 1;
+          retryTimer = setTimeout(verify, attempts * 700);
+          return;
+        }
+
+        deny();
+      } catch {
+        if (attempts < 2) {
+          attempts += 1;
+          retryTimer = setTimeout(verify, attempts * 700);
+          return;
+        }
+        deny();
+      }
+    };
+
+    void verify();
+    return () => {
+      active = false;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   return { allowed, checking };

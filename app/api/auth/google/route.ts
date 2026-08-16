@@ -13,8 +13,8 @@ export async function POST(request:Request){
     const verified=profile.email_verified===true||profile.email_verified==="true";
     if(profile.aud!==GOOGLE_CLIENT_ID||!verified)return NextResponse.json({error:"حساب Google غير موثّق"},{status:401});
     if(profile.email?.toLowerCase()!==ADMIN_EMAIL)return NextResponse.json({error:"هذا الحساب غير مخوّل لدخول الإدارة"},{status:403});
-    const response=NextResponse.json({ok:true});
-    response.cookies.set("navixa_google_token",credential,{httpOnly:true,secure:true,sameSite:"strict",path:"/",maxAge:3600});
+    const response=NextResponse.json({ok:true},{headers:{"Cache-Control":"no-store"}});
+    response.cookies.set("navixa_google_token",credential,{httpOnly:true,secure:true,sameSite:"lax",path:"/",maxAge:3600});
     return response;
   }catch{return NextResponse.json({error:"حدث خطأ أثناء التحقق من الحساب"},{status:500})}
 }
