@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { deleteAdminSession, readAdminSession } from "../sessionStore";
 
-const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.googleusercontent.com";
 const ADMIN_EMAIL = "s2shug@gmail.com";
 
 function getCookie(request: Request, name: string) {
@@ -9,30 +9,38 @@ function getCookie(request: Request, name: string) {
   return match ? decodeURIComponent(match[1]) : "";
 }
 
+function clearSession(response: NextResponse) {
+  response.cookies.set("navixa_admin_session", "", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
+}
+
 export async function GET(request: Request) {
-  const token = getCookie(request, "navixa_google_token");
-  if (!token) return NextResponse.json({ authenticated: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  try {
-    const check = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`, { cache: "no-store" });
-    if (!check.ok) {
-      const status = check.status;
-      if (status >= 500 || status === 429) {
-        return NextResponse.json({ authenticated: false, retry: true }, { status: 503, headers: { "Cache-Control": "no-store" } });
-      }
-      throw new Error("invalid-token");
-    }
-    const profile = await check.json() as { aud?: string; email?: string; email_verified?: string | boolean; iss?: string; sub?: string };
-    const verified = profile.email_verified === true || profile.email_verified === "true";
-    const validIssuer = profile.iss === "accounts.google.com" || profile.iss === "https://accounts.google.com";
-    const valid = profile.aud === GOOGLE_CLIENT_ID && verified && validIssuer && !!profile.sub && profile.email?.toLowerCase() === ADMIN_EMAIL;
-    if (!valid) throw new Error("invalid-profile");
-    return NextResponse.json({ authenticated: true, email: ADMIN_EMAIL }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    if (error instanceof TypeError) {
-      return NextResponse.json({ authenticated: false, retry: true }, { status: 503, headers: { "Cache-Control": "no-store" } });
-    }
-    const response = NextResponse.json({ authenticated: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
-    response.cookies.set("navixa_google_token", "", { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 0 });
-    return response;
+  const sessionId = getCookie(request, "navixa_admin_session");
+  if (!sessionId) {
+    return NextResponse.json({ authenticated: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
+
+  try {
+    const session = await readAdminSession(sessionId);
+    if (!session || session.email !== ADMIN_EMAIL) {
+      const response = NextResponse.json({ authenticated: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      return clearSession(response);
+    }
+    return NextResponse.json({ authenticated: true, email: ADMIN_EMAIL }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ authenticated: false, retry: true }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const sessionId = getCookie(request, "navixa_admin_session");
+  await deleteAdminSession(sessionId);
+  const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  return clearSession(response);
 }
