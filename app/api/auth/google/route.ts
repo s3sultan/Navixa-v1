@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
 
     const session = await createAdminSession(email);
-    const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    const response = NextResponse.json({ ok: true, sessionId: session.sessionId }, { headers: { "Cache-Control": "no-store" } });
     response.cookies.set("navixa_admin_session", session.sessionId, {
       httpOnly: true,
       secure: true,

@@ -13,15 +13,18 @@ export function useAdminAuth() {
 
     const deny = () => {
       if (!active) return;
+      sessionStorage.removeItem("navixa_admin_session");
       setChecking(false);
       window.location.replace("/admin/login?reason=session");
     };
 
     const verify = async () => {
       try {
+        const sessionId = sessionStorage.getItem("navixa_admin_session");
         const response = await fetch("/api/auth/session", {
           credentials: "include",
           cache: "no-store",
+          headers: sessionId ? { "x-navixa-admin-session": sessionId } : undefined,
         });
 
         if (response.ok) {

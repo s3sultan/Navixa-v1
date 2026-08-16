@@ -33,8 +33,10 @@ export default function AdminLogin(){
           const response=await fetch("/api/auth/google",{method:"POST",headers:{"content-type":"application/json"},credentials:"include",cache:"no-store",body:JSON.stringify({credential})});
           const data=await response.json();
           if(!response.ok){setError(data.error||"تعذر تسجيل الدخول بهذا الحساب");setLoading(false);return}
-          const session=await fetch("/api/auth/session",{credentials:"include",cache:"no-store"});
-          if(!session.ok){setError("تم التحقق من الحساب، لكن لم تُحفظ جلسة الإدارة. حاول مرة أخرى.");setLoading(false);return}
+          if(!data.sessionId||typeof data.sessionId!=="string"){setError("تم التحقق من الحساب، لكن لم يصل معرف جلسة الإدارة.");setLoading(false);return}
+          sessionStorage.setItem("navixa_admin_session",data.sessionId);
+          const session=await fetch("/api/auth/session",{credentials:"include",cache:"no-store",headers:{"x-navixa-admin-session":data.sessionId}});
+          if(!session.ok){sessionStorage.removeItem("navixa_admin_session");setError("تم التحقق من الحساب، لكن تعذر تثبيت جلسة الإدارة. حاول مرة أخرى.");setLoading(false);return}
           window.location.assign("/admin");
         }catch{setError("تعذر الاتصال بخدمة تسجيل الدخول");setLoading(false)}
       }});

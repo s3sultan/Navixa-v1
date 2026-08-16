@@ -20,8 +20,12 @@ function clearSession(response: NextResponse) {
   return response;
 }
 
+function getSessionId(request: Request) {
+  return request.headers.get("x-navixa-admin-session") || getCookie(request, "navixa_admin_session");
+}
+
 export async function GET(request: Request) {
-  const sessionId = getCookie(request, "navixa_admin_session");
+  const sessionId = getSessionId(request);
   if (!sessionId) {
     return NextResponse.json({ authenticated: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
@@ -39,7 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const sessionId = getCookie(request, "navixa_admin_session");
+  const sessionId = getSessionId(request);
   await deleteAdminSession(sessionId);
   const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   return clearSession(response);
