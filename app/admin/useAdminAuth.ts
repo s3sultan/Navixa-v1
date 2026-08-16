@@ -13,18 +13,17 @@ export function useAdminAuth() {
 
     const deny = () => {
       if (!active) return;
-      sessionStorage.removeItem("navixa_admin_session");
+      sessionStorage.removeItem("navixa_google_credential");
       setChecking(false);
       window.location.replace("/admin/login?reason=session");
     };
 
     const verify = async () => {
       try {
-        const sessionId = sessionStorage.getItem("navixa_admin_session");
+        const credential = sessionStorage.getItem("navixa_google_credential");
         const response = await fetch("/api/auth/session", {
-          credentials: "include",
           cache: "no-store",
-          headers: sessionId ? { "x-navixa-admin-session": sessionId } : undefined,
+          headers: credential ? { "x-navixa-google-credential": credential } : undefined,
         });
 
         if (response.ok) {

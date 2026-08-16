@@ -40,22 +40,21 @@ export default function AdminLogin() {
         setState("ready");
         return;
       }
-      if (!data.sessionId || typeof data.sessionId !== "string") {
-        setError("تم التحقق من الحساب، لكن الخادم لم ينشئ جلسة إدارة.");
+      if (!data.credential || typeof data.credential !== "string") {
+        setError("تم التحقق من الحساب، لكن لم يصل تأكيد Google للجلسة.");
         setState("ready");
         return;
       }
 
-      sessionStorage.setItem("navixa_admin_session", data.sessionId);
+      sessionStorage.setItem("navixa_google_credential", data.credential);
       const session = await fetch("/api/auth/session", {
-        credentials: "include",
         cache: "no-store",
-        headers: { "x-navixa-admin-session": data.sessionId },
+        headers: { "x-navixa-google-credential": data.credential },
       });
       if (!session.ok) {
         const details = await session.json().catch(() => ({}));
-        sessionStorage.removeItem("navixa_admin_session");
-        setError(details.error || "لم يقبل الخادم جلسة الإدارة الجديدة.");
+        sessionStorage.removeItem("navixa_google_credential");
+        setError(details.error || "لم يقبل الخادم تأكيد Google للجلسة.");
         setState("ready");
         return;
       }
