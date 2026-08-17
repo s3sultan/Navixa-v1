@@ -1,42 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { clearAdminToken, readAdminToken, verifyGoogleAdminToken } from "./localAuth";
+import { clearAdminSession, readAdminSession } from "./adminSession";
 
 export function useAdminAuth() {
   const [allowed, setAllowed] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    let active = true;
-
-    const deny = () => {
-      if (!active) return;
-      clearAdminToken();
-      setChecking(false);
-      window.location.replace("/admin/login?reason=session");
-    };
-
-    const verify = async () => {
-      const token = readAdminToken();
-      if (!token) {
-        deny();
-        return;
-      }
-
-      const verified = await verifyGoogleAdminToken(token);
-      if (!active) return;
-      if (!verified.ok) {
-        deny();
-        return;
-      }
-
+    const session = readAdminSession();
+    if (session) {
       setAllowed(true);
       setChecking(false);
-    };
+      return;
+    }
 
-    void verify();
-    return () => { active = false; };
+    clearAdminSession();
+    setChecking(false);
+    window.location.replace("/admin/login?reason=session");
   }, []);
 
   return { allowed, checking };

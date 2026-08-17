@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import "./login.css";
-import { GOOGLE_CLIENT_ID, clearAdminToken, readAdminToken, saveAdminToken, verifyGoogleAdminToken } from "../localAuth";
+import { saveAdminSession } from "../adminSession";
+
+const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.googleusercontent.com";
 
 type GoogleIdentity = {
   accounts: {
@@ -26,41 +28,26 @@ export default function AdminLogin() {
     setState("authorizing");
     setError("");
 
-    const verified = await verifyGoogleAdminToken(credential);
-    if (!verified.ok) {
-      setError(verified.error);
-      setState("ready");
-      return;
-    }
-
-    saveAdminToken(credential);
-    window.location.assign("/admin");
-  }, []);
-
-  useEffect(() => {
-    let disposed = false;
-    const resumeFromGoogleTab = async () => {
-      const storedToken = readAdminToken();
-      if (!storedToken) return;
-      const verified = await verifyGoogleAdminToken(storedToken);
-      if (disposed) return;
-      if (verified.ok) {
-        window.location.assign("/admin");
-      } else {
-        clearAdminToken();
+    try {
+      const response = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ credential }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok || typeof result.email !== "string") {
+        setError(result.error || "تعذر تأكيد حساب الإدارة. أعد المحاولة.");
+        setState("ready");
+        return;
       }
-    };
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === "navixa_admin_google_token" && event.newValue) void resumeFromGoogleTab();
-    };
-    window.addEventListener("focus", resumeFromGoogleTab);
-    window.addEventListener("storage", onStorage);
-    void resumeFromGoogleTab();
-    return () => {
-      disposed = true;
-      window.removeEventListener("focus", resumeFromGoogleTab);
-      window.removeEventListener("storage", onStorage);
-    };
+
+      saveAdminSession(result.email);
+      window.location.replace("/admin");
+    } catch {
+      setError("تعذر الاتصال بخدمة التحقق. تحقق من الشبكة ثم أعد المحاولة.");
+      setState("ready");
+    }
   }, []);
 
   useEffect(() => {
