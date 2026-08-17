@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import "./login.css";
-import { GOOGLE_CLIENT_ID, saveAdminToken, verifyGoogleAdminToken } from "../localAuth";
+import { GOOGLE_CLIENT_ID, clearAdminToken, readAdminToken, saveAdminToken, verifyGoogleAdminToken } from "../localAuth";
 
 type GoogleIdentity = {
   accounts: {
@@ -35,6 +35,32 @@ export default function AdminLogin() {
 
     saveAdminToken(credential);
     window.location.assign("/admin");
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    const resumeFromGoogleTab = async () => {
+      const storedToken = readAdminToken();
+      if (!storedToken) return;
+      const verified = await verifyGoogleAdminToken(storedToken);
+      if (disposed) return;
+      if (verified.ok) {
+        window.location.assign("/admin");
+      } else {
+        clearAdminToken();
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "navixa_admin_google_token" && event.newValue) void resumeFromGoogleTab();
+    };
+    window.addEventListener("focus", resumeFromGoogleTab);
+    window.addEventListener("storage", onStorage);
+    void resumeFromGoogleTab();
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", resumeFromGoogleTab);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   useEffect(() => {

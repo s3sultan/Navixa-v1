@@ -88,13 +88,15 @@ export async function verifyGoogleAdminToken(token: string): Promise<{ ok: true 
 }
 
 export function saveAdminToken(token: string) {
-  sessionStorage.setItem(STORAGE_KEY, token);
+  // Google may complete sign-in in a separate mobile browser tab; localStorage
+  // keeps the verified short-lived token available to the NAVIXA admin tab.
+  localStorage.setItem(STORAGE_KEY, token);
 }
 
 export function clearAdminToken() {
-  sessionStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 export function readAdminToken() {
-  return sessionStorage.getItem(STORAGE_KEY) || "";
+  return localStorage.getItem(STORAGE_KEY) || "";
 }
