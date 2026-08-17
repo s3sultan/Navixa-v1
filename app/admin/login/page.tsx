@@ -19,42 +19,37 @@ type LoginState = "loading" | "ready" | "authorizing" | "error";
 
 export default function AdminLogin() {
   const googleButton = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState("");
   const [state, setState] = useState<LoginState>("loading");
+  const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   const finishGoogleLogin = useCallback(async (credential: string) => {
     setState("authorizing");
     setError("");
+
     try {
       const response = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        credentials: "include",
         cache: "no-store",
         body: JSON.stringify({ credential }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setError(data.error || "تعذر تسجيل الدخول بهذا الحساب");
-        setState("ready");
-        return;
-      }
-      if (!data.credential || typeof data.credential !== "string") {
-        setError("تم التحقق من الحساب، لكن لم يصل تأكيد Google للجلسة.");
+      if (!response.ok || !data.ok) {
+        setError(data.error || "تعذر التحقق من حساب Google.");
         setState("ready");
         return;
       }
 
-      sessionStorage.setItem("navixa_google_credential", data.credential);
+      sessionStorage.setItem("navixa_google_credential", credential);
       const session = await fetch("/api/auth/session", {
         cache: "no-store",
-        headers: { "x-navixa-google-credential": data.credential },
+        headers: { "x-navixa-google-credential": credential },
       });
-      if (!session.ok) {
-        const details = await session.json().catch(() => ({}));
+      const details = await session.json().catch(() => ({}));
+      if (!session.ok || !details.authenticated) {
         sessionStorage.removeItem("navixa_google_credential");
-        setError(details.error || "لم يقبل الخادم تأكيد Google للجلسة.");
+        setError(details.error || "تعذر تأكيد جلسة الإدارة. أعد المحاولة.");
         setState("ready");
         return;
       }
@@ -68,6 +63,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     let active = true;
+    let interval: ReturnType<typeof setInterval> | undefined;
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
     const mountGoogleButton = () => {
@@ -100,41 +96,66 @@ export default function AdminLogin() {
       }
     };
 
-    if (mountGoogleButton()) return () => { active = false; };
+    const stopWaiting = () => {
+      if (interval) clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
+    };
 
-    const existing = document.querySelector<HTMLScriptElement>('script[data-navixa-google="true"]');
-    const script = existing || document.createElement("script");
-    const onLoad = () => { if (!mountGoogleButton() && active) { setError("تم تحميل Google لكن لم يجهز زر الدخول."); setState("error"); } };
-    const onError = () => { if (active) { setError("تعذر تحميل Google. تحقق من الشبكة ثم أعد المحاولة."); setState("error"); } };
+    const ready = () => {
+      if (mountGoogleButton()) {
+        stopWaiting();
+        return true;
+      }
+      return false;
+    };
 
-    if (!existing) {
+    setState("loading");
+    setError("");
+    if (ready()) return () => { active = false; stopWaiting(); };
+
+    const selector = "script[data-navixa-google='true']";
+    let script = document.querySelector<HTMLScriptElement>(selector);
+    const onLoad = () => { ready(); };
+    const onError = () => {
+      if (!active) return;
+      stopWaiting();
+      setError("تعذر تحميل Google من الشبكة. جرّب إعادة التجهيز أو أوقف مانع المحتوى لهذه الصفحة.");
+      setState("error");
+    };
+
+    if (!script) {
+      script = document.createElement("script");
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.dataset.navixaGoogle = "true";
+      script.addEventListener("load", onLoad, { once: true });
+      script.addEventListener("error", onError, { once: true });
       document.head.appendChild(script);
+    } else {
+      script.addEventListener("load", onLoad, { once: true });
+      script.addEventListener("error", onError, { once: true });
     }
-    script.addEventListener("load", onLoad, { once: true });
-    script.addEventListener("error", onError, { once: true });
 
+    interval = setInterval(ready, 250);
     timeout = setTimeout(() => {
-      if (active && !(window as Window & { google?: GoogleIdentity }).google?.accounts?.id) {
-        setError("استغرق تحميل Google وقتًا أطول من المتوقع. اضغط إعادة تجهيز الدخول.");
-        setState("error");
-      }
-    }, 10000);
+      if (!active || ready()) return;
+      stopWaiting();
+      setError("لم يجهز زر Google خلال 12 ثانية. اضغط إعادة تجهيز الدخول، وتأكد من عدم حظر Google أو JavaScript في المتصفح.");
+      setState("error");
+    }, 12000);
 
     return () => {
       active = false;
-      if (timeout) clearTimeout(timeout);
-      script.removeEventListener("load", onLoad);
-      script.removeEventListener("error", onError);
+      stopWaiting();
+      script?.removeEventListener("load", onLoad);
+      script?.removeEventListener("error", onError);
     };
   }, [finishGoogleLogin, reloadKey]);
 
   const statusText = state === "loading"
     ? "جارٍ تجهيز تسجيل الدخول الآمن…"
     : state === "authorizing"
-      ? "جارٍ التحقق من الحساب وفتح الجلسة…"
+      ? "جارٍ التحقق من الحساب وفتح لوحة الإدارة…"
       : "";
 
   return (
@@ -153,7 +174,7 @@ export default function AdminLogin() {
           <div ref={googleButton} />
           {statusText && <span className="google-status">{statusText}</span>}
         </div>
-        {state === "error" && <button className="google-retry" onClick={() => { setError(""); setState("loading"); setReloadKey((key) => key + 1); }}>إعادة تجهيز الدخول</button>}
+        {state === "error" && <button className="google-retry" onClick={() => setReloadKey(key => key + 1)}>إعادة تجهيز الدخول</button>}
         {error && <p className="login-error" role="alert">{error}</p>}
         <p className="privacy">🔒 NAVIXA لا يرى كلمة مرور Google ولا يحفظها.</p>
       </section>

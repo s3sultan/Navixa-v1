@@ -13,5 +13,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ ok: true, credential }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, email: verified.email }, { headers: { "Cache-Control": "no-store" } });
 }
