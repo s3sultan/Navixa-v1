@@ -59,14 +59,13 @@ export default function Home(){
   const [screen,setScreen]=useState(false);
   const [entered,setEntered]=useState(false);
   const [hideWelcomeForever,setHideWelcomeForever]=useState(false);
-  const [welcomeSwipe,setWelcomeSwipe]=useState(0);
-  const [quoteIndex,setQuoteIndex]=useState(0);
+
   const [watchTerms,setWatchTerms]=useState("");
   const [heardText,setHeardText]=useState("");
   const [interimText,setInterimText]=useState("");
   const [heardMatch,setHeardMatch]=useState("");
   const [alertSound,setAlertSound]=useState("chime");
-  const [typedWelcome,setTypedWelcome]=useState("");
+
   const [visitCount,setVisitCount]=useState(0);
   const [ehsanCount,setEhsanCount]=useState(0);
   const [showCounter,setShowCounter]=useState(true);
@@ -107,8 +106,6 @@ export default function Home(){
   const screenDragRef=useRef<{mode:"draw"|"move"|"resize";startX:number;startY:number;origin:{x:number;y:number;w:number;h:number}}|null>(null);
   const lastIntentRef=useRef("");
   const lastNameAlertRef=useRef({name:"",at:0});
-  const welcomeTrackRef=useRef<HTMLDivElement>(null);
-  const welcomeDragRef=useRef(false);
   const backupInputRef=useRef<HTMLInputElement>(null);
   const focusDeadlineRef=useRef<number|null>(null);
   const playAlert=(sound=alertSound)=>{if(sound==="silent")return;try{const AudioCtx=(window as any).AudioContext||(window as any).webkitAudioContext;const ctx=new AudioCtx();const patterns:Record<string,number[]>={chime:[659,880],bell:[784,659,784],pulse:[440,440,660],urgent:[880,660,880,660]};const notes=patterns[sound]||patterns.chime;notes.forEach((frequency,index)=>{const oscillator=ctx.createOscillator();const gain=ctx.createGain();const start=ctx.currentTime+index*.18;oscillator.type=sound==="urgent"?"square":"sine";oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(sound==="urgent"?.13:.2,start+.02);gain.gain.exponentialRampToValueAtTime(.001,start+.16);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start);oscillator.stop(start+.18)});setTimeout(()=>ctx.close(),notes.length*180+300)}catch{}}
@@ -148,8 +145,7 @@ export default function Home(){
   const hideTutorial=(key:TutorialKey)=>{setTutorialHidden(current=>({...current,[key]:true}));setTutorialOpen(null);notify("لن يظهر هذا الشرح تلقائيًا مرة أخرى")};
   const restoreTutorial=(key:TutorialKey)=>setTutorialHidden(current=>({...current,[key]:false}));
   useEffect(()=>()=>{listeningRequestedRef.current=false;recognitionRef.current?.abort();recognitionRef.current=null},[]);
-  useEffect(()=>{const timer=setInterval(()=>setQuoteIndex(i=>(i+1)%4),3200);return()=>clearInterval(timer)},[]);
-  useEffect(()=>{const copy="مساعدك الذكي يرتب يومك، يلتقط المواعيد والملاحظات، يساعدك على التركيز والصحة—مع خصوصيتك أولًا.";let i=0;const timer=setInterval(()=>{i++;setTypedWelcome(copy.slice(0,i));if(i>=copy.length)clearInterval(timer)},28);const settings=JSON.parse(localStorage.getItem("navixa-counter-settings")||'{"enabled":true,"start":12840}');setShowCounter(settings.enabled!==false);const next=Number(localStorage.getItem("navixa-visit-count")||settings.start||12840)+1;localStorage.setItem("navixa-visit-count",String(next));setVisitCount(next);setEhsanCount(Number(localStorage.getItem("navixa-ehsan-clicks")||1200));return()=>clearInterval(timer)},[]);
+  useEffect(()=>{const settings=JSON.parse(localStorage.getItem("navixa-counter-settings")||'{"enabled":true,"start":12840}');setShowCounter(settings.enabled!==false);const next=Number(localStorage.getItem("navixa-visit-count")||settings.start||12840)+1;localStorage.setItem("navixa-visit-count",String(next));setVisitCount(next);setEhsanCount(Number(localStorage.getItem("navixa-ehsan-clicks")||1200))},[]);
   useEffect(()=>{const stored=localStorage.getItem("navixa-stats-visitor-key");const visitorKey=stored||((crypto as any).randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);if(!stored)localStorage.setItem("navixa-stats-visitor-key",visitorKey);fetch("/api/stats",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({event:"visit",visitorKey})}).then(response=>response.json()).then(data=>{if(data?.configured&&data?.stats){setVisitCount(Number(data.stats.visits)||0);setEhsanCount(Number(data.stats.ehsan)||0)}}).catch(()=>{});},[]);
   const endFocusMode=()=>{const remaining=Math.max(0,(focusDeadlineRef.current??Date.now())-Date.now());focusDeadlineRef.current=null;setSeconds(Math.ceil(remaining/1000));setFocusProgress(Math.max(0,Math.min(1,(focusDuration*1000-remaining)/(focusDuration*1000))));setRunning(false);setFocusMode(false);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
   const applyFocusDuration=(value:number)=>{const minutes=Math.max(1,Math.min(480,Math.round(value)));const duration=minutes*60;focusDeadlineRef.current=null;setRunning(false);setFocusMode(false);setFocusDuration(duration);setFocusMinutesInput(String(minutes));setSeconds(duration);setFocusProgress(0);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
@@ -208,16 +204,12 @@ export default function Home(){
   const endScreenSelection=(event:React.PointerEvent<HTMLDivElement>)=>{screenDragRef.current=null;try{event.currentTarget.releasePointerCapture(event.pointerId)}catch{}};
 
   const hour=new Date().getHours();const greeting=hour<12?"صباح الخير":hour<18?"مساء الخير":"مساء النور";
-  const welcomeQuotes=["خطوة بسيطة اليوم تصنع فرقًا كبيرًا بكرة.","رتّب يومك بهدوء، والإنجاز يتبعك.","كل دقيقة تركيز تقرّبك من هدفك.","ابدأ بخطوة واحدة، والباقي يصير أسهل."];
-  const beginWelcomeSwipe=(event:React.PointerEvent<HTMLButtonElement>)=>{event.preventDefault();welcomeDragRef.current=true;try{event.currentTarget.setPointerCapture(event.pointerId)}catch{}};
-  const moveWelcomeSwipe=(clientX:number)=>{if(!welcomeDragRef.current)return;const track=welcomeTrackRef.current;if(!track)return;const rect=track.getBoundingClientRect();const progress=Math.max(0,Math.min(1,(rect.right-clientX)/(rect.width-72)));setWelcomeSwipe(progress);if(progress>.93)setEntered(true)};
-  const endWelcomeSwipe=(event?:React.PointerEvent<HTMLDivElement>)=>{welcomeDragRef.current=false;setWelcomeSwipe(0);if(event){try{event.currentTarget.releasePointerCapture(event.pointerId)}catch{}}};
   useEffect(()=>{setHideWelcomeForever(localStorage.getItem("navixa-hide-welcome")==="1")},[]);
   const toggleWelcomeForever=()=>{setHideWelcomeForever(current=>{const next=!current;localStorage.setItem("navixa-hide-welcome",next?"1":"0");return next})};
   const showWelcomeAgain=()=>{localStorage.setItem("navixa-hide-welcome","0");setHideWelcomeForever(false);setEntered(false);setModal(null);window.scrollTo({top:0,behavior:"smooth"})};
     return <main className={`nx ${entered?"entered":"waiting"}`} dir="rtl">
     <PersonalReminderEngine focusRunning={running} focusElapsedSeconds={focusDuration-seconds} onReminder={gentleReminder}/>
-	{!entered&&!hideWelcomeForever&&<section className="welcome"><div className="welcome-pattern"/><div className="welcome-orb one"/><div className="welcome-orb two"/><div className="navixa-logo-hero"><img src="/navixa-mark.png" alt="شعار NAVIXA" /></div><small>{greeting}</small><h1>يفهم يومك <b>NAVIXA</b></h1><p className="type-welcome">{typedWelcome}<i>|</i></p><blockquote key={quoteIndex}>“{welcomeQuotes[quoteIndex]}”</blockquote><div className="welcome-benefits"><span>◉ متابعة ذكية</span><span>▣ مراقبة محلية</span><span>◎ تركيز وصحة</span></div><div ref={welcomeTrackRef} className="welcome-swipe" onPointerMove={e=>moveWelcomeSwipe(e.clientX)} onPointerUp={endWelcomeSwipe} onPointerCancel={endWelcomeSwipe}><b>تفضل بالدخول</b><button type="button" aria-label="اسحب شعار NAVIXA للدخول أو اضغط للدخول مباشرة" style={{right:`calc(6px + ${welcomeSwipe*100}% - ${welcomeSwipe*76}px)`}} onPointerDown={beginWelcomeSwipe} onClick={()=>setEntered(true)}><img src="/navixa-mark.png" alt="شعار NAVIXA" /></button><span>←</span></div><button type="button" className="welcome-direct-enter" onClick={()=>setEntered(true)}>دخول مباشر</button><label className="welcome-persistent-toggle"><input type="checkbox" checked={hideWelcomeForever} onChange={toggleWelcomeForever}/><span>عدم إظهار الصفحة الترحيبية مرة أخرى على هذا الجهاز</span></label><em>🔒 لا يعمل الميكروفون أو الشاشة إلا بموافقتك الصريحة</em></section>}
+		{!entered&&!hideWelcomeForever&&<section className="welcome" aria-label="لوحة ترحيب NAVIXA"><div className="welcome-pattern"/><div className="welcome-orb one"/><div className="welcome-orb two"/><div className="welcome-shell"><div className="navixa-logo-hero"><img src="/navixa-mark.png" alt="شعار NAVIXA" /></div><small>{greeting}، هذا NAVIXA</small><h1>انتبه لما يهمك<br/><b>بطريقتك الخاصة.</b></h1><p>سماع نداء الاسم ومتابعة الشاشة يعملان محليًا في متصفحك، ولا يبدأ أي منهما إلا عندما تمنحه الإذن.</p><div className="welcome-priority-features"><article><span>◉</span><div><b>سماع نداء الاسم</b><small>تنبيه لطيف عندما يسمع الاسم الذي تختاره</small></div></article><article><span>▣</span><div><b>متابعة الشاشة</b><small>راقب الشاشة كاملة أو منطقة محددة بموافقتك</small></div></article></div><button type="button" className="welcome-enter" onClick={()=>setEntered(true)}><span>ابدأ مع NAVIXA</span><i>←</i></button><p className="welcome-assurance"><span>🔒</span> لا يتم تشغيل الميكروفون أو مشاركة الشاشة دون موافقتك الصريحة.</p><label className="welcome-persistent-toggle"><input type="checkbox" checked={hideWelcomeForever} onChange={toggleWelcomeForever}/><span>عدم إظهار لوحة الترحيب مرة أخرى على هذا الجهاز</span></label></div></section>}
     {toast&&<div className="nx-toast">✓ {toast}</div>}
     <aside className="nx-side">
       <a className="nx-brand" href="#top"><span className="brand-logo"><img src="/navixa-mark.png" alt="" /></span><div><b>NAVIXA</b><small>مساعدك اليومي</small></div></a>
