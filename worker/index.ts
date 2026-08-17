@@ -1,6 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath, isProtectedAdminPath, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "./adminAuth";
 
 interface Env {
   ASSETS: Fetcher;
@@ -25,9 +26,48 @@ interface ExecutionContext {
 // dangerouslyAllowSVG: true in next.config.js and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
+const publicMutationLimiter = createMemoryRateLimiter();
+const publicMutationLimits: Record<string, number> = {
+  "/api/telegram-alert": 5,
+  "/api/stats": 20,
+  "/api/sync": 12,
+  "/api/auth/google": 10,
+  "/api/auth/logout": 10,
+};
+
+function publicMutationGuard(request: Request, url: URL) {
+  if (!Object.hasOwn(publicMutationLimits, url.pathname) || !["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return null;
+  if (!isTrustedSameOriginRequest(request)) {
+    return new Response(JSON.stringify({ error: "مصدر الطلب غير موثوق" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  }
+  const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const limit = publicMutationLimits[url.pathname];
+  const result = publicMutationLimiter.consume(`${url.pathname}:${clientIp}`, limit, 60_000);
+  if (!result.allowed) {
+    return new Response(JSON.stringify({ error: "تجاوزت الحد المؤقت للطلبات" }), { status: 429, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "retry-after": String(result.retryAfterSeconds) } });
+  }
+  return null;
+}
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    const mutationRejection = publicMutationGuard(request, url);
+    if (mutationRejection) return mutationRejection;
+
+    const requiresAdminSession = isProtectedAdminPath(url.pathname) || isProtectedAdminApiPath(url.pathname);
+    if (requiresAdminSession) {
+      const secret = await resolveAdminJwtSecret();
+      const session = secret ? await verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret) : null;
+      if (!session) {
+        if (isProtectedAdminApiPath(url.pathname)) {
+          return new Response(JSON.stringify({ error: "يلزم تسجيل دخول إداري صالح" }), { status: 401, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+        }
+        const loginUrl = new URL("/admin/login?reason=session", request.url);
+        return Response.redirect(loginUrl.toString(), 302);
+      }
+    }
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
@@ -40,7 +80,9 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+    if (requiresAdminSession) response.headers.set("Cache-Control", "private, no-store");
+    return response;
   },
 };
 

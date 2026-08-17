@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server.js";
 
 type MatchStatus="scheduled"|"live"|"finished";
 type Match={id:string;league:string;home:string;away:string;kickoff:string;status:MatchStatus;homeScore:number|null;awayScore:number|null;venue:string};

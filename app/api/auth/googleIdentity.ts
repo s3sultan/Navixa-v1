@@ -9,11 +9,11 @@ type GoogleProfile = {
   exp?: string;
 };
 
-export async function verifyAdminGoogleCredential(credential: string) {
+export async function verifyAdminGoogleCredential(credential: string, fetcher: typeof fetch = fetch) {
   if (!credential || typeof credential !== "string") return { ok: false as const, status: 400, error: "لم يصل تأكيد Google" };
 
   try {
-    const check = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, { cache: "no-store" });
+    const check = await fetcher(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, { cache: "no-store" });
     if (!check.ok) return { ok: false as const, status: 401, error: "انتهت صلاحية تأكيد Google أو تعذر التحقق منه" };
 
     const profile = await check.json() as GoogleProfile;

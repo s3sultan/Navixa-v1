@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import "./login.css";
-import { saveAdminSession } from "../adminSession";
 
 const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.googleusercontent.com";
 
@@ -36,13 +35,12 @@ export default function AdminLogin() {
         body: JSON.stringify({ credential }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.ok || typeof result.email !== "string") {
+      if (!response.ok || !result.ok) {
         setError(result.error || "تعذر تأكيد حساب الإدارة. أعد المحاولة.");
         setState("ready");
         return;
       }
 
-      saveAdminSession(result.email);
       window.location.replace("/admin");
     } catch {
       setError("تعذر الاتصال بخدمة التحقق. تحقق من الشبكة ثم أعد المحاولة.");
