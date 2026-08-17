@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { clearAdminToken, readAdminToken, verifyGoogleAdminToken } from "./localAuth";
 
 export function useAdminAuth() {
   const [allowed, setAllowed] = useState(false);
@@ -8,54 +9,34 @@ export function useAdminAuth() {
 
   useEffect(() => {
     let active = true;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let attempts = 0;
 
     const deny = () => {
       if (!active) return;
-      sessionStorage.removeItem("navixa_google_credential");
+      clearAdminToken();
       setChecking(false);
       window.location.replace("/admin/login?reason=session");
     };
 
     const verify = async () => {
-      try {
-        const credential = sessionStorage.getItem("navixa_google_credential");
-        const response = await fetch("/api/auth/session", {
-          cache: "no-store",
-          headers: credential ? { "x-navixa-google-credential": credential } : undefined,
-        });
-
-        if (response.ok) {
-          if (active) {
-            setAllowed(true);
-            setChecking(false);
-          }
-          return;
-        }
-
-        if (response.status === 503 && attempts < 2) {
-          attempts += 1;
-          retryTimer = setTimeout(verify, attempts * 700);
-          return;
-        }
-
+      const token = readAdminToken();
+      if (!token) {
         deny();
-      } catch {
-        if (attempts < 2) {
-          attempts += 1;
-          retryTimer = setTimeout(verify, attempts * 700);
-          return;
-        }
-        deny();
+        return;
       }
+
+      const verified = await verifyGoogleAdminToken(token);
+      if (!active) return;
+      if (!verified.ok) {
+        deny();
+        return;
+      }
+
+      setAllowed(true);
+      setChecking(false);
     };
 
     void verify();
-    return () => {
-      active = false;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
+    return () => { active = false; };
   }, []);
 
   return { allowed, checking };

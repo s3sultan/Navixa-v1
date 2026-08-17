@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import "./login.css";
-
-const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.googleusercontent.com";
+import { GOOGLE_CLIENT_ID, saveAdminToken, verifyGoogleAdminToken } from "../localAuth";
 
 type GoogleIdentity = {
   accounts: {
@@ -27,38 +26,15 @@ export default function AdminLogin() {
     setState("authorizing");
     setError("");
 
-    try {
-      const response = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ credential }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) {
-        setError(data.error || "تعذر التحقق من حساب Google.");
-        setState("ready");
-        return;
-      }
-
-      sessionStorage.setItem("navixa_google_credential", credential);
-      const session = await fetch("/api/auth/session", {
-        cache: "no-store",
-        headers: { "x-navixa-google-credential": credential },
-      });
-      const details = await session.json().catch(() => ({}));
-      if (!session.ok || !details.authenticated) {
-        sessionStorage.removeItem("navixa_google_credential");
-        setError(details.error || "تعذر تأكيد جلسة الإدارة. أعد المحاولة.");
-        setState("ready");
-        return;
-      }
-
-      window.location.assign("/admin");
-    } catch {
-      setError("تعذر الاتصال بخدمة تسجيل الدخول. تحقق من الشبكة ثم أعد المحاولة.");
+    const verified = await verifyGoogleAdminToken(credential);
+    if (!verified.ok) {
+      setError(verified.error);
       setState("ready");
+      return;
     }
+
+    saveAdminToken(credential);
+    window.location.assign("/admin");
   }, []);
 
   useEffect(() => {
