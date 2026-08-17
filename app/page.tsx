@@ -220,17 +220,15 @@ export default function Home(){
         <a href="/worship"><i>﷽</i> عبادتي</a>
         <a href="#assistant"><i>✦</i> المساعد</a>
       </nav>
-      <div className="side-quick"><small>أدوات سريعة</small><button onClick={()=>setModal("tasks")}>المهام</button><button onClick={()=>setModal("alerts")}>التنبيهات</button><button onClick={()=>setModal("backup")}>البيانات</button><button onClick={()=>setModal("appearance")}>المظهر</button></div>
+      <div className="side-quick"><small>أدوات سريعة</small><button onClick={()=>setModal("tasks")}>المهام</button><button onClick={()=>setModal("alerts")}>التنبيهات</button><button onClick={()=>setModal("backup")}>البيانات</button><button onClick={()=>setModal("appearance")}>المظهر</button></div><div className="side-stats" aria-label="إحصاءات NAVIXA المباشرة">{showCounter&&<div className="side-stat visit"><span>◉</span><div><small>الزوار</small><b>{visitCount.toLocaleString("en-US")}</b></div></div>}<div className="side-stat ehsan"><span>✦</span><div><small>إحسان</small><b>{ehsanCount.toLocaleString("en-US")}</b></div></div></div>
       <details className="side-sound"><summary>♫ صوت التنبيهات</summary><div>{[["chime","رنين هادئ"],["bell","جرس واضح"],["pulse","نبض سريع"],["urgent","تنبيه مهم"],["silent","بدون صوت"]].map(([value,label])=><label key={value}><input type="radio" name="side-alert-sound" checked={alertSound===value} onChange={()=>setAlertSound(value)}/><span>{label}</span><button type="button" onClick={()=>playAlert(value)}>تجربة</button></label>)}</div></details>
       <a className="nx-user admin-user-entry" href="/admin/login"><span className="side-mark"><img src="/navixa-mark.png" alt="" /></span><div><b>دخول الإدارة</b><small>مركز تحكم NAVIXA</small></div><i>←</i></a>
     </aside>
 
     <section className="nx-page" id="top">
-      <div className="mobile-topbar"><a href="#top" className="mobile-topbar-brand"><img src="/navixa-mark.png" alt="NAVIXA" /><b>NAVIXA</b></a><a href="/admin/login" className="mobile-topbar-admin"><img src="/navixa-mark.png" alt="" /><span>دخول الإدارة</span></a></div>
+      <div className="mobile-topbar"><a href="#top" className="mobile-topbar-brand"><img src="/navixa-mark.png" alt="NAVIXA" /><b>NAVIXA</b></a><a href="/admin/login" className="mobile-topbar-admin"><img src="/navixa-mark.png" alt="" /><span>دخول الإدارة</span></a></div><div className="mobile-live-stats" aria-label="إحصاءات NAVIXA المباشرة">{showCounter&&<div className="visit"><span>◉</span><small>الزوار</small><b>{visitCount.toLocaleString("en-US")}</b></div>}<div className="ehsan"><span>✦</span><small>إحسان</small><b>{ehsanCount.toLocaleString("en-US")}</b></div></div>
       <header className="nx-head"><a className="mobile-brand" href="#top"><img src="/navixa-mark.png" alt="NAVIXA" /></a><div><small>يوم جديد · فرصة جديدة</small><h1>{greeting}، وش ودّك تنجز اليوم؟</h1></div><div><button aria-label="التنبيهات" onClick={()=>setModal("alerts")}>♢<i/></button></div></header>
             <PrayerStrip/>
-      <section className="live-counters" aria-label="إحصاءات NAVIXA المباشرة">{showCounter&&<article className="visit-counter"><span>◉</span><div><small>زوار NAVIXA</small><b>{visitCount.toLocaleString("en-US")}</b></div><em>نشط الآن</em></article>}<article className="ehsan-counter"><span>✦</span><div><small>زيارات إحسان</small><b>{ehsanCount.toLocaleString("en-US")}</b></div><em>أثر طيب</em></article></section>
-
       <section className="navixa-command-center" id="today" aria-labelledby="today-title">
         <div className="priority-heading"><div><small>NAVIXA · ميزاتك الأهم</small><h2 id="today-title">التقط ما يهمك، قبل أن يفوتك</h2><p>ابدأ بميزة واحدة: نداء اسمك أو مراقبة الجزء المهم من شاشتك. كل شيء يعمل محليًا بعد إذنك.</p></div><button onClick={()=>setModal("tasks")}>✓ مهامي {tasks.filter(t=>!t.done).length}</button></div>
         <div className="priority-feature-grid">
