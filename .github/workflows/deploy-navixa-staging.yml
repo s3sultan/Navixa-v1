@@ -45,11 +45,11 @@ jobs:
           if [ -n "$STAGING_D1_DATABASE_ID" ]; then
             echo "Using configured STAGING_D1_DATABASE_ID"
           else
-            existing=$(npx --no-install wrangler d1 list --json)
-            database_id=$(printf '%s' "$existing" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const rows=JSON.parse(s);const item=rows.find(x=>x.name==="navixa-staging");process.stdout.write(item?.uuid||item?.database_id||"")})')
+            existing=$(npx --no-install wrangler d1 list)
+            database_id=$(printf '%s\n' "$existing" | grep -Eo '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' | head -n 1 || true)
             if [ -z "$database_id" ]; then
-              created=$(npx --no-install wrangler d1 create navixa-staging --json)
-              database_id=$(printf '%s' "$created" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);process.stdout.write(x.uuid||x.database_id||x.result?.uuid||x.result?.database_id||"")})')
+              created=$(npx --no-install wrangler d1 create navixa-staging)
+              database_id=$(printf '%s\n' "$created" | grep -Eo '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' | head -n 1 || true)
             fi
             test -n "$database_id" || { echo "Could not resolve navixa-staging database id"; exit 1; }
             echo "STAGING_D1_DATABASE_ID=$database_id" >> "$GITHUB_ENV"
