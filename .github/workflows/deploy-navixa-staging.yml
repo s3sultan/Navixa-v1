@@ -72,6 +72,13 @@ jobs:
           fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
           NODE
 
+      - name: Prepare staging D1 migrations
+        run: |
+          test -d migrations || { echo "migrations directory is missing"; exit 1; }
+          mkdir -p dist/server/migrations
+          cp migrations/*.sql dist/server/migrations/
+          test -n "$(find dist/server/migrations -maxdepth 1 -name '*.sql' -print -quit)"
+
       - name: Apply staging D1 migrations
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
