@@ -12,6 +12,8 @@ export async function GET(request:Request){
   try{
     const response=await fetch(url,{cache:"no-store"});
     if(!response.ok)return NextResponse.json({error:"تعذر جلب مواقيت الصلاة"},{status:502});
-    return NextResponse.json(await response.json());
+    const result=NextResponse.json(await response.json());
+    result.headers.set("Cache-Control","public, s-maxage=300, stale-while-revalidate=900");
+    return result;
   }catch{return NextResponse.json({error:"تعذر جلب مواقيت الصلاة"},{status:500})}
 }
