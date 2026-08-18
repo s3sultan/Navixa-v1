@@ -67,7 +67,7 @@ export async function GET(request:Request){
 
   try{
     const provider=await fetch(`https://v3.football.api-sports.io/fixtures?date=${encodeURIComponent(date)}&timezone=Asia%2FRiyadh`,{
-      headers:{"x-apisports-key":apiKey,accept:"application/json"},
+      headers:{"x-apisports-key":apiKey},
       cache:"no-store"
     });
     const payload=await provider.json();
