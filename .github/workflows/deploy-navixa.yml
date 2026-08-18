@@ -41,12 +41,18 @@ jobs:
         run: |
           echo "Deployment skipped safely: configure ADMIN_JWT_SECRET in GitHub Actions secrets, then run this workflow again."
 
+      - name: Upload admin JWT secret
+        if: env.ADMIN_JWT_SECRET != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          printf '%s' "$ADMIN_JWT_SECRET" | npx --no-install wrangler secret put ADMIN_JWT_SECRET --config dist/server/wrangler.json --name navixa
+
       - name: Deploy the navixa Worker
         if: env.ADMIN_JWT_SECRET != ''
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config dist/server/wrangler.json
-          secrets: |
-            ADMIN_JWT_SECRET
+          command: deploy --config dist/server/wrangler.json --name navixa
