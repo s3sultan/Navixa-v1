@@ -99,10 +99,25 @@ const worker = {
       }, allowedWidths);
     }
 
+    const isCacheableHome = url.pathname === "/" && request.method === "GET" && !request.headers.has("RSC") && !request.headers.has("Next-Router-Prefetch");
+    const homeCacheKey = isCacheableHome ? new Request(new URL("/", request.url).toString(), { method: "GET" }) : null;
+    if (homeCacheKey) {
+      const cachedHome = await caches.default.match(homeCacheKey);
+      if (cachedHome) {
+        const hit = new Response(cachedHome.body, cachedHome);
+        hit.headers.set("X-NAVIXA-Edge-Cache", "HIT");
+        return auditResponse(request, url, hit, startedAt, "public");
+      }
+    }
+
     const response = await handler.fetch(request, env, ctx);
     if (requiresAdminSession) response.headers.set("Cache-Control", "private, no-store");
-    if (url.pathname === "/" && request.method === "GET" && !request.headers.has("RSC") && !request.headers.has("Next-Router-Prefetch")) {
+    if (isCacheableHome) {
       response.headers.set("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=120");
+      response.headers.set("X-NAVIXA-Edge-Cache", "MISS");
+      if (homeCacheKey && response.status === 200 && !response.headers.has("Set-Cookie")) {
+        ctx.waitUntil(caches.default.put(homeCacheKey, response.clone()));
+      }
     }
     return auditResponse(request, url, response, startedAt, requiresAdminSession ? "admin" : "public");
   },
