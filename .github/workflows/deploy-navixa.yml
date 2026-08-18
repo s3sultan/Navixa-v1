@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 30
     env:
       ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
     steps:
       - name: Read official source
         uses: actions/checkout@v6
@@ -59,6 +60,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           printf '%s' "$ADMIN_JWT_SECRET" | npx --no-install wrangler secret put ADMIN_JWT_SECRET --config dist/server/wrangler.json --name navixa
+
+      - name: Upload optional football data secret
+        if: env.ADMIN_JWT_SECRET != '' && env.API_FOOTBALL_KEY != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: printf '%s' "$API_FOOTBALL_KEY" | npx --no-install wrangler secret put API_FOOTBALL_KEY --config dist/server/wrangler.json --name navixa
 
       - name: Deploy the navixa Worker
         if: env.ADMIN_JWT_SECRET != ''

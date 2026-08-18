@@ -9,9 +9,18 @@ const FINISHED=new Set(["FT","AET","PEN","AWD","WO"]);
 
 function demoMatches(date:string):Match[]{
   return [
-    {id:`demo-${date}-1`,league:"معاينة جدول المباريات",home:"الفريق المضيف",away:"الفريق الضيف",kickoff:`${date}T18:30:00+03:00`,status:"scheduled",homeScore:null,awayScore:null,venue:"يظهر اسم الملعب عند الربط"},
-    {id:`demo-${date}-2`,league:"معاينة جدول المباريات",home:"الفريق الأول",away:"الفريق الثاني",kickoff:`${date}T21:00:00+03:00`,status:"scheduled",homeScore:null,awayScore:null,venue:"الوقت معروض بتوقيت الرياض"}
+    {id:`demo-${date}-rsl`,league:"دوري روشن",competitionId:"rsl",home:"الفريق المضيف",away:"الفريق الضيف",kickoff:`${date}T18:30:00+03:00`,status:"scheduled",homeScore:null,awayScore:null,venue:"بيانات تجريبية آمنة"},
+    {id:`demo-${date}-kings`,league:"كأس الملك",competitionId:"kings-cup",home:"الفريق الأول",away:"الفريق الثاني",kickoff:`${date}T21:00:00+03:00`,status:"scheduled",homeScore:null,awayScore:null,venue:"بيانات تجريبية آمنة"},
+    {id:`demo-${date}-gulf`,league:"كأس الخليج",competitionId:"gulf-cup",home:"الفريق الثالث",away:"الفريق الرابع",kickoff:`${date}T22:30:00+03:00`,status:"scheduled",homeScore:null,awayScore:null,venue:"بيانات تجريبية آمنة"}
   ];
+}
+
+function competitionId(name:string):string|undefined{
+  const value=name.toLowerCase();
+  if(value.includes("pro league")||value.includes("professional league")||value.includes("saudi pro"))return "rsl";
+  if(value.includes("king")&&value.includes("cup"))return "kings-cup";
+  if(value.includes("gulf cup")||value.includes("arabian gulf"))return "gulf-cup";
+  return undefined;
 }
 
 function matchStatus(short:string):MatchStatus{
@@ -21,10 +30,11 @@ function matchStatus(short:string):MatchStatus{
 }
 
 function mapFixture(fixture:any):Match{
-  const short=String(fixture?.fixture?.status?.short||"NS");
+  const short=String(fixture?.fixture?.status?.short||"NS"),league=String(fixture?.league?.name||"مباراة");
   return {
     id:String(fixture?.fixture?.id||crypto.randomUUID()),
-    league:String(fixture?.league?.name||"مباراة"),
+    league,
+    competitionId:competitionId(league),
     home:String(fixture?.teams?.home?.name||"الفريق المضيف"),
     away:String(fixture?.teams?.away?.name||"الفريق الضيف"),
     kickoff:String(fixture?.fixture?.date||""),
@@ -53,7 +63,7 @@ export async function GET(request:Request){
     });
     const payload=await provider.json();
     if(!provider.ok||payload?.errors&&Object.keys(payload.errors).length)throw new Error("provider");
-    const response=NextResponse.json({source:"api-football",matches:(Array.isArray(payload?.response)?payload.response:[]).slice(0,24).map(mapFixture)});
+    const response=NextResponse.json({source:"api-football",matches:(Array.isArray(payload?.response)?payload.response:[]).map(mapFixture).filter((match:Match)=>match.competitionId).slice(0,24)});
     response.headers.set("Cache-Control","public, s-maxage=900, stale-while-revalidate=3600");
     return response;
   }catch{

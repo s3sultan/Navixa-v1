@@ -23,7 +23,7 @@ test("matches API rejects malformed dates and provides safe demo data without a 
     const payload = await response.json() as { source: string; matches: unknown[] };
     assert.equal(response.status, 200);
     assert.equal(payload.source, "demo");
-    assert.equal(payload.matches.length, 2);
+    assert.equal(payload.matches.length, 3);
   } finally {
     if (prior === undefined) delete process.env.API_FOOTBALL_KEY;
     else process.env.API_FOOTBALL_KEY = prior;
