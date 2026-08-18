@@ -2,84 +2,24 @@ import { NextResponse } from "next/server.js";
 
 type MatchStatus="scheduled"|"live"|"finished";
 type Competition={id:string;label:string};
-type Match={id:string;league:string;competitionId:string;home:string;away:string;homeLogo:string;awayLogo:string;kickoff:string;status:MatchStatus;homeScore:number|null;awayScore:number|null;venue:string};
+type Match={id:string;league:string;competitionId:string;home:string;away:string;homeLogo:string;awayLogo:string;kickoff:string;status:MatchStatus;homeScore:number|null;awayScore:number|null;venue:string;venueCity:string};
+type D1Statement={bind:(...values:unknown[])=>D1Statement;run:()=>Promise<unknown>;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>};
+type D1Database={prepare:(sql:string)=>D1Statement};
+type MatchOverride={hidden:boolean;homeNameAr:string;awayNameAr:string;leagueNameAr:string;homeLogo:string;awayLogo:string;showHomeLogo:boolean;showAwayLogo:boolean};
 
 const DATE=/^\d{4}-\d{2}-\d{2}$/;
 const LIVE=new Set(["1H","HT","2H","ET","BT","P","INT"]);
 const FINISHED=new Set(["FT","AET","PEN","AWD","WO"]);
-const FEATURED_BY_LEAGUE_ID:Record<number,Competition>={
-  307:{id:"rsl",label:"دوري روشن السعودي"},
-  39:{id:"premier-league",label:"الدوري الإنجليزي الممتاز"},
-  140:{id:"la-liga",label:"الدوري الإسباني"},
-  78:{id:"bundesliga",label:"الدوري الألماني"},
-  135:{id:"serie-a",label:"الدوري الإيطالي"},
-  61:{id:"ligue-1",label:"الدوري الفرنسي"},
-  2:{id:"champions-league",label:"دوري أبطال أوروبا"}
-};
+const ARABIC_TEAM_NAMES:Record<string,string>={"al-hilal":"الهلال","al-nassr":"النصر","al-ittihad":"الاتحاد","al-ahli jeddah":"الأهلي","al-shabab":"الشباب","al-ettifaq":"الاتفاق","al-fateh":"الفتح","al-fayha":"الفيحاء","al-raed":"الرائد","al-khaleej":"الخليج","al-taawoun":"التعاون","al-riyadh":"الرياض","al-qadsiah":"القادسية","al-orobah":"العروبة","al-okhdood":"الأخدود","damac":"ضمك","al-wehda":"الوحدة","al-hazm":"الحزم","al-jabalain":"الجبيل","al-jubail":"الجبيل","al-diriyah":"الدرعية","saudi arabia":"السعودية","bahrain":"البحرين","qatar":"قطر","kuwait":"الكويت","united arab emirates":"الإمارات","oman":"عُمان","iraq":"العراق","yemen":"اليمن"};
+const FEATURED_BY_LEAGUE_ID:Record<number,Competition>={307:{id:"rsl",label:"دوري روشن السعودي"},39:{id:"premier-league",label:"الدوري الإنجليزي الممتاز"},140:{id:"la-liga",label:"الدوري الإسباني"},78:{id:"bundesliga",label:"الدوري الألماني"},135:{id:"serie-a",label:"الدوري الإيطالي"},61:{id:"ligue-1",label:"الدوري الفرنسي"},2:{id:"champions-league",label:"دوري أبطال أوروبا"}};
+const arabicTeamName=(name:string,competitionId:string)=>["rsl","kings-cup","gulf-cup"].includes(competitionId)?ARABIC_TEAM_NAMES[name.toLowerCase()]||name:name;
+const matchStatus=(short:string):MatchStatus=>LIVE.has(short)?"live":FINISHED.has(short)?"finished":"scheduled";
 
-function matchStatus(short:string):MatchStatus{
-  if(LIVE.has(short))return "live";
-  if(FINISHED.has(short))return "finished";
-  return "scheduled";
-}
+function featuredCompetition(fixture:any):Competition|undefined{const leagueId=Number(fixture?.league?.id);if(FEATURED_BY_LEAGUE_ID[leagueId])return FEATURED_BY_LEAGUE_ID[leagueId];const name=String(fixture?.league?.name||"").toLowerCase();const country=String(fixture?.league?.country||"").toLowerCase();if(country.includes("saudi")&&name.includes("king")&&name.includes("cup"))return {id:"kings-cup",label:"كأس الملك"};if(name.includes("gulf cup")||name.includes("gulf cup of nations"))return {id:"gulf-cup",label:"كأس الخليج"};return undefined}
+function mapFixture(fixture:any,competition:Competition):Match{const short=String(fixture?.fixture?.status?.short||"NS");return {id:String(fixture?.fixture?.id||crypto.randomUUID()),league:competition.label,competitionId:competition.id,home:arabicTeamName(String(fixture?.teams?.home?.name||"الفريق المضيف"),competition.id),away:arabicTeamName(String(fixture?.teams?.away?.name||"الفريق الضيف"),competition.id),homeLogo:String(fixture?.teams?.home?.logo||""),awayLogo:String(fixture?.teams?.away?.logo||""),kickoff:String(fixture?.fixture?.date||""),status:matchStatus(short),homeScore:fixture?.goals?.home??null,awayScore:fixture?.goals?.away??null,venue:String(fixture?.fixture?.venue?.name||""),venueCity:String(fixture?.fixture?.venue?.city||"")}}
+async function getDb():Promise<D1Database|null>{try{return (await import("cloudflare:workers") as {env?:{DB?:D1Database}}).env?.DB||null}catch{return (globalThis as {DB?:D1Database}).DB||null}}
+async function loadOverrides():Promise<Record<string,MatchOverride>>{const db=await getDb();if(!db)return {};try{const rows=await db.prepare("SELECT match_id,hidden,home_name_ar,away_name_ar,league_name_ar,home_logo,away_logo,show_home_logo,show_away_logo FROM navixa_match_overrides LIMIT 200").all<Record<string,unknown>>();return Object.fromEntries(rows.results.map(row=>[String(row.match_id||""),{hidden:Number(row.hidden||0)===1,homeNameAr:String(row.home_name_ar||""),awayNameAr:String(row.away_name_ar||""),leagueNameAr:String(row.league_name_ar||""),homeLogo:String(row.home_logo||""),awayLogo:String(row.away_logo||""),showHomeLogo:Number(row.show_home_logo??1)===1,showAwayLogo:Number(row.show_away_logo??1)===1}]));}catch{return {}}}
+function applyOverride(match:Match,override:MatchOverride|undefined):Match|null{if(!override)return match;if(override.hidden)return null;return {...match,home:override.homeNameAr||match.home,away:override.awayNameAr||match.away,league:override.leagueNameAr||match.league,homeLogo:override.showHomeLogo?(override.homeLogo||match.homeLogo):"",awayLogo:override.showAwayLogo?(override.awayLogo||match.awayLogo):""}}
+function fallback(date:string,message:string,cacheControl:string){const response=NextResponse.json({source:"unavailable",matches:[],date,message});response.headers.set("Cache-Control",cacheControl);return response}
 
-function featuredCompetition(fixture:any):Competition|undefined{
-  const leagueId=Number(fixture?.league?.id);
-  if(FEATURED_BY_LEAGUE_ID[leagueId])return FEATURED_BY_LEAGUE_ID[leagueId];
-  const name=String(fixture?.league?.name||"").toLowerCase();
-  const country=String(fixture?.league?.country||"").toLowerCase();
-  // The country condition prevents the Iranian Persian Gulf Pro League from being labelled as Saudi Roshn League.
-  if(country.includes("saudi")&&name.includes("king")&&name.includes("cup"))return {id:"kings-cup",label:"كأس الملك"};
-  if(name.includes("gulf cup")||name.includes("gulf cup of nations"))return {id:"gulf-cup",label:"كأس الخليج"};
-  return undefined;
-}
-
-function mapFixture(fixture:any,competition:Competition):Match{
-  const short=String(fixture?.fixture?.status?.short||"NS");
-  return {
-    id:String(fixture?.fixture?.id||crypto.randomUUID()),
-    league:competition.label,
-    competitionId:competition.id,
-    home:String(fixture?.teams?.home?.name||"الفريق المضيف"),
-    away:String(fixture?.teams?.away?.name||"الفريق الضيف"),
-    homeLogo:String(fixture?.teams?.home?.logo||""),
-    awayLogo:String(fixture?.teams?.away?.logo||""),
-    kickoff:String(fixture?.fixture?.date||""),
-    status:matchStatus(short),
-    homeScore:fixture?.goals?.home??null,
-    awayScore:fixture?.goals?.away??null,
-    venue:String(fixture?.fixture?.venue?.name||"")
-  };
-}
-
-function fallback(date:string,message:string,cacheControl:string){
-  const response=NextResponse.json({source:"unavailable",matches:[],date,message});
-  response.headers.set("Cache-Control",cacheControl);
-  return response;
-}
-
-export async function GET(request:Request){
-  const date=new URL(request.url).searchParams.get("date")||new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Riyadh"}).format(new Date());
-  if(!DATE.test(date))return NextResponse.json({error:"تاريخ غير صالح"},{status:400});
-
-  const apiKey=process.env.API_FOOTBALL_KEY;
-  if(!apiKey)return fallback(date,"مصدر المباريات غير مفعّل حاليًا.","public, s-maxage=300, stale-while-revalidate=900");
-
-  try{
-    const provider=await fetch(`https://v3.football.api-sports.io/fixtures?date=${encodeURIComponent(date)}&timezone=Asia%2FRiyadh`,{
-      headers:{"x-apisports-key":apiKey},
-      cache:"no-store"
-    });
-    const payload=await provider.json();
-    if(!provider.ok||payload?.errors&&Object.keys(payload.errors).length)throw new Error("provider");
-    const matches=(Array.isArray(payload?.response)?payload.response:[])
-      .map((fixture:any)=>{const competition=featuredCompetition(fixture);return competition?mapFixture(fixture,competition):null})
-      .filter((match:Match|null):match is Match=>Boolean(match))
-      .slice(0,36);
-    const response=NextResponse.json({source:"api-football",matches});
-    response.headers.set("Cache-Control","public, s-maxage=900, stale-while-revalidate=3600");
-    return response;
-  }catch{
-    return fallback(date,"تعذر تحديث مصدر المباريات الآن؛ لن تظهر مباريات غير مؤكدة.","public, s-maxage=300, stale-while-revalidate=900");
-  }
-}
+export async function GET(request:Request){const date=new URL(request.url).searchParams.get("date")||new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Riyadh"}).format(new Date());if(!DATE.test(date))return NextResponse.json({error:"تاريخ غير صالح"},{status:400});const apiKey=process.env.API_FOOTBALL_KEY;if(!apiKey)return fallback(date,"مصدر المباريات غير مفعّل حاليًا.","public, s-maxage=120, stale-while-revalidate=600");try{const provider=await fetch(`https://v3.football.api-sports.io/fixtures?date=${encodeURIComponent(date)}&timezone=Asia%2FRiyadh`,{headers:{"x-apisports-key":apiKey},cache:"no-store"});const payload=await provider.json();if(!provider.ok||payload?.errors&&Object.keys(payload.errors).length)throw new Error("provider");const overrides=await loadOverrides();const matches=(Array.isArray(payload?.response)?payload.response:[]).map((fixture:any)=>{const competition=featuredCompetition(fixture);return competition?applyOverride(mapFixture(fixture,competition),overrides[String(fixture?.fixture?.id||"")]):null}).filter((match:Match|null):match is Match=>Boolean(match)).slice(0,36);const response=NextResponse.json({source:"api-football",matches});response.headers.set("Cache-Control","public, s-maxage=120, stale-while-revalidate=600");return response}catch{return fallback(date,"تعذر تحديث مصدر المباريات الآن؛ لن تظهر مباريات غير مؤكدة.","public, s-maxage=120, stale-while-revalidate=600")}}

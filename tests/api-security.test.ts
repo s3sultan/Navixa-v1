@@ -5,6 +5,7 @@ import { createAdminSessionToken, makeAdminSessionCookie } from "../worker/admin
 import { POST as googleLogin } from "../app/api/auth/google/route.ts";
 import { GET as getMatches } from "../app/api/matches/route.ts";
 import { POST as telegramAlert } from "../app/api/telegram-alert/route.ts";
+import { GET as getAdminMatches, POST as saveAdminMatch } from "../app/api/admin/matches/route.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -94,6 +95,13 @@ test("admin-session API only reports authenticated when a valid signed cookie is
     if (priorSecret === undefined) delete process.env.ADMIN_JWT_SECRET;
     else process.env.ADMIN_JWT_SECRET = priorSecret;
   }
+});
+
+test("match administration API rejects anonymous and cross-origin mutation requests", async () => {
+  const anonymous = await getAdminMatches(new Request(`${appOrigin}/api/admin/matches`));
+  assert.equal(anonymous.status, 401);
+  const crossOrigin = await saveAdminMatch(new Request(`${appOrigin}/api/admin/matches`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ matchId: "1" }) }));
+  assert.equal(crossOrigin.status, 401);
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {
