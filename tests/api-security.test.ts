@@ -13,7 +13,7 @@ function post(path: string, body: unknown, headers: Record<string, string> = {})
   return new Request(`${appOrigin}${path}`, { method: "POST", headers: { origin: appOrigin, "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
 }
 
-test("matches API rejects malformed dates and provides safe demo data without a provider key", async () => {
+test("matches API rejects malformed dates and returns no unverified fixtures without a provider key", async () => {
   const prior = process.env.API_FOOTBALL_KEY;
   delete process.env.API_FOOTBALL_KEY;
   try {
@@ -22,9 +22,34 @@ test("matches API rejects malformed dates and provides safe demo data without a 
     const response = await getMatches(new Request(`${appOrigin}/api/matches?date=2026-08-17`));
     const payload = await response.json() as { source: string; matches: unknown[] };
     assert.equal(response.status, 200);
-    assert.equal(payload.source, "demo");
-    assert.equal(payload.matches.length, 3);
+    assert.equal(payload.source, "unavailable");
+    assert.equal(payload.matches.length, 0);
   } finally {
+    if (prior === undefined) delete process.env.API_FOOTBALL_KEY;
+    else process.env.API_FOOTBALL_KEY = prior;
+  }
+});
+
+test("matches API keeps Saudi Roshn fixtures and team logos while excluding Persian Gulf Pro League", async () => {
+  const prior = process.env.API_FOOTBALL_KEY;
+  const priorFetch = globalThis.fetch;
+  process.env.API_FOOTBALL_KEY = "test-football-key";
+  globalThis.fetch = async () => new Response(JSON.stringify({response:[
+    {fixture:{id:1,date:"2026-08-18T18:00:00+03:00",status:{short:"NS"},venue:{name:"الملعب"}},league:{id:307,name:"Saudi Pro League",country:"Saudi Arabia"},teams:{home:{name:"الهلال",logo:"https://logos.example/hilal.png"},away:{name:"النصر",logo:"https://logos.example/nassr.png"}},goals:{home:null,away:null}},
+    {fixture:{id:2,date:"2026-08-18T18:00:00+03:00",status:{short:"NS"},venue:{name:""}},league:{id:294,name:"Persian Gulf Pro League",country:"Iran"},teams:{home:{name:"فريق إيراني",logo:""},away:{name:"فريق آخر",logo:""}},goals:{home:null,away:null}}
+  ]}),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response = await getMatches(new Request(`${appOrigin}/api/matches?date=2026-08-18`));
+    const payload = await response.json() as { source: string; matches: Array<{competitionId:string;home:string;away:string;homeLogo:string;awayLogo:string}> };
+    assert.equal(payload.source,"api-football");
+    assert.equal(payload.matches.length,1);
+    assert.equal(payload.matches[0].competitionId,"rsl");
+    assert.equal(payload.matches[0].home,"الهلال");
+    assert.equal(payload.matches[0].away,"النصر");
+    assert.equal(payload.matches[0].homeLogo,"https://logos.example/hilal.png");
+    assert.equal(payload.matches[0].awayLogo,"https://logos.example/nassr.png");
+  } finally {
+    globalThis.fetch = priorFetch;
     if (prior === undefined) delete process.env.API_FOOTBALL_KEY;
     else process.env.API_FOOTBALL_KEY = prior;
   }
