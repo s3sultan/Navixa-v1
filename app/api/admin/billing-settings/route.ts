@@ -23,11 +23,11 @@ async function schema(database:D1Database){
   for(const key of settingKeys)await database.prepare("INSERT OR IGNORE INTO navixa_billing_settings (setting_key,setting_value,updated_at) VALUES (?,?,?)").bind(key,defaults[key],now).run();
 }
 async function readSettings(database:D1Database){await schema(database);const rows=await database.prepare("SELECT setting_key,setting_value FROM navixa_billing_settings").all<BillingSetting>();const settings={...defaults};for(const row of rows.results)if(settingKeys.includes(row.setting_key as SettingKey))settings[row.setting_key as SettingKey]=row.setting_value;return settings;}
-function safeStatus(secrets:Env){return {testKeyConfigured:Boolean(secrets.MOYASAR_TEST_SECRET_KEY),testWebhookSecretConfigured:Boolean(secrets.MOYASAR_TEST_WEBHOOK_SECRET),liveKeyConfigured:Boolean(secrets.MOYASAR_LIVE_SECRET_KEY),liveWebhookSecretConfigured:Boolean(secrets.MOYASAR_LIVE_WEBHOOK_SECRET)};}
+function safeStatus(secrets:Env){return {testPublishableKeyConfigured:Boolean(secrets.MOYASAR_TEST_PUBLISHABLE_KEY),testKeyConfigured:Boolean(secrets.MOYASAR_TEST_SECRET_KEY),testWebhookSecretConfigured:Boolean(secrets.MOYASAR_TEST_WEBHOOK_SECRET),livePublishableKeyConfigured:Boolean(secrets.MOYASAR_LIVE_PUBLISHABLE_KEY),liveKeyConfigured:Boolean(secrets.MOYASAR_LIVE_SECRET_KEY),liveWebhookSecretConfigured:Boolean(secrets.MOYASAR_LIVE_WEBHOOK_SECRET)};}
 
 export async function GET(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
-  const database=await db();if(!database)return NextResponse.json({settings:defaults,secrets:{testKeyConfigured:false,testWebhookSecretConfigured:false,liveKeyConfigured:false,liveWebhookSecretConfigured:false},events:[]},{headers:{"Cache-Control":"no-store"}});
+  const database=await db();if(!database)return NextResponse.json({settings:defaults,secrets:{testPublishableKeyConfigured:false,testKeyConfigured:false,testWebhookSecretConfigured:false,livePublishableKeyConfigured:false,liveKeyConfigured:false,liveWebhookSecretConfigured:false},events:[]},{headers:{"Cache-Control":"no-store"}});
   const [settings,secrets,lastEvents]=await Promise.all([readSettings(database),env(),database.prepare("SELECT id,provider_event_id,event_type,mode,created_at,processed_at FROM navixa_billing_events ORDER BY created_at DESC LIMIT 12").all<BillingEvent>()]);
   return NextResponse.json({settings,secrets:safeStatus(secrets),events:lastEvents.results},{headers:{"Cache-Control":"no-store"}});
 }
