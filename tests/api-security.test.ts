@@ -15,6 +15,7 @@ import { GET as getAdminManualMatches, POST as saveAdminManualMatch } from "../a
 import { POST as shareAssistantLearning } from "../app/api/assistant-learning/route.ts";
 import { GET as getAssistantLearningReview } from "../app/api/admin/assistant-learning/route.ts";
 import { GET as getSubscriptions } from "../app/api/admin/subscriptions/route.ts";
+import { GET as getBillingSettings } from "../app/api/admin/billing-settings/route.ts";
 import { GET as getBillingWebhook, POST as billingWebhook } from "../app/api/billing/webhook/route.ts";
 import { POST as registerPlusInterest } from "../app/api/plus/interest/route.ts";
 
@@ -168,12 +169,14 @@ test("global assistant learning requires same-origin consent and admin review st
   assert.equal(review.status, 401);
 });
 
-test("subscription administration stays protected and the billing webhook is disabled by default", async () => {
+test("subscription administration stays protected and the billing webhook is locked by default", async () => {
   const subscriptions = await getSubscriptions(new Request(`${appOrigin}/api/admin/subscriptions`));
   assert.equal(subscriptions.status, 401);
+  const billingSettings = await getBillingSettings(new Request(`${appOrigin}/api/admin/billing-settings`));
+  assert.equal(billingSettings.status, 401);
   const status = await getBillingWebhook();
   assert.equal(status.status, 200);
-  assert.deepEqual(await status.json(), { billing:"disabled",mode:"test",message:"بوابة الدفع غير مفعلة. لا يتم قبول أي دفعات أو بيانات بطاقات." });
+  assert.deepEqual(await status.json(), { billing:"disabled",mode:"test",message:"بوابة الدفع مخفية ومقفلة حتى يفعّلها المدير. لا يتم قبول أي دفعات أو بيانات بطاقات الآن." });
   const webhook = await billingWebhook(new Request(`${appOrigin}/api/billing/webhook`, { method:"POST",headers:{"content-type":"application/json"},body:"{}" }));
   assert.equal(webhook.status,503);
   const crossOriginInterest = await registerPlusInterest(new Request(`${appOrigin}/api/plus/interest`, { method:"POST",headers:{origin:"https://attacker.example","content-type":"application/json"},body:JSON.stringify({email:"test@example.com"}) }));
