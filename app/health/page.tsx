@@ -17,5 +17,10 @@ export default function HealthPage(){
     </header>
     <section className="health-hero" aria-labelledby="health-hero-title"><div className="health-hero-copy"><small>صحة NAVIXA · محليًا وخصوصيًا</small><h2 id="health-hero-title">اجلس بوعي، وتحرك في وقتك</h2><p>راقب وضعية جلوسك، سجّل ماءك، وخذ استراحة قصيرة عندما يحتاجها جسدك — بدون رفع صور الكاميرا إلى أي خادم.</p><div className="health-hero-pills"><span>خصوصية أولًا</span><span>مراقبة محلية</span><span>خطوات بسيطة</span></div></div><div className="health-hero-orb"><img src="/navixa-mark.png" alt="" /><span>جسمك<br/><b>يستحق العناية</b></span></div></section>
     <HealthMonitor/>
+    <section className="health-ecosystem-teaser" aria-label="منظومة NAVIXA القادمة">
+      <div className="health-ecosystem-icon" aria-hidden="true">◒</div>
+      <div className="health-ecosystem-copy"><small>من منظومة NAVIXA</small><h2>NAVIXA Fitness</h2><p>مساحة رياضية هادئة تساعدك على بناء عادات حركة متوازنة.</p></div>
+      <span className="health-coming-soon">قريبًا</span>
+    </section>
   </main>
 }
