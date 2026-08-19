@@ -18,6 +18,8 @@ import { GET as getSubscriptions } from "../app/api/admin/subscriptions/route.ts
 import { GET as getBillingSettings } from "../app/api/admin/billing-settings/route.ts";
 import { GET as getBillingWebhook, POST as billingWebhook } from "../app/api/billing/webhook/route.ts";
 import { POST as registerPlusInterest } from "../app/api/plus/interest/route.ts";
+import { GET as getAdminReferrals } from "../app/api/admin/referrals/route.ts";
+import { createCode } from "../app/referrals.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -181,6 +183,12 @@ test("subscription administration stays protected and the billing webhook is loc
   assert.equal(webhook.status,503);
   const crossOriginInterest = await registerPlusInterest(new Request(`${appOrigin}/api/plus/interest`, { method:"POST",headers:{origin:"https://attacker.example","content-type":"application/json"},body:JSON.stringify({email:"test@example.com"}) }));
   assert.equal(crossOriginInterest.status,403);
+});
+
+test("referral administration stays protected and generated codes use the NAVIXA format", async () => {
+  const referrals = await getAdminReferrals(new Request(`${appOrigin}/api/admin/referrals`));
+  assert.equal(referrals.status, 401);
+  assert.match(createCode(), /^NVX-[A-Z0-9]{8}$/);
 });
 
 test("Plus interest records only a contact through the same-origin endpoint", async () => {

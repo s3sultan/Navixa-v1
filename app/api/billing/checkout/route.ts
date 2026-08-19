@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server.js";
+import {clean as cleanReferral,createAttribution} from "../../../referrals.ts";
 
 type D1Statement={bind:(...values:unknown[])=>D1Statement;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
 type D1Database={prepare:(sql:string)=>D1Statement};
@@ -27,9 +28,10 @@ export async function POST(request:Request){
   const database=await db();if(!database)return NextResponse.json({error:"الدفع غير متاح حاليًا"},{status:503,headers:{"Cache-Control":"no-store"}});
   const current=await settings(database);if(current.public_checkout!=="true"||current.live_payments_enabled!=="true"||current.mode!=="live")return NextResponse.json({error:"الدفع غير متاح حاليًا"},{status:404,headers:{"Cache-Control":"no-store"}});
   const secrets=await env(),publicKey=secrets.MOYASAR_LIVE_PUBLISHABLE_KEY||"";if(!publicKey)return NextResponse.json({error:"إعداد الدفع غير مكتمل"},{status:503,headers:{"Cache-Control":"no-store"}});
-  const body=await request.json().catch(()=>({})) as {contact?:unknown;plan?:unknown};const contact=email(body.contact),plan=clean(body.plan,20) as Plan;if(!validEmail(contact)||!(plan in planDetails))return NextResponse.json({error:"بيانات الاشتراك غير صالحة"},{status:400,headers:{"Cache-Control":"no-store"}});
+  const body=await request.json().catch(()=>({})) as {contact?:unknown;plan?:unknown;referralCode?:unknown};const contact=email(body.contact),plan=clean(body.plan,20) as Plan,referralCode=cleanReferral(body.referralCode,20).toUpperCase();if(!validEmail(contact)||!(plan in planDetails))return NextResponse.json({error:"بيانات الاشتراك غير صالحة"},{status:400,headers:{"Cache-Control":"no-store"}});
   const now=new Date(),intentId=crypto.randomUUID(),details=planDetails[plan],expires=new Date(now.getTime()+30*60_000).toISOString();
-  await database.prepare("INSERT INTO navixa_billing_intents (id,contact,plan,amount,currency,mode,status,provider_payment_id,created_at,updated_at,expires_at) VALUES (?,?,?,?, 'SAR','live','pending','',?,?,?)").bind(intentId,contact,plan,details.amount,now.toISOString(),now.toISOString(),expires).run();
+  await database.prepare("INSERT INTO navixa_billing_intents (id,contact,plan,amount,currency,mode,status,provider_payment_id,referral_code,created_at,updated_at,expires_at) VALUES (?,?,?,?, 'SAR','live','pending','',?,?,?,?)").bind(intentId,contact,plan,details.amount,referralCode,now.toISOString(),now.toISOString(),expires).run();
+  const attribution=referralCode?await createAttribution(database,referralCode,contact,intentId).catch(()=>null):null;
   const origin=new URL(request.url).origin;
-  return NextResponse.json({intentId,provider:"moyasar",publicKey,amount:details.amount,currency:"SAR",description:details.label,callbackUrl:`${origin}/plus/complete?intent=${encodeURIComponent(intentId)}`,metadata:{navixa_intent:intentId,navixa_contact:contact,navixa_plan:plan}},{headers:{"Cache-Control":"no-store"}});
+  return NextResponse.json({intentId,provider:"moyasar",publicKey,amount:details.amount,currency:"SAR",description:details.label,callbackUrl:`${origin}/plus/complete?intent=${encodeURIComponent(intentId)}`,metadata:{navixa_intent:intentId,navixa_contact:contact,navixa_plan:plan},referralApplied:Boolean(attribution)},{headers:{"Cache-Control":"no-store"}});
 }

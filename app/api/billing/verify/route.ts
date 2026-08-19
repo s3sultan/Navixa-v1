@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server.js";
+import {applyPendingCredits,rewardReferralAfterVerifiedPayment} from "../../../referrals.ts";
 
 type D1Statement={bind:(...values:unknown[])=>D1Statement;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
 type D1Database={prepare:(sql:string)=>D1Statement};
@@ -32,6 +33,7 @@ export async function POST(request:Request){
   const now=new Date().toISOString(),days=intent.plan==="quarterly"?120:30,end=new Date(Date.now()+days*86400000).toISOString(),subscriberId=crypto.randomUUID();
   await database.prepare("UPDATE navixa_billing_intents SET status='paid',provider_payment_id=?,updated_at=? WHERE id=?").bind(id,now,intent.id).run();
   await database.prepare("INSERT INTO navixa_subscribers (id,contact,display_name,plan,status,subscription_ends_at,source,created_at,updated_at) VALUES (?,?,'',?,'active',?,'moyasar_verify',?,?) ON CONFLICT(contact) DO UPDATE SET plan=excluded.plan,status='active',subscription_ends_at=excluded.subscription_ends_at,source='moyasar_verify',updated_at=excluded.updated_at").bind(subscriberId,intent.contact,intent.plan,end,now,now).run();
-  await database.prepare("INSERT OR IGNORE INTO navixa_billing_events (id,provider_event_id,subscriber_id,event_type,mode,payload_json,created_at,processed_at) VALUES (?,?,?,?, 'live',?,?,?)").bind(crypto.randomUUID(),`verify:${id}`,subscriberId,"payment_verified",JSON.stringify({intentId:intent.id,plan:intent.plan}),now,now).run();
-  return NextResponse.json({ok:true,plan:intent.plan,endsAt:end},{headers:{"Cache-Control":"no-store"}});
+  const creditsApplied=await applyPendingCredits(database,intent.contact);const referral=await rewardReferralAfterVerifiedPayment(database,intent.id,id,intent.plan).catch(()=>({rewarded:false,reason:"review"}));
+  await database.prepare("INSERT OR IGNORE INTO navixa_billing_events (id,provider_event_id,subscriber_id,event_type,mode,payload_json,created_at,processed_at) VALUES (?,?,?,?, 'live',?,?,?)").bind(crypto.randomUUID(),`verify:${id}`,subscriberId,"payment_verified",JSON.stringify({intentId:intent.id,plan:intent.plan,creditsApplied,referral}),now,now).run();
+  return NextResponse.json({ok:true,plan:intent.plan,endsAt:end,creditsApplied,referral},{headers:{"Cache-Control":"no-store"}});
 }

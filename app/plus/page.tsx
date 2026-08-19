@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./plus.css";
 import InterestForm from "./InterestForm";
+import ReferralCapture from "./ReferralCapture";
 
 export const metadata: Metadata = {
   title: "NAVIXA Plus — يفهم يومك بعمق أكبر",
@@ -18,7 +19,7 @@ const included = [
 ];
 
 export default function NavixaPlusPage() {
-  return <main className="plus-page" dir="rtl">
+  return <main className="plus-page" dir="rtl"><ReferralCapture/>
     <nav className="plus-nav">
       <Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt=""/><span><b>NAVIXA</b><small>يفهم يومك</small></span></Link>
       <Link href="/" className="plus-back">العودة للرئيسية ←</Link>
