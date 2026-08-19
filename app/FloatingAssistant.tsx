@@ -126,7 +126,8 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
         return reply("تمام، نخليها مجرد حديث بيننا.");
       }
     }
-    if (/^(هلا|هلو|السلام|سلام|مرحبا|صباح الخير|مساء الخير|كيف الحال|كيفك|شلونك|اخبارك)/i.test(text)) return reply(`${stylePrefix()}ياهلا${friendlyName}، أنا معك. وش في بالك؟`);
+    if (/^(?:من انت|مين انت|من تكون|عرفني بنفسك|وش انت)\??$/i.test(text)) return reply(`أنا NAVIXA${friendlyName} — مساعد يومي يساعدك ترتّب فكرتك، تتابع الأهم، وتستخدم أدواتك بخصوصية.\n\nقل لي وش تحتاج بطريقتك، وأنا ما أحوّل كلامك لمهمة إلا إذا طلبت.`);
+    if (/^(هلا|هلو|السلام|سلام|مرحبا|صباح الخير|مساء الخير|كيف الحال|كيفك|شلونك|اخبارك)/i.test(text)) return reply(`${stylePrefix()}ياهلا${friendlyName}، أنا معك. ودك نتكلم، نرتّب فكرة، أو نفتح أداة من الموقع؟`);
     if (/(شكرا|مشكور|يعطيك العافية|تسلم)/i.test(text)) return reply("العفو، يسعدني. خذ راحتك في الكلام.");
     if (/(كيف تتعلم|كيف تحفظ|وش تحفظ|الخصوصية|بياناتي)/i.test(text)) return reply("أتعلم محليًا من الاسم والتفضيلات أو العبارة التي تطلب حفظها. تقدر تراجع أو تمسح أي شيء من زر الذاكرة، ولا أرسل المحادثة للخارج.");
     if (/(وش تعرف عني|ماذا تعرف عني|وش حفظت|ذاكرتك)/i.test(text)) {
@@ -154,7 +155,7 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
     const globalPattern = globalPatterns.find(pattern => { const trigger = normalise(pattern.trigger); return trigger.length >= 3 && text.includes(trigger); });
     if (globalPattern) return reply(globalPattern.response);
     if (learned) return reply(`${stylePrefix()}وصلتني، وحفظت التفضيل محليًا عشان تكون ردودي أقرب لك. تقدر تغيره أو تمسحه بأي وقت.`);
-    return reply(`${stylePrefix()}فهمتك${preferenceHint} خذ راحتك؛ قل لي أكثر عن اللي تقصده وأنا برد عليك بدون ما أفترض أنك تبي مهمة أو تذكير.`);
+    return reply(`${stylePrefix()}فهمتك${preferenceHint}، بس أبي أتأكد أني فهمت قصدك صح. قل لي أكثر بجملة أو مثال، وأنا أرد مباشرة من دون ما أفترض أنها مهمة أو تذكير.`);
   };
 
   const send = (event: FormEvent<HTMLFormElement>) => {
@@ -183,6 +184,7 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
     const latest = [...messages].reverse().find(message => message.from === "navixa")?.text || "";
     if (/(تعبان|متضايق|نخفف الحمل)/.test(latest)) return ["خلنا نرتبها بهدوء", "أبي أتكلم فقط", "أعطني خطوة صغيرة"];
     if (/(مهمة|تذكير|موعد)/.test(latest)) return ["خليها مجرد حديث", "أبغى أحفظها", "وش الخيارات؟"];
+    if (/(أنا NAVIXA|مساعد يومي)/.test(latest)) return ["وش تقدر تسوي؟", "كيف تحمي خصوصيتي؟", "رتب لي فكرة"];
     if (/(شرح|أفهم|توضيح)/.test(latest)) return ["اختصرها", "أعطني مثال", "وش الخطوة التالية؟"];
     return ["اختصر لي", "أعطني مثال", "خلنا نكمل"];
   }, [messages]);
@@ -194,6 +196,6 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
       <div className="assistant-chat" ref={chatRef} aria-live="polite">{messages.length<=1&&<div className="assistant-quick-replies"><small>ابدأ من هنا أو اكتب بطريقتك</small><div><button type="button" onClick={()=>sendQuickMessage("وش تقدر تسوي؟")}>وش تقدر تسوي؟</button><button type="button" onClick={()=>sendQuickMessage("أحتاج رأيك في فكرة")}>أحتاج رأيك</button><button type="button" onClick={()=>sendQuickMessage("رتب أفكاري بدون مهام")}>رتب أفكاري</button></div></div>}{messages.slice(-MAX_MESSAGES).map(message => <div className={`assistant-message-group ${message.from}`} key={message.id}><article className={`assistant-message ${message.from}`}><p>{message.text}</p><time dateTime={message.at}>{new Intl.DateTimeFormat("ar-SA",{hour:"numeric",minute:"2-digit"}).format(new Date(message.at))}{message.from === "user" && <span>✓✓</span>}</time></article>{message.id===lastAssistantMessageId&&!typing&&<div className="assistant-follow-ups" aria-label="متابعات مقترحة">{quickFollowUps.map(prompt=><button type="button" key={prompt} onClick={()=>sendQuickMessage(prompt)}>{prompt}</button>)}</div>}</div>)}{typing && <article className="assistant-message navixa assistant-typing"><i></i><i></i><i></i></article>}{long && <aside className="chat-limit"><b>نقفل هذه المحادثة ونبدأ من جديد؟</b><span>المحادثة الطويلة تبقى على جهازك فقط.</span><button disabled={clears >= CLEAR_LIMIT} onClick={clearChat}>{clears >= CLEAR_LIMIT ? "استخدمت حد الحذف اليومي" : "بدء محادثة جديدة"}</button></aside>}</div>
       <form onSubmit={send}><textarea name="message" rows={1} disabled={long} autoComplete="off" placeholder={long ? "ابدأ محادثة جديدة أولًا" : "اكتب اللي في بالك..."} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit()}}}/><button disabled={long} aria-label="إرسال الرسالة">➤</button></form>
     </section>}
-    <button className="assistant-bubble" aria-label="فتح مساعد NAVIXA" onClick={() => setOpen(value => !value)} onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }}><span className="mini-mark"><img src="/navixa-mark.webp" alt="" /></span><em>{learningEnabled ? "يتعلّم" : "متاح"}</em></button>
+    <button className="assistant-bubble" aria-label="فتح مساعد NAVIXA" onClick={() => setOpen(value => !value)} onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }}><span className="mini-mark"><img src="/navixa-mark.webp" alt="" /></span><span className="assistant-bubble-copy"><b>المساعد</b><em>{learningEnabled ? "افتح المحادثة" : "جاهز للمساعدة"}</em></span></button>
   </div>;
 }

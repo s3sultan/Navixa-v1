@@ -370,3 +370,20 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
   .beta-badge { min-height: 17px; padding: 0 6px; font-size: 9px; }
   .topbar-brand b { gap: 5px; }
 }
+
+/* Future Plus feature markers remain informational during beta. */
+.plus-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7656d6, #a184ed);
+  color: #fff !important;
+  font-size: 8px !important;
+  font-style: normal !important;
+  font-weight: 800;
+  line-height: 1.4;
+  vertical-align: middle;
+  letter-spacing: .01em;
+}
