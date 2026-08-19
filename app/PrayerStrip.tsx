@@ -139,12 +139,13 @@ export default function PrayerStrip(){
       <div className="prayer-edit-actions"><button type="button" onClick={saveEdit}>حفظ</button><button type="button" className="ghost" onClick={()=>setEditing(false)}>إلغاء</button></div>
     </article></div>}
 
-    {alertInfo&&<div className="adhan-alert-back" onClick={()=>setAlertInfo(null)}><article onClick={e=>e.stopPropagation()}>
-      <div className="mosque-scene"><div className="mosque-dome"/><div className="mosque-minaret one"/><div className="mosque-minaret two"/><div className="mosque-glow"/></div>
-      <small>{alertInfo.type==="adhan"?"حان الآن وقت أذان":"حانت الآن إقامة صلاة"}</small>
-      <h3>{prayerLabels[alertInfo.name]}</h3>
-      <p>{getAdminMessages()[alertInfo.type]||"حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الْفَلَاحِ — اترك ما بيدك والحق بالصلاة."}</p>
-      <button type="button" onClick={()=>setAlertInfo(null)}>إغلاق</button>
+    {alertInfo&&<div className="adhan-alert-back" role="presentation" onClick={()=>setAlertInfo(null)}><article className={`adhan-alert-card is-${alertInfo.type}`} role="dialog" aria-modal="true" aria-labelledby="adhan-alert-title" onClick={e=>e.stopPropagation()}>
+      <button type="button" className="adhan-alert-close" onClick={()=>setAlertInfo(null)} aria-label="إغلاق التنبيه">×</button>
+      <div className="adhan-alert-photo"><img src="/navixa-mosque-prayer.jpg" alt="مسجد مضاء وقت الغروب"/><span className="adhan-alert-photo-shade"/></div>
+      <div className="adhan-alert-copy"><small><i>◌</i>{alertInfo.type==="adhan"?"وقت الأذان":"تنبيه الإقامة"}</small>
+      <h3 id="adhan-alert-title">صلاة {prayerLabels[alertInfo.name]}</h3>
+      <p>{getAdminMessages()[alertInfo.type]||"حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الْفَلَاحِ — اترك ما بيدك والحق بالصلاة."}</p></div>
+      <button type="button" className="adhan-alert-confirm" onClick={()=>setAlertInfo(null)}>تم، جزاك الله خيرًا</button>
     </article></div>}
   </div>
 }

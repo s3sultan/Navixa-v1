@@ -4,12 +4,13 @@ import { readRuntimeSecrets } from "./runtimeEnv";
 type D1Statement={bind:(...values:unknown[])=>D1Statement;run:()=>Promise<unknown>;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>};
 type D1Database={prepare:(sql:string)=>D1Statement};
 type PushEnv={DB:D1Database};
-type PushSubscriptionRow={id:string;endpoint:string;p256dh:string;auth:string;competitions_json:string;teams_json:string;before_minutes:number};
+type PushSubscriptionRow={id:string;endpoint:string;p256dh:string;auth:string;competitions_json:string;teams_json:string;before_minutes:number;before_minutes_json?:string};
 type Fixture={id:string;competitionId:string;league:string;home:string;away:string;kickoff:string};
 
 const REFRESH_MS=15*60*1000;
 const FEATURED:Record<number,{id:string;label:string}>={307:{id:"rsl",label:"دوري روشن السعودي"},39:{id:"premier-league",label:"الدوري الإنجليزي الممتاز"},140:{id:"la-liga",label:"الدوري الإسباني"},78:{id:"bundesliga",label:"الدوري الألماني"},135:{id:"serie-a",label:"الدوري الإيطالي"},61:{id:"ligue-1",label:"الدوري الفرنسي"},2:{id:"champions-league",label:"دوري أبطال أوروبا"}};
 const toArray=(value:string)=>{try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed.filter((item):item is string=>typeof item==="string").slice(0,16):[]}catch{return []}};
+const toAlertMinutes=(value:string|undefined,fallback:number)=>{try{const parsed=JSON.parse(value||"[]");const minutes=Array.isArray(parsed)?parsed.map(Number).filter(item=>[0,5,10,15,30].includes(item)):[];return [...new Set(minutes)].sort((a,b)=>b-a)}catch{return [Math.max(0,Math.min(30,Number(fallback)||0))]}};
 const normalize=(value:string)=>value.trim().toLocaleLowerCase("ar").replace(/[\s-]+/g," ");
 const dateKey=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Riyadh"}).format(new Date());
 function competitionOf(fixture:any){const id=Number(fixture?.league?.id);if(FEATURED[id])return FEATURED[id];const name=String(fixture?.league?.name||"").toLowerCase();const country=String(fixture?.league?.country||"").toLowerCase();if(country.includes("saudi")&&name.includes("king")&&name.includes("cup"))return {id:"kings-cup",label:"كأس الملك"};if(name.includes("gulf cup")||name.includes("gulf cup of nations"))return {id:"gulf-cup",label:"كأس الخليج"};return null}
@@ -20,4 +21,34 @@ function wantsFixture(subscription:PushSubscriptionRow,fixture:Fixture){const co
 async function deliveryExists(db:D1Database,subscriptionId:string,fixtureId:string,before:number){const result=await db.prepare("SELECT 1 AS present FROM navixa_push_deliveries WHERE subscription_id=? AND fixture_id=? AND before_minutes=? LIMIT 1").bind(subscriptionId,fixtureId,before).all<{present:number}>();return result.results.length>0}
 async function track(db:D1Database,subscriptionId:string,fixtureId:string,before:number){await db.prepare("INSERT OR IGNORE INTO navixa_push_deliveries (subscription_id,fixture_id,before_minutes,sent_at) VALUES (?,?,?,?)").bind(subscriptionId,fixtureId,before,new Date().toISOString()).run();await db.prepare("INSERT INTO navixa_match_analytics_daily (day,metric,fixture_id,total) VALUES (?,?,?,1) ON CONFLICT(day,metric,fixture_id) DO UPDATE SET total=total+1").bind(dateKey(),"push_sent",fixtureId).run()}
 
-export async function deliverDueMatchPushes(env:PushEnv){const secrets=await readRuntimeSecrets();if(!secrets.VAPID_PUBLIC_KEY||!secrets.VAPID_PRIVATE_KEY||!secrets.VAPID_SUBJECT)return {delivered:0,skipped:"vapid"};const result=await env.DB.prepare("SELECT id,endpoint,p256dh,auth,competitions_json,teams_json,before_minutes FROM navixa_push_subscriptions WHERE enabled=1 LIMIT 200").all<PushSubscriptionRow>();if(!result.results.length)return {delivered:0,skipped:"subscriptions"};const fixtures=[...await refreshFixtureCache(env.DB),...await sharedManualFixtures(env.DB)].filter((fixture,index,items)=>items.findIndex(item=>item.id===fixture.id)===index);if(!fixtures.length)return {delivered:0,skipped:"fixtures"};webpush.setVapidDetails(secrets.VAPID_SUBJECT,secrets.VAPID_PUBLIC_KEY,secrets.VAPID_PRIVATE_KEY);let delivered=0;const now=Date.now();for(const fixture of fixtures){const kickoff=Date.parse(fixture.kickoff);for(const subscription of result.results){const before=Math.max(0,Math.min(15,Number(subscription.before_minutes)||0));const dueAt=kickoff-before*60000;if(dueAt>now||now-dueAt>75000||!wantsFixture(subscription,fixture))continue;if(await deliveryExists(env.DB,subscription.id,fixture.id,before))continue;try{await webpush.sendNotification({endpoint:subscription.endpoint,keys:{p256dh:subscription.p256dh,auth:subscription.auth}},JSON.stringify({title:"NAVIXA · مباراة قريبة",body:`${fixture.home} × ${fixture.away} ${before?`بعد ${before} دقائق`:"الآن"}`,tag:`navixa-match-${fixture.id}`,data:{url:"/",fixtureId:fixture.id}}),{TTL:120,urgency:"high",topic:`match-${fixture.id}`});await track(env.DB,subscription.id,fixture.id,before);delivered+=1}catch(error){const status=error instanceof webpush.WebPushError?error.statusCode:0;if(status===404||status===410)await env.DB.prepare("DELETE FROM navixa_push_subscriptions WHERE id=?").bind(subscription.id).run()}}}return {delivered,skipped:""}}
+export async function deliverDueMatchPushes(env:PushEnv){
+  const secrets=await readRuntimeSecrets();
+  if(!secrets.VAPID_PUBLIC_KEY||!secrets.VAPID_PRIVATE_KEY||!secrets.VAPID_SUBJECT)return {delivered:0,skipped:"vapid"};
+  const result=await env.DB.prepare("SELECT id,endpoint,p256dh,auth,competitions_json,teams_json,before_minutes,before_minutes_json FROM navixa_push_subscriptions WHERE enabled=1 LIMIT 200").all<PushSubscriptionRow>();
+  if(!result.results.length)return {delivered:0,skipped:"subscriptions"};
+  const fixtures=[...await refreshFixtureCache(env.DB),...await sharedManualFixtures(env.DB)].filter((fixture,index,items)=>items.findIndex(item=>item.id===fixture.id)===index);
+  if(!fixtures.length)return {delivered:0,skipped:"fixtures"};
+  webpush.setVapidDetails(secrets.VAPID_SUBJECT,secrets.VAPID_PUBLIC_KEY,secrets.VAPID_PRIVATE_KEY);
+  let delivered=0;
+  const now=Date.now();
+  for(const fixture of fixtures){
+    const kickoff=Date.parse(fixture.kickoff);
+    for(const subscription of result.results){
+      if(!wantsFixture(subscription,fixture))continue;
+      for(const before of toAlertMinutes(subscription.before_minutes_json,subscription.before_minutes)){
+        const dueAt=kickoff-before*60000;
+        if(dueAt>now||now-dueAt>75000)continue;
+        if(await deliveryExists(env.DB,subscription.id,fixture.id,before))continue;
+        try{
+          await webpush.sendNotification({endpoint:subscription.endpoint,keys:{p256dh:subscription.p256dh,auth:subscription.auth}},JSON.stringify({title:"NAVIXA · مباراة قريبة",body:`${fixture.home} × ${fixture.away} ${before?`بعد ${before} دقيقة`:"الآن"}`,tag:`navixa-match-${fixture.id}-${before}`,data:{url:"/",fixtureId:fixture.id}}),{TTL:120,urgency:"high",topic:`match-${fixture.id}-${before}`});
+          await track(env.DB,subscription.id,fixture.id,before);
+          delivered+=1;
+        }catch(error){
+          const status=error instanceof webpush.WebPushError?error.statusCode:0;
+          if(status===404||status===410)await env.DB.prepare("DELETE FROM navixa_push_subscriptions WHERE id=?").bind(subscription.id).run();
+        }
+      }
+    }
+  }
+  return {delivered,skipped:""};
+}

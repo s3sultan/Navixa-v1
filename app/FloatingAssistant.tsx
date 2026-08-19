@@ -36,6 +36,7 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
   const [shareStatus, setShareStatus] = useState("");
   const [globalPatterns, setGlobalPatterns] = useState<GlobalPattern[]>([]);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   const name = useMemo(() => memory.find(item => item.kind === "name")?.value || "", [memory]);
   const preferences = useMemo(() => memory.filter(item => item.kind === "preference"), [memory]);
@@ -63,6 +64,7 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
   useEffect(() => localStorage.setItem("navixa-assistant-learning", String(learningEnabled)), [learningEnabled]);
   useEffect(() => localStorage.setItem("navixa-assistant-style", assistantStyle), [assistantStyle]);
   useEffect(() => localStorage.setItem("navixa-assistant-global-learning", String(globalLearning)), [globalLearning]);
+  useEffect(() => { if (open) chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" }); }, [messages, typing, open]);
 
   const append = (from: Message["from"], text: string) => setMessages(current => [...current, makeMessage(from, text)].slice(-MAX_MESSAGES));
   const reply = (text: string) => {
@@ -153,13 +155,14 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
 
   const send = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const input = event.currentTarget.elements.namedItem("message") as HTMLInputElement;
+    const input = event.currentTarget.elements.namedItem("message") as HTMLTextAreaElement;
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
     append("user", text);
     understand(text);
   };
+  const sendQuickMessage = (text: string) => { append("user", text); understand(text); };
   const clearChat = () => {
     if (clears >= CLEAR_LIMIT) return;
     const next = clears + 1;
@@ -174,10 +177,10 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
 
   return <div className="floating-assistant" style={{ left: position.x, top: position.y }} dir="rtl">
     {open && <section className="assistant-panel" aria-label="محادثة NAVIXA">
-      <header><div><img className="assistant-logo-mark" src="/navixa-mark.webp" alt="" /><span><b>NAVIXA</b><small>{learningEnabled ? "محادثة خاصة على جهازك" : "الذاكرة المحلية متوقفة"}</small></span></div><div className="assistant-header-actions"><button className="assistant-memory-button" type="button" aria-label="فتح الذاكرة" onClick={() => setShowMemory(value => !value)}>⌁</button><button type="button" aria-label="إغلاق المساعد" onClick={() => setOpen(false)}>×</button></div></header>
+      <header><div><img className="assistant-logo-mark" src="/navixa-mark.webp" alt="" /><span><b>NAVIXA</b><small><i className="assistant-online-dot"/>{learningEnabled ? "محادثة خاصة على جهازك" : "الذاكرة المحلية متوقفة"}</small></span></div><div className="assistant-header-actions"><button className="assistant-memory-button" type="button" aria-label="فتح الذاكرة" onClick={() => setShowMemory(value => !value)}>⌁</button><button type="button" aria-label="إغلاق المساعد" onClick={() => setOpen(false)}>×</button></div></header>
       {showMemory && <aside className="assistant-memory" aria-label="ذاكرة المساعد المحلية"><div><b>ذاكرتي المحلية</b><button type="button" onClick={() => setMemory([])}>مسح الكل</button></div><p>لا تُحفظ إلا التفضيلات أو العبارات التي توافق عليها، وتبقى على هذا الجهاز.</p><label className="assistant-learning-toggle"><input type="checkbox" checked={learningEnabled} onChange={event => setLearningEnabled(event.target.checked)} /> تعلّم محلي بإذني</label><label className="assistant-learning-toggle"><input type="checkbox" checked={globalLearning} onChange={event => { setGlobalLearning(event.target.checked); setShareStatus(""); }} /> أساهم اختياريًا في تحسين الردود العامة</label>{globalLearning&&<div className="assistant-global-learning"><p>لا نشارك شيئًا تلقائيًا. أنت تختار آخر سؤال ورد لإرساله للمراجعة قبل اعتماده للجميع.</p><label><input type="checkbox" checked={sensitiveShareConsent} onChange={event => setSensitiveShareConsent(event.target.checked)} /> أوافق بشكل مستقل إذا احتوت المساهمة معلومات شخصية</label><button type="button" onClick={() => void shareLatestExchange()}>مشاركة آخر سؤال ورد للمراجعة</button>{shareStatus&&<small>{shareStatus}</small>}</div>}<label className="assistant-style"><span>أسلوب الرد</span><select value={assistantStyle} onChange={event => setAssistantStyle(event.target.value as AssistantStyle)}><option value="warm">ودود وقريب</option><option value="calm">هادئ ومتزن</option><option value="direct">مختصر ومباشر</option></select></label><div className="assistant-memory-list">{memory.length ? memory.slice().reverse().map(item => <div key={item.id}><span><small>{memoryTitle[item.kind]}</small>{item.value}</span><button type="button" aria-label={`حذف ${item.value}`} onClick={() => forget(item.id)}>×</button></div>) : <small>لا توجد معلومات محفوظة بعد.</small>}</div></aside>}
-      <div className="assistant-chat" aria-live="polite">{messages.slice(-MAX_MESSAGES).map(message => <article key={message.id} className={`assistant-message ${message.from}`}><small>{message.from === "user" ? "أنت" : "NAVIXA"}</small><p>{message.text}</p></article>)}{typing && <article className="assistant-message navixa assistant-typing"><i></i><i></i><i></i></article>}{long && <aside className="chat-limit"><b>نقفل هذه المحادثة ونبدأ من جديد؟</b><span>المحادثة الطويلة تبقى على جهازك فقط.</span><button disabled={clears >= CLEAR_LIMIT} onClick={clearChat}>{clears >= CLEAR_LIMIT ? "استخدمت حد الحذف اليومي" : "بدء محادثة جديدة"}</button></aside>}</div>
-      <form onSubmit={send}><input name="message" disabled={long} autoComplete="off" placeholder={long ? "ابدأ محادثة جديدة أولًا" : "اكتب اللي في بالك..."} /><button disabled={long} aria-label="إرسال الرسالة">↑</button></form>
+      <div className="assistant-chat" ref={chatRef} aria-live="polite">{messages.length<=1&&<div className="assistant-quick-replies"><small>ابدأ من هنا أو اكتب بطريقتك</small><div><button type="button" onClick={()=>sendQuickMessage("وش تقدر تسوي؟")}>وش تقدر تسوي؟</button><button type="button" onClick={()=>sendQuickMessage("أحتاج رأيك في فكرة")}>أحتاج رأيك</button><button type="button" onClick={()=>sendQuickMessage("رتب أفكاري بدون مهام")}>رتب أفكاري</button></div></div>}{messages.slice(-MAX_MESSAGES).map(message => <article key={message.id} className={`assistant-message ${message.from}`}><p>{message.text}</p><time dateTime={message.at}>{new Intl.DateTimeFormat("ar-SA",{hour:"numeric",minute:"2-digit"}).format(new Date(message.at))}{message.from === "user" && <span>✓✓</span>}</time></article>)}{typing && <article className="assistant-message navixa assistant-typing"><i></i><i></i><i></i></article>}{long && <aside className="chat-limit"><b>نقفل هذه المحادثة ونبدأ من جديد؟</b><span>المحادثة الطويلة تبقى على جهازك فقط.</span><button disabled={clears >= CLEAR_LIMIT} onClick={clearChat}>{clears >= CLEAR_LIMIT ? "استخدمت حد الحذف اليومي" : "بدء محادثة جديدة"}</button></aside>}</div>
+      <form onSubmit={send}><textarea name="message" rows={1} disabled={long} autoComplete="off" placeholder={long ? "ابدأ محادثة جديدة أولًا" : "اكتب اللي في بالك..."} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit()}}}/><button disabled={long} aria-label="إرسال الرسالة">➤</button></form>
     </section>}
     <button className="assistant-bubble" aria-label="فتح مساعد NAVIXA" onClick={() => setOpen(value => !value)} onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }}><span className="mini-mark"><img src="/navixa-mark.webp" alt="" /></span><em>{learningEnabled ? "يتعلّم" : "متاح"}</em></button>
   </div>;

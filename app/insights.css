@@ -80,21 +80,15 @@ footer>div.counters{display:flex;gap:24px}
 .prayer-edit-actions{display:flex;gap:8px;margin-top:16px}
 .prayer-edit-actions button{flex:1;border:0;background:var(--sa);color:#fff;border-radius:10px;padding:11px;cursor:pointer}
 .prayer-edit-actions button.ghost{background:#edf1ee;color:var(--ink)}
-.adhan-alert-back>article{background:#fff;width:min(380px,100%);border-radius:22px;padding:30px;text-align:center;display:grid;gap:8px}
-.adhan-alert-back small{color:var(--lav);font-weight:700;font-size:10px}
-.adhan-alert-back h3{margin:0;font-size:20px}
-.adhan-alert-back p{color:var(--muted);font-size:12px;line-height:2;margin:6px 0 10px}
-.adhan-alert-back button{border:0;background:var(--sa);color:#fff;border-radius:12px;padding:12px;font-size:11px;cursor:pointer}
-.mosque-scene{position:relative;width:180px;height:140px;margin:0 auto 14px;display:flex;align-items:flex-end;justify-content:center}
-.mosque-glow{position:absolute;inset:-20px;background:radial-gradient(circle,rgba(141,120,207,.35),transparent 70%);animation:mosqueGlow 2s ease-in-out infinite}
-@keyframes mosqueGlow{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.05)}}
-.mosque-dome{position:relative;width:70px;height:70px;background:linear-gradient(135deg,var(--sa),var(--lav));border-radius:50% 50% 0 0;z-index:2}
-.mosque-dome:before{content:"";position:absolute;bottom:-14px;left:-15px;width:100px;height:24px;background:inherit;border-radius:6px 6px 0 0}
-.mosque-dome:after{content:"";position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:3px;height:16px;background:#e8e2f7}
-.mosque-minaret{position:absolute;bottom:0;width:12px;height:100px;background:linear-gradient(180deg,var(--lav),var(--sa));border-radius:6px 6px 0 0;z-index:1}
-.mosque-minaret:before{content:"";position:absolute;top:-10px;left:-3px;width:18px;height:14px;background:inherit;border-radius:50% 50% 0 0}
-.mosque-minaret.one{right:14px}
-.mosque-minaret.two{left:14px}
+.adhan-alert-back{background:radial-gradient(circle at 50% 18%,rgba(31,185,174,.22),transparent 34%),rgba(7,26,40,.76)!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important;animation:adhanBackIn .28s ease-out}
+.adhan-alert-card{position:relative;width:min(440px,100%);overflow:hidden;border:1px solid rgba(204,247,241,.32);border-radius:30px;background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(243,250,249,.92) 56%,rgba(245,242,255,.95));box-shadow:0 32px 90px rgba(1,20,33,.48);text-align:right;animation:adhanCardIn .36s cubic-bezier(.2,.9,.2,1) both}
+.adhan-alert-card:after{content:"";position:absolute;inset:auto -28% -80px;height:150px;background:radial-gradient(ellipse,rgba(118,86,214,.15),transparent 68%);pointer-events:none}
+.adhan-alert-photo{position:relative;height:215px;overflow:hidden;background:#123e56}.adhan-alert-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 54%;transform:scale(1.08);filter:saturate(.88) contrast(1.02)}.adhan-alert-photo-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,29,43,.03),rgba(8,29,43,.02) 42%,rgba(8,29,43,.5));box-shadow:inset 0 -34px 30px -22px rgba(9,34,47,.72)}
+.adhan-alert-copy{position:relative;z-index:1;padding:22px 28px 10px;display:grid;gap:8px}.adhan-alert-copy small{display:flex;align-items:center;gap:7px;color:#0d777b!important;font-weight:800;font-size:11px!important;letter-spacing:.02em}.adhan-alert-copy small i{display:grid;place-items:center;width:21px;height:21px;border-radius:7px;background:linear-gradient(135deg,#e1fbf6,#eee9ff);color:#7656d6;font-style:normal}.adhan-alert-card.is-iqama .adhan-alert-copy small{color:#7656d6!important}.adhan-alert-card.is-iqama .adhan-alert-copy small i{color:#087f83}.adhan-alert-copy h3{margin:0!important;color:#173e50;font-size:clamp(23px,6vw,29px)!important;letter-spacing:-.03em}.adhan-alert-copy p{margin:0!important;color:#55707a!important;font-size:13px!important;line-height:2!important}
+.adhan-alert-close{position:absolute!important;z-index:3;top:12px;left:12px;width:34px;height:34px;padding:0!important;border:1px solid rgba(255,255,255,.38)!important;border-radius:11px!important;background:rgba(12,37,50,.48)!important;color:#fff!important;font-size:22px!important;line-height:1;cursor:pointer;backdrop-filter:blur(10px)}.adhan-alert-close:hover{background:rgba(12,37,50,.7)!important}
+.adhan-alert-confirm{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:calc(100% - 56px);margin:12px 28px 27px;padding:14px 18px!important;border:0!important;border-radius:15px!important;background:linear-gradient(112deg,#087f83,#10b7b2 58%,#7656d6)!important;color:#fff!important;font:700 12px "Alexandria",sans-serif!important;cursor:pointer;box-shadow:0 14px 24px rgba(8,127,131,.2);transition:transform .18s ease,filter .18s ease}.adhan-alert-confirm:hover{transform:translateY(-1px);filter:saturate(1.15)}
+@keyframes adhanBackIn{from{opacity:0}to{opacity:1}}@keyframes adhanCardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@media(max-width:650px){.adhan-alert-back{padding:16px!important;align-items:end!important}.adhan-alert-card{width:100%;border-radius:26px}.adhan-alert-photo{height:190px}.adhan-alert-copy{padding:20px 22px 8px}.adhan-alert-copy p{font-size:12px!important}.adhan-alert-confirm{width:calc(100% - 44px);margin:12px 22px 22px}}@media(prefers-reduced-motion:reduce){.adhan-alert-back,.adhan-alert-card{animation:none!important}.adhan-alert-confirm{transition:none!important}}
 @media(max-width:650px){.prayer-strip{position:static;flex-wrap:wrap}.prayer-strip-next{width:100%}}
 .telegram-setup{background:#f6f3fd;border-radius:12px;padding:14px;margin:14px 0}
 .telegram-setup>small{color:var(--lav);font-weight:700;font-size:10px}
