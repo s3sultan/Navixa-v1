@@ -387,3 +387,20 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
   vertical-align: middle;
   letter-spacing: .01em;
 }
+
+.topbar-actions .topbar-plus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 31px;
+  padding: 0 10px;
+  border: 1px solid rgba(118,86,214,.28);
+  border-radius: 10px;
+  background: #f6f2ff;
+  color: #6847c1;
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.topbar-actions .topbar-plus:hover { background:#eee8ff; }
+@media(max-width:650px){.topbar-actions .topbar-plus{min-height:28px;padding:0 8px;font-size:9px}.topbar-actions .topbar-plus span{display:inline!important}}
