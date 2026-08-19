@@ -22,7 +22,7 @@ const memoryTitle: Record<MemoryKind, string> = { name: "الاسم", preference
 const makeMessage = (from: Message["from"], text: string): Message => ({ id: id(), from, text, at: new Date().toISOString() });
 const initialMessage = () => makeMessage("navixa", "هلا، أنا NAVIXA. نتكلم براحتك؛ أفهم السياق وأحفظ فقط ما توافق عليه على جهازك.");
 
-export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: string) => void }) {
+export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTask: (title: string) => void; openRequest: number }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([initialMessage()]);
   const [position, setPosition] = useState({ x: 24, y: 0 });
@@ -63,10 +63,11 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
   }, []);
 
   useEffect(() => {
-    const openFromPage = () => { localStorage.removeItem("navixa-assistant-enabled"); document.documentElement.classList.remove("assistant-off"); setOpen(true); };
-    window.addEventListener("navixa:open-assistant", openFromPage);
-    return () => window.removeEventListener("navixa:open-assistant", openFromPage);
-  }, []);
+    if (!openRequest) return;
+    localStorage.removeItem("navixa-assistant-enabled");
+    document.documentElement.classList.remove("assistant-off");
+    setOpen(true);
+  }, [openRequest]);
 
   useEffect(() => localStorage.setItem("navixa-chat", JSON.stringify(messages.slice(-MAX_MESSAGES))), [messages]);
   useEffect(() => localStorage.setItem(memoryKey, JSON.stringify(memory.slice(-40))), [memory]);
