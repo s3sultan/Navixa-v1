@@ -6,8 +6,8 @@ const siteUrl = "https://navixa.s2shug.workers.dev";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "NAVIXA | ذكاء يفهم يومك",
-    template: "%s | NAVIXA",
+    default: "NAVIXA — يفهم يومك",
+    template: "%s — NAVIXA",
   },
   description: "NAVIXA مساعد ذكي يرتب يومك، يساعدك على التركيز والصحة والمهام والأتمتة مع خصوصية محلية.",
   applicationName: "NAVIXA",
@@ -24,13 +24,13 @@ export const metadata: Metadata = {
     locale: "ar_SA",
     url: siteUrl,
     siteName: "NAVIXA",
-    title: "NAVIXA | ذكاء يفهم يومك",
+    title: "NAVIXA — يفهم يومك",
     description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.",
-    images: [{ url: "/navixa-logo-clean.png", width: 720, height: 613, alt: "NAVIXA | ذكاء يفهم يومك" }],
+    images: [{ url: "/navixa-logo-clean.png", width: 720, height: 613, alt: "NAVIXA — يفهم يومك" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "NAVIXA | ذكاء يفهم يومك",
+    title: "NAVIXA — يفهم يومك",
     description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.",
     images: ["/navixa-logo-clean.png"],
   },
