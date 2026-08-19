@@ -77,9 +77,9 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
     } catch {}
   };
   const learnFromUse = (text: string) => {
-    const named = text.match(/(?:نادني|اسمي|انا اسمي)\s+([^،.!؟]{2,32}?)(?=\s+(?:و(?:أفضل|افضل|أحب|احب|أبي|ابغى|ودي)|لكن|وخل|وخلك)\b|[،.!؟]|$)/i)?.[1];
+    const named = text.match(/(?:نادني|اسمي|انا اسمي)\s+([^،.!؟]{2,32}?)(?=\s+(?:و(?:تحدث|كلمني|رد|جاوب|خل|خلك|أفضل|افضل|أحب|احب|أبي|ابغى|ودي)|لكن)(?:\s|$)|[،.!؟]|$)/i)?.[1];
     if (named) remember("name", named);
-    const preferred = text.match(/(?:احب|أفضل|افضل|ودي|ابغى|أبي)\s+([^،.!؟]{3,75})/i)?.[1];
+    const preferred = text.match(/(?:أفضل|افضل|أحب|احب|ودي|ابغى)\s+((?:(?:ردود|أسلوب|طريقة|أن تكون|إنك تكون|تكلمني|تتحدث معي)[^،.!؟]{0,70}))/i)?.[1] || text.match(/(?:أبي|ابغى|أريد)\s+((?:(?:ردود|أسلوب|طريقة|أن تكون|إنك تكون|تكلمني|تتحدث معي)[^،.!؟]{0,70}))/i)?.[1];
     if (preferred) remember("preference", preferred);
     const chosenStyle = /(?:رسمي|مختصر|مباشر)/.test(text) ? "direct" : /(?:هادئ|بهدوء)/.test(text) ? "calm" : /(?:ودي|عفوي|بشري)/.test(text) ? "warm" : null;
     if (chosenStyle) { setAssistantStyle(chosenStyle); remember("style", chosenStyle === "direct" ? "مختصر ومباشر" : chosenStyle === "calm" ? "هادئ ومتزن" : "ودود وقريب" ); }
@@ -100,7 +100,7 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
     }
     if (/(انس|امسح|احذف) (?:كل )?(?:الذاكرة|معلوماتي|تفضيلاتي)/i.test(text)) { setMemory([]); return reply("تم مسح الذاكرة المحلية للمساعد من هذا الجهاز."); }
     if (/(صحتي|الكاميرا|الجلوس|الماء|تمرين|وضعية)/i.test(text)) { reply(`${stylePrefix()}فتحت لك مركز صحتي؛ هناك أدوات الجلوس والتنفس والترطيب.`); window.setTimeout(() => { location.href = "/health"; }, 650); return; }
-    if (/(تركيز|بومودورو|25 دقيقة)/i.test(text)) { reply(`${stylePrefix()}وصلتك إلى جلسة التركيز. اختر المدة وابدأ وقت ما يناسبك.`); location.hash = "focus"; return; }
+    if (/(تركيز|أركز|اركز|ركّزني|ركزني|بومودورو|25 دقيقة)/i.test(text)) { reply(`${stylePrefix()}خلّنا نركز: افتح جلسة التركيز، اختر المدة، وابدأ خطوة واحدة الآن.`); location.hash = "focus"; return; }
     if (/(مراقبة الشاشة|شارك الشاشة|متابعة الشاشة|الاستماع|اسمع اسمي|راقب اسمي)/i.test(text)) { reply(`${stylePrefix()}فتحت لك أداة المتابعة. التشغيل لا يبدأ إلا بعد موافقتك.`); location.hash = "assistant"; return; }
     if (/(مباريات|دوري|نادي|فريق)/i.test(text)) { reply(`${stylePrefix()}جدول المباريات جاهز. افتح بطاقة المباريات واختر ناديك أو دوريك ثم فعّل التنبيه إذا رغبت.`); return; }
     if (/(مهمة|ذكرني|موعد|اجتماع|مقابلة|كويز|اختبار|فاينل|نهائي|تسليم|ددلاين|لازم|عندي)/i.test(text)) {
