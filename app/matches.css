@@ -1,8 +1,8 @@
 /* شريط مباريات NAVIXA: يتحرك تلقائيًا فقط حين توجد أكثر من ثلاث مباريات. */
 .matches-ribbon-viewport{overflow:hidden;mask-image:linear-gradient(to left,transparent,#000 3%,#000 97%,transparent)}
-.matches-ribbon-track{display:flex;gap:7px;width:max-content;padding:1px 0 3px}
+.matches-ribbon-track{display:flex;width:max-content;padding:1px 0 3px}.matches-ribbon-set{display:flex;flex:none;gap:7px;padding-inline-end:7px}
 .matches-ribbon.is-moving .matches-ribbon-track{animation:navixa-matches-scroll var(--match-ribbon-duration,36s) linear infinite;will-change:transform}.matches-ribbon.theme-teal{--match-accent:#1ab9ae;--match-accent-soft:rgba(26,185,174,.14)}.matches-ribbon.theme-lavender{--match-accent:#8e72e7;--match-accent-soft:rgba(142,114,231,.15)}.matches-ribbon.theme-navy{--match-accent:#193a59;--match-accent-soft:rgba(25,58,89,.14)}.matches-ribbon.theme-teal,.matches-ribbon.theme-lavender,.matches-ribbon.theme-navy{border-color:color-mix(in srgb,var(--match-accent) 35%,transparent);background:linear-gradient(125deg,var(--match-accent-soft),rgba(255,255,255,.66))}.matches-ribbon.theme-teal .matches-ribbon-item,.matches-ribbon.theme-lavender .matches-ribbon-item,.matches-ribbon.theme-navy .matches-ribbon-item{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--match-accent) 18%,transparent)}
-@keyframes navixa-matches-scroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+@keyframes navixa-matches-scroll{from{transform:translate3d(-50%,0,0)}to{transform:translate3d(0,0,0)}}
 .matches-ribbon-item{display:grid;gap:4px;align-content:center}
 .matches-ribbon-item b{display:flex;align-items:center;justify-content:center;gap:5px;min-height:20px}
 .matches-ribbon-item b img{width:18px;height:18px;object-fit:contain;flex:0 0 18px}
