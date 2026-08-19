@@ -28,13 +28,16 @@ export default function WorshipCenter(){
   const [azkarList,setAzkarList]=useState<AzkarItem[]|null>(null);
   const [afterPrayerList,setAfterPrayerList]=useState<AzkarItem[]|null>(null);
   const [wirdDone,setWirdDone]=useState(false);
+  const [azkarDone,setAzkarDone]=useState(false);
+  const [tasbihDone,setTasbihDone]=useState(false);
+  const [wirdStreak,setWirdStreak]=useState(0);
   const [showSadaqah,setShowSadaqah]=useState(false);
   const [tipText,setTipText]=useState("");
   const [ehsanThanks,setEhsanThanks]=useState(false);
   const [donationReason,setDonationReason]=useState("وردك اليومي");
 
   useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[]);
-  useEffect(()=>{setWirdDone(localStorage.getItem(`navixa-wird-${today()}`)==="1")},[]);
+  useEffect(()=>{const day=today();setWirdDone(localStorage.getItem(`navixa-wird-${day}`)==="1");setAzkarDone(localStorage.getItem(`navixa-azkar-${day}`)==="1");setTasbihDone(localStorage.getItem(`navixa-tasbih-${day}`)==="1");setWirdStreak(Number(localStorage.getItem("navixa-wird-streak")||0))},[]);
   useEffect(()=>{
     fetch("/api/azkar?category=27").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAzkarList(d.items)}).catch(()=>{});
     fetch("/api/azkar?category=25").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAfterPrayerList(d.items)}).catch(()=>{});
@@ -81,7 +84,7 @@ export default function WorshipCenter(){
     localStorage.setItem(`navixa-wird-${today()}`,"1");
     const streak=Number(localStorage.getItem("navixa-wird-streak")||0)+1;
     localStorage.setItem("navixa-wird-streak",String(streak));
-    setWirdDone(true);showDonation("ورد القرآن");
+    setWirdStreak(streak);setWirdDone(true);showDonation("ورد القرآن");
     sendTelegramAlert("wird",`📖 تذكير NAVIXA: أنجز ورد اليوم (صفحة ${dayPage()}) — سلسلة ${streak} يوم`);
     sendTelegramAlert("sadaqah","🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام الورد");
   };
@@ -94,7 +97,17 @@ export default function WorshipCenter(){
     window.open("https://ehsan.sa","_blank","noopener,noreferrer");
   };
 
+  const completeAzkar=()=>{localStorage.setItem(`navixa-azkar-${today()}`,"1");setAzkarDone(true);showDonation("أذكار اليوم")};
+  const completeTasbih=()=>{localStorage.setItem(`navixa-tasbih-${today()}`,"1");setTasbihDone(true);showDonation("ورد التسبيح")};
+  const completedCount=[wirdDone,azkarDone,tasbihDone].filter(Boolean).length;
+  const hijriDate=now.toLocaleDateString("ar-SA-u-ca-islamic",{weekday:"long",day:"numeric",month:"long"});
+
   return <section className="worship-center" dir="rtl">
+    <article className="worship-hero">
+      <div className="worship-hero-copy"><span className="worship-kicker">وردك اليومي</span><h2>لحظات قليلة تقرّبك أكثر</h2><p>{hijriDate} · احفظ وردك على جهازك وارجع إليه متى شئت.</p><nav className="worship-jump-links" aria-label="أقسام الورد"><a href="#daily-azkar">الأذكار</a><a href="#daily-tasbih">التسبيح</a><a href="#daily-quran">القرآن</a></nav></div>
+      <div className="worship-hero-progress"><div className="worship-progress-ring" style={{"--worship-progress":`${(completedCount/3)*100}%`} as React.CSSProperties}><b>{completedCount}<small>/3</small></b></div><div><strong>{completedCount===3?"اكتمل وردك اليوم":"خطواتك اليوم"}</strong><span>{completedCount===3?"تقبّل الله منك":"أنجز ما يناسبك بهدوء"}</span></div></div>
+      <div className="worship-streak"><span>✦</span><div><small>سلسلة القرآن</small><b>{wirdStreak} يوم</b></div></div>
+    </article>
     <article className="prayer-card">
       <header><span className="card-explain-icon">🕌</span><div><small>مواقيت الصلاة والإقامة</small><h3>أوقاتك اليوم</h3></div></header>
       {locStatus!=="ready"&&<div className="location-request">
@@ -117,9 +130,9 @@ export default function WorshipCenter(){
       </>}
     </article>
 
-    {azkarPeriod&&azkarList&&<article className="azkar-card">
+    {azkarPeriod&&azkarList&&<article className="azkar-card" id="daily-azkar">
       <header><span className="card-explain-icon">{azkarPeriod==="sabah"?"🌅":"🌙"}</span><div><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>حصّن يومك بالذكر</h3></div></header>
-      <AzkarList items={azkarList}/><button type="button" className="wird-done" onClick={()=>showDonation("أذكار اليوم")}>تم إتمام الأذكار — تذكير بالصدقة</button>
+      <AzkarList items={azkarList}/><button type="button" className={`wird-done ${azkarDone?"is-complete":""}`} onClick={completeAzkar}>{azkarDone?"تم إتمام أذكار اليوم ✓":"تم إتمام الأذكار — تذكير بالصدقة"}</button>
     </article>}
 
     {afterPrayerName&&afterPrayerList&&<article className="azkar-card after-prayer">
@@ -127,12 +140,12 @@ export default function WorshipCenter(){
       <AzkarList items={afterPrayerList}/><button type="button" className="wird-done" onClick={()=>showDonation(`أذكار بعد صلاة ${prayerLabels[afterPrayerName]}`)}>تم إتمام الأذكار — تذكير بالصدقة</button>
     </article>}
 
-    <article className="tasbih-card">
+    <article className="tasbih-card" id="daily-tasbih">
       <header><span className="card-explain-icon">📿</span><div><small>سبّح واستغفر</small><h3>عداد التسبيح اليومي</h3></div></header>
-      <TasbihCounter onComplete={()=>showDonation("ورد التسبيح")}/>
+      <TasbihCounter onComplete={completeTasbih}/>{tasbihDone&&<p className="worship-inline-complete">أتممت ورد التسبيح اليوم ✓</p>}
     </article>
 
-    <QuranReader wirdDone={wirdDone} onComplete={completeWird}/>
+    <div id="daily-quran"><QuranReader wirdDone={wirdDone} onComplete={completeWird}/></div>
 
     {showSadaqah&&<div className="sadaqah-back" onClick={()=>setShowSadaqah(false)}><article onClick={e=>e.stopPropagation()}>
       <button className="sadaqah-close" onClick={()=>setShowSadaqah(false)}>×</button>
