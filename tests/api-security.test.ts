@@ -8,6 +8,7 @@ import { POST as telegramAlert } from "../app/api/telegram-alert/route.ts";
 import { GET as getAdminMatches, POST as saveAdminMatch } from "../app/api/admin/matches/route.ts";
 import { GET as getPushConfig } from "../app/api/push/config/route.ts";
 import { POST as savePushSubscription } from "../app/api/push/subscriptions/route.ts";
+import { POST as sendPushTest } from "../app/api/push/test/route.ts";
 import { POST as trackMatchEvent } from "../app/api/match-events/route.ts";
 import { GET as getMatchAnalytics } from "../app/api/admin/match-analytics/route.ts";
 import { GET as getAdminManualMatches, POST as saveAdminManualMatch } from "../app/api/admin/manual-matches/route.ts";
@@ -126,6 +127,8 @@ test("Push configuration never exposes a private key and Push mutations reject c
     assert.equal(unavailable.status, 503);
     const crossOrigin = await savePushSubscription(new Request(`${appOrigin}/api/push/subscriptions`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({}) }));
     assert.equal(crossOrigin.status, 403);
+    const pushTest = await sendPushTest(new Request(`${appOrigin}/api/push/test`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ endpoint: "https://push.example/device" }) }));
+    assert.equal(pushTest.status, 403);
     const event = await trackMatchEvent(new Request(`${appOrigin}/api/match-events`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ event: "ribbon_view" }) }));
     assert.equal(event.status, 403);
     const analytics = await getMatchAnalytics(new Request(`${appOrigin}/api/admin/match-analytics`));
