@@ -335,3 +335,38 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
 .match-alert-timing{display:grid;gap:6px;padding:8px 9px;border:1px solid rgba(118,86,214,.16);border-radius:11px;background:rgba(255,255,255,.72)}.match-alert-timing>small{color:#697f87;font-size:8px;font-weight:800}.match-alert-timing>div{display:flex;flex-wrap:wrap;gap:5px}.match-alert-timing label{display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:999px;background:#f5f3ff;color:#5f5196;font-size:8px;cursor:pointer}.match-alert-timing input{accent-color:#7656d6}.match-personal-controls{display:grid;gap:10px;margin-top:12px;padding:13px;border:1px solid rgba(118,86,214,.18);border-radius:15px;background:linear-gradient(135deg,rgba(246,243,255,.74),rgba(238,250,248,.78))}.match-personal-controls>div:first-child{display:grid;gap:3px}.match-personal-controls small{color:var(--muted);font-size:8px}.match-personal-controls b{font-size:11px}.match-personal-controls p{margin:0;color:#5e757d;font-size:9px;line-height:1.7}.match-personal-controls form{display:flex;gap:7px}.match-personal-controls form input{flex:1;min-width:0;border:1px solid rgba(71,106,111,.16);border-radius:9px;padding:8px;background:#fff;color:var(--nx-ink);font:inherit;font-size:9px}.match-personal-controls form button{border:0;border-radius:9px;padding:8px 10px;background:#7656d6;color:#fff;font:inherit;font-size:8px;font-weight:800;cursor:pointer;white-space:nowrap}.match-personal-tags{display:flex;flex-wrap:wrap;gap:6px}.match-personal-tags button,.match-hidden-list button{display:flex;align-items:center;gap:7px;border:1px solid rgba(118,86,214,.17);border-radius:999px;padding:6px 8px;background:#fff;color:#4f4780;font:inherit;font-size:8px;cursor:pointer}.match-personal-tags span{font-size:12px;line-height:.8;color:#a65368}.match-hidden-list{display:grid;gap:5px}.match-hidden-list>small{font-weight:800;color:#667c84}.match-hidden-list button{justify-content:space-between;border-radius:9px;color:#45656c}.match-hidden-list button span{color:#0d777b;font-weight:800}.match-hide-button,.match-hide-schedule{border:1px solid rgba(183,92,99,.3);border-radius:11px;background:rgba(255,240,239,.72);color:#a14c5c;font:inherit;font-size:10px;font-weight:800;cursor:pointer}.match-hide-button{width:100%;margin-top:14px;padding:10px}.match-hide-schedule{justify-self:start;margin-top:2px;padding:7px 9px;font-size:8px}.match-hide-button:hover,.match-hide-schedule:hover{background:rgba(255,228,226,.95)}
 @media(max-width:650px){.favourite-match-countdown{grid-template-columns:1fr auto;gap:6px;padding:11px}.favourite-match-countdown>span{justify-self:start}.favourite-match-countdown>b{grid-column:1/-1;grid-row:2;font-size:11px}.favourite-match-countdown em{grid-column:1;grid-row:3;font-size:8px}.favourite-match-countdown strong{grid-column:2;grid-row:3;font-size:8px}.match-personal-controls form{display:grid;grid-template-columns:1fr}.match-personal-controls form button{min-height:36px}.match-alert-timing label{font-size:7px}.match-hide-schedule{width:100%;min-height:32px}}
 @media(prefers-reduced-motion:reduce){.favourite-match-countdown{transition:none!important}}
+
+/* Beta release status and fair-use messaging */
+.topbar-brand b { display: inline-flex; align-items: center; gap: 7px; }
+.beta-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 19px;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, #14b8aa 52%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #14b8aa 12%, transparent);
+  color: #087c72;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.8;
+  white-space: nowrap;
+}
+.beta-usage-note {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted, #65727f);
+  font-size: 12px;
+  line-height: 1.7;
+}
+[data-navixa-theme="dark"] .beta-badge {
+  border-color: rgba(112, 229, 215, .45);
+  background: rgba(112, 229, 215, .13);
+  color: #9df3e8;
+}
+@media (max-width: 560px) {
+  .beta-badge { min-height: 17px; padding: 0 6px; font-size: 9px; }
+  .topbar-brand b { gap: 5px; }
+}
