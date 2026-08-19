@@ -10,6 +10,7 @@ import { GET as getPushConfig } from "../app/api/push/config/route.ts";
 import { POST as savePushSubscription } from "../app/api/push/subscriptions/route.ts";
 import { POST as trackMatchEvent } from "../app/api/match-events/route.ts";
 import { GET as getMatchAnalytics } from "../app/api/admin/match-analytics/route.ts";
+import { GET as getAdminManualMatches, POST as saveAdminManualMatch } from "../app/api/admin/manual-matches/route.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -106,6 +107,13 @@ test("match administration API rejects anonymous and cross-origin mutation reque
   assert.equal(anonymous.status, 401);
   const crossOrigin = await saveAdminMatch(new Request(`${appOrigin}/api/admin/matches`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ matchId: "1" }) }));
   assert.equal(crossOrigin.status, 401);
+});
+
+test("shared manual matches stay restricted to an authenticated administrator", async () => {
+  const listing = await getAdminManualMatches(new Request(`${appOrigin}/api/admin/manual-matches`));
+  assert.equal(listing.status, 401);
+  const mutation = await saveAdminManualMatch(new Request(`${appOrigin}/api/admin/manual-matches`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({}) }));
+  assert.equal(mutation.status, 401);
 });
 
 test("Push configuration never exposes a private key and Push mutations reject cross-origin calls", async () => {
