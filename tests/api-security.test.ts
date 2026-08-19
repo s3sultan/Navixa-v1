@@ -141,6 +141,21 @@ test("Push configuration never exposes a private key and Push mutations reject c
   }
 });
 
+test("Push subscription stores every selected alert time without duplicates", async () => {
+  const statements: Array<{sql:string;values:unknown[]}> = [];
+  const database = { prepare(sql:string) { const statement = { bind(...values:unknown[]) { statements.push({sql,values}); return statement; }, async run() { return {}; } }; return statement; } };
+  const host = globalThis as typeof globalThis & { DB?: typeof database };
+  const prior = host.DB; host.DB = database;
+  try {
+    const response = await savePushSubscription(post("/api/push/subscriptions", { endpoint:"https://push.example/device", keys:{p256dh:"1234567890123456",auth:"12345678"}, competitions:["rsl"], teams:["الهلال"], beforeMinutesList:[5,30,15,5,0] }));
+    assert.equal(response.status,200);
+    const insert = statements.find(item=>item.sql.startsWith("INSERT INTO navixa_push_subscriptions"));
+    assert.ok(insert);
+    assert.equal(insert.values[6],30);
+    assert.equal(insert.values[7],"[30,15,5,0]");
+  } finally { if(prior===undefined) delete host.DB; else host.DB=prior; }
+});
+
 test("global assistant learning requires same-origin consent and admin review stays protected", async () => {
   const shared = await shareAssistantLearning(new Request(`${appOrigin}/api/assistant-learning`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ question: "كيف أرتب يومي؟", response: "ابدأ بخطوة واحدة" }) }));
   assert.equal(shared.status, 403);
