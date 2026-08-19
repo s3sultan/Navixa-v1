@@ -404,3 +404,12 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
 }
 .topbar-actions .topbar-plus:hover { background:#eee8ff; }
 @media(max-width:650px){.topbar-actions .topbar-plus{min-height:28px;padding:0 8px;font-size:9px}.topbar-actions .topbar-plus span{display:inline!important}}
+
+/* Always-visible assistant entry point for mobile users. */
+.topbar-assistant{background:linear-gradient(135deg,#087f83,#7656d6)!important;color:#fff!important;border:1px solid rgba(255,255,255,.28)!important;box-shadow:0 6px 14px rgba(8,127,131,.18)}
+.topbar-assistant span{color:inherit!important}
+@media(max-width:700px){
+  .navixa-topbar .topbar-actions{gap:5px}
+  .navixa-topbar .topbar-assistant{display:inline-flex!important;align-items:center;gap:4px;min-height:32px;padding:0 8px!important;border-radius:10px!important;font-size:10px!important;white-space:nowrap}
+  .navixa-topbar .topbar-assistant span{display:inline!important}
+}

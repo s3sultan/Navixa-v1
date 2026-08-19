@@ -62,6 +62,12 @@ export default function FloatingAssistant({ onAddTask }: { onAddTask: (title: st
     void fetch("/api/assistant-patterns").then(response => response.ok ? response.json() : { patterns: [] }).then((data: { patterns?: GlobalPattern[] }) => setGlobalPatterns(Array.isArray(data.patterns) ? data.patterns.slice(0, 40) : [])).catch(() => setGlobalPatterns([]));
   }, []);
 
+  useEffect(() => {
+    const openFromPage = () => { localStorage.removeItem("navixa-assistant-enabled"); document.documentElement.classList.remove("assistant-off"); setOpen(true); };
+    window.addEventListener("navixa:open-assistant", openFromPage);
+    return () => window.removeEventListener("navixa:open-assistant", openFromPage);
+  }, []);
+
   useEffect(() => localStorage.setItem("navixa-chat", JSON.stringify(messages.slice(-MAX_MESSAGES))), [messages]);
   useEffect(() => localStorage.setItem(memoryKey, JSON.stringify(memory.slice(-40))), [memory]);
   useEffect(() => localStorage.setItem("navixa-assistant-learning", String(learningEnabled)), [learningEnabled]);
