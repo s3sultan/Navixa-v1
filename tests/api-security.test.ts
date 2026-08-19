@@ -6,6 +6,10 @@ import { POST as googleLogin } from "../app/api/auth/google/route.ts";
 import { GET as getMatches } from "../app/api/matches/route.ts";
 import { POST as telegramAlert } from "../app/api/telegram-alert/route.ts";
 import { GET as getAdminMatches, POST as saveAdminMatch } from "../app/api/admin/matches/route.ts";
+import { GET as getPushConfig } from "../app/api/push/config/route.ts";
+import { POST as savePushSubscription } from "../app/api/push/subscriptions/route.ts";
+import { POST as trackMatchEvent } from "../app/api/match-events/route.ts";
+import { GET as getMatchAnalytics } from "../app/api/admin/match-analytics/route.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -102,6 +106,26 @@ test("match administration API rejects anonymous and cross-origin mutation reque
   assert.equal(anonymous.status, 401);
   const crossOrigin = await saveAdminMatch(new Request(`${appOrigin}/api/admin/matches`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ matchId: "1" }) }));
   assert.equal(crossOrigin.status, 401);
+});
+
+test("Push configuration never exposes a private key and Push mutations reject cross-origin calls", async () => {
+  const publicBefore = process.env.VAPID_PUBLIC_KEY;
+  const privateBefore = process.env.VAPID_PRIVATE_KEY;
+  delete process.env.VAPID_PUBLIC_KEY;
+  delete process.env.VAPID_PRIVATE_KEY;
+  try {
+    const unavailable = await getPushConfig();
+    assert.equal(unavailable.status, 503);
+    const crossOrigin = await savePushSubscription(new Request(`${appOrigin}/api/push/subscriptions`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({}) }));
+    assert.equal(crossOrigin.status, 403);
+    const event = await trackMatchEvent(new Request(`${appOrigin}/api/match-events`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ event: "ribbon_view" }) }));
+    assert.equal(event.status, 403);
+    const analytics = await getMatchAnalytics(new Request(`${appOrigin}/api/admin/match-analytics`));
+    assert.equal(analytics.status, 401);
+  } finally {
+    if (publicBefore === undefined) delete process.env.VAPID_PUBLIC_KEY; else process.env.VAPID_PUBLIC_KEY = publicBefore;
+    if (privateBefore === undefined) delete process.env.VAPID_PRIVATE_KEY; else process.env.VAPID_PRIVATE_KEY = privateBefore;
+  }
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {

@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath, isProtectedAdminPath, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "./adminAuth";
+import { deliverDueMatchPushes } from "./matchPush";
 
 interface Env {
   ASSETS: Fetcher;
@@ -33,6 +34,8 @@ const publicMutationLimits: Record<string, number> = {
   "/api/sync": 12,
   "/api/auth/google": 10,
   "/api/auth/logout": 10,
+  "/api/push/subscriptions": 8,
+  "/api/match-events": 30,
 };
 
 function publicMutationGuard(request: Request, url: URL) {
@@ -68,6 +71,9 @@ function auditResponse(request: Request, url: URL, response: Response, startedAt
 }
 
 const worker = {
+  async scheduled(_controller: { cron: string }, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(deliverDueMatchPushes(env).then(result => console.log(JSON.stringify({ event: "match_push_scheduled", delivered: result.delivered, skipped: result.skipped }))));
+  },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const startedAt = Date.now();
