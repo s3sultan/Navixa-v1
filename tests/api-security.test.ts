@@ -12,6 +12,8 @@ import { POST as sendPushTest } from "../app/api/push/test/route.ts";
 import { POST as trackMatchEvent } from "../app/api/match-events/route.ts";
 import { GET as getMatchAnalytics } from "../app/api/admin/match-analytics/route.ts";
 import { GET as getAdminManualMatches, POST as saveAdminManualMatch } from "../app/api/admin/manual-matches/route.ts";
+import { POST as shareAssistantLearning } from "../app/api/assistant-learning/route.ts";
+import { GET as getAssistantLearningReview } from "../app/api/admin/assistant-learning/route.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -137,6 +139,15 @@ test("Push configuration never exposes a private key and Push mutations reject c
     if (publicBefore === undefined) delete process.env.VAPID_PUBLIC_KEY; else process.env.VAPID_PUBLIC_KEY = publicBefore;
     if (privateBefore === undefined) delete process.env.VAPID_PRIVATE_KEY; else process.env.VAPID_PRIVATE_KEY = privateBefore;
   }
+});
+
+test("global assistant learning requires same-origin consent and admin review stays protected", async () => {
+  const shared = await shareAssistantLearning(new Request(`${appOrigin}/api/assistant-learning`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ question: "كيف أرتب يومي؟", response: "ابدأ بخطوة واحدة" }) }));
+  assert.equal(shared.status, 403);
+  const forbidden = await shareAssistantLearning(post("/api/assistant-learning", { question: "كلمة مرور الحساب", response: "لا تشاركها" }));
+  assert.equal(forbidden.status, 400);
+  const review = await getAssistantLearningReview(new Request(`${appOrigin}/api/admin/assistant-learning`));
+  assert.equal(review.status, 401);
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {
