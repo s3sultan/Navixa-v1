@@ -14,6 +14,9 @@ import { GET as getMatchAnalytics } from "../app/api/admin/match-analytics/route
 import { GET as getAdminManualMatches, POST as saveAdminManualMatch } from "../app/api/admin/manual-matches/route.ts";
 import { POST as shareAssistantLearning } from "../app/api/assistant-learning/route.ts";
 import { GET as getAssistantLearningReview } from "../app/api/admin/assistant-learning/route.ts";
+import { GET as getSubscriptions } from "../app/api/admin/subscriptions/route.ts";
+import { GET as getBillingWebhook, POST as billingWebhook } from "../app/api/billing/webhook/route.ts";
+import { POST as registerPlusInterest } from "../app/api/plus/interest/route.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -163,6 +166,26 @@ test("global assistant learning requires same-origin consent and admin review st
   assert.equal(forbidden.status, 400);
   const review = await getAssistantLearningReview(new Request(`${appOrigin}/api/admin/assistant-learning`));
   assert.equal(review.status, 401);
+});
+
+test("subscription administration stays protected and the billing webhook is disabled by default", async () => {
+  const subscriptions = await getSubscriptions(new Request(`${appOrigin}/api/admin/subscriptions`));
+  assert.equal(subscriptions.status, 401);
+  const status = await getBillingWebhook();
+  assert.equal(status.status, 200);
+  assert.deepEqual(await status.json(), { billing:"disabled",mode:"test",message:"بوابة الدفع غير مفعلة. لا يتم قبول أي دفعات أو بيانات بطاقات." });
+  const webhook = await billingWebhook(new Request(`${appOrigin}/api/billing/webhook`, { method:"POST",headers:{"content-type":"application/json"},body:"{}" }));
+  assert.equal(webhook.status,503);
+  const crossOriginInterest = await registerPlusInterest(new Request(`${appOrigin}/api/plus/interest`, { method:"POST",headers:{origin:"https://attacker.example","content-type":"application/json"},body:JSON.stringify({email:"test@example.com"}) }));
+  assert.equal(crossOriginInterest.status,403);
+});
+
+test("Plus interest records only a contact through the same-origin endpoint", async () => {
+  const statements: Array<{sql:string;values:unknown[]}> = [];
+  const database = { prepare(sql:string) { const statement = { bind(...values:unknown[]) { statements.push({sql,values}); return statement; }, async run() { return {}; } }; return statement; } };
+  const host = globalThis as typeof globalThis & { DB?: typeof database };const prior=host.DB;host.DB=database;
+  try { const response=await registerPlusInterest(post("/api/plus/interest",{email:"early@example.com",name:"مستخدم مبكر"}));assert.equal(response.status,200);assert.equal((await response.json() as {ok:boolean}).ok,true);assert.ok(statements.some(item=>item.sql.startsWith("INSERT INTO navixa_subscribers"))); }
+  finally { if(prior===undefined) delete host.DB; else host.DB=prior; }
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./plus.css";
+import InterestForm from "./InterestForm";
 
 export const metadata: Metadata = {
   title: "NAVIXA Plus — يفهم يومك بعمق أكبر",
@@ -40,12 +41,14 @@ export default function NavixaPlusPage() {
     <section className="plus-plans" id="plans" aria-labelledby="plans-title">
       <header><small>خطط الإطلاق المقترحة</small><h2 id="plans-title">اختر ما يناسبك لاحقًا</h2><p>هذه باقات تعريفية في النسخة التجريبية. لن يتم طلب دفع أو بطاقة الآن.</p></header>
       <div className="plan-grid">
-        <article className="plan-card trial"><span className="plan-tag">ابدأ هنا</span><h3>تجربة Plus</h3><div className="plan-price"><b>14</b><span>يومًا<br/>بلا بطاقة</span></div><p>تعرف على المساعد الأذكى وميزات Plus قبل أي قرار.</p><a href="mailto:hello@navixa.sa?subject=NAVIXA%20Plus%20Trial">أرغب في التجربة</a></article>
-        <article className="plan-card featured"><span className="plan-tag">الأقرب للإطلاق</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>للشخص الذي يريد ذكاءً أعمق وتخصيصًا مستمرًا.</p><a href="mailto:hello@navixa.sa?subject=NAVIXA%20Plus%20Monthly">سجّل اهتمامك</a></article>
-        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="mailto:hello@navixa.sa?subject=NAVIXA%20Plus%203%2B1">سجّل اهتمامك</a></article>
+        <article className="plan-card trial"><span className="plan-tag">ابدأ هنا</span><h3>تجربة Plus</h3><div className="plan-price"><b>14</b><span>يومًا<br/>بلا بطاقة</span></div><p>تعرف على المساعد الأذكى وميزات Plus قبل أي قرار.</p><a href="#interest">أرغب في التجربة</a></article>
+        <article className="plan-card featured"><span className="plan-tag">الأقرب للإطلاق</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>للشخص الذي يريد ذكاءً أعمق وتخصيصًا مستمرًا.</p><a href="#interest">سجّل اهتمامك</a></article>
+        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="#interest">سجّل اهتمامك</a></article>
       </div>
       <aside className="founders-note"><span>✦</span><p><b>سعر المؤسسين قادم.</b> أوائل المستخدمين سيحصلون على عرض خاص لفترة محدودة عند فتح الاشتراك.</p></aside>
     </section>
+
+    <InterestForm/>
 
     <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>لا نبيع بياناتك لنموذج الاشتراك.</h2><p>الدفع سيكون عبر بوابة خارجية آمنة عند الإطلاق. تفضيلاتك وخصوصيتك المحلية تبقى كما هي.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
 
