@@ -1,7 +1,5 @@
 /// <reference lib="webworker" />
 
-import { pipeline } from "@huggingface/transformers";
-
 type WorkerRequest = {
   type: "transcribe";
   audio: Float32Array;
@@ -19,7 +17,8 @@ const MODELS: Record<"tiny" | "base", ModelChoice> = {
 };
 
 let activeModelKey: "tiny" | "base" | null = null;
-let transcriber: Awaited<ReturnType<typeof pipeline>> | null = null;
+let transcriber: ((audio: Float32Array, options: Record<string, unknown>) => Promise<unknown>) | null = null;
+let runtimePromise: Promise<{ pipeline: (task: string, model: string, options: Record<string, unknown>) => Promise<typeof transcriber> }> | null = null;
 
 function send(payload: Record<string, unknown>) {
   self.postMessage(payload);
@@ -28,8 +27,13 @@ function send(payload: Record<string, unknown>) {
 async function getTranscriber(model: "tiny" | "base") {
   if (transcriber && activeModelKey === model) return transcriber;
   const choice = MODELS[model];
+  send({ type: "state", state: "loading-runtime", message: "جارٍ تنزيل محرك التفريغ لمرة واحدة إلى جهازك…" });
+  // يبقى هذا الاستيراد عنوانًا خارجيًا حتى لا تدخل ملفات ONNX/WASM الضخمة في Worker الإنتاجي.
+  // لا تُنقل بيانات الصوت إلى هذا العنوان؛ الاستيراد يحمّل المحرك فقط داخل Web Worker للمتصفح.
+  runtimePromise ||= import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm") as unknown as Promise<{ pipeline: (task: string, model: string, options: Record<string, unknown>) => Promise<typeof transcriber> }>;
+  const runtime = await runtimePromise;
   send({ type: "state", state: "loading-model", message: "جارٍ تجهيز النموذج المحلي على جهازك…" });
-  transcriber = await pipeline("automatic-speech-recognition", choice.id, {
+  transcriber = await runtime.pipeline("automatic-speech-recognition", choice.id, {
     dtype: choice.dtype,
     progress_callback: (progress: Record<string, unknown>) => {
       const percentage = typeof progress.progress === "number" ? Math.round(progress.progress) : null;
