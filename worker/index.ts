@@ -29,6 +29,56 @@ interface ExecutionContext {
 
 const publicMutationLimiter = createMemoryRateLimiter();
 
+// Local STT model relay. It is deliberately a strict file allowlist: the relay
+// serves public model artifacts only and never accepts audio, transcripts, IDs,
+// cookies, or user-provided remote URLs.
+const LOCAL_STT_MODEL_PREFIX = "/api/local-stt-model/";
+const LOCAL_STT_MODELS = new Set(["Xenova/whisper-tiny", "Xenova/whisper-base"]);
+const LOCAL_STT_MODEL_FILES = new Set([
+  "config.json", "generation_config.json", "preprocessor_config.json", "tokenizer_config.json",
+  "tokenizer.json", "special_tokens_map.json", "vocab.json", "merges.txt", "added_tokens.json",
+  "onnx/encoder_model.onnx", "onnx/encoder_model_quantized.onnx",
+  "onnx/decoder_model_merged.onnx", "onnx/decoder_model_merged_quantized.onnx",
+]);
+const LOCAL_STT_MODEL_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+function localSttModelPath(url: URL) {
+  if (!url.pathname.startsWith(LOCAL_STT_MODEL_PREFIX) || url.search) return null;
+  const pieces = url.pathname.slice(LOCAL_STT_MODEL_PREFIX.length).split("/").map(decodeURIComponent);
+  if (pieces.length < 5 || pieces[2] !== "resolve" || pieces[3] !== "main") return null;
+  const model = `${pieces[0]}/${pieces[1]}`;
+  const file = pieces.slice(4).join("/");
+  if (!LOCAL_STT_MODELS.has(model) || !LOCAL_STT_MODEL_FILES.has(file)) return null;
+  return { model, file };
+}
+
+async function relayLocalSttModel(request: Request, url: URL, ctx: ExecutionContext) {
+  const source = localSttModelPath(url);
+  if (!source) return new Response(JSON.stringify({ error: "ملف نموذج غير مسموح" }), { status: 404, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+
+  const cacheKey = new Request(url.toString(), { method: "GET" });
+  const cached = await caches.default.match(cacheKey);
+  if (cached) {
+    const hit = new Response(cached.body, cached);
+    hit.headers.set("X-NAVIXA-Local-STT-Cache", "HIT");
+    return hit;
+  }
+
+  const upstream = await fetch(`https://huggingface.co/${source.model}/resolve/main/${source.file}`);
+  if (!upstream.ok || !upstream.body) return new Response(JSON.stringify({ error: "تعذر تنزيل ملف النموذج" }), { status: 502, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  const response = new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "content-type": upstream.headers.get("content-type") || "application/octet-stream",
+      "cache-control": `public, max-age=0, s-maxage=${LOCAL_STT_MODEL_TTL_SECONDS}`,
+      "cross-origin-resource-policy": "same-origin",
+      "X-NAVIXA-Local-STT-Cache": "MISS",
+    },
+  });
+  ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+  return response;
+}
+
 // Public-document cache is deliberately an allowlist. Never cache a request that
 // could be personalized by a session, a Next.js RSC navigation, or a query string.
 const PUBLIC_DOCUMENT_PATHS = new Set(["/", "/health", "/worship", "/plus", "/privacy"]);
@@ -196,6 +246,11 @@ const worker = {
         const loginUrl = new URL("/admin/login?reason=session", request.url);
         return auditResponse(request, url, Response.redirect(loginUrl.toString(), 302), startedAt, "admin");
       }
+    }
+
+    if (request.method === "GET" && url.pathname.startsWith(LOCAL_STT_MODEL_PREFIX)) {
+      const response = await relayLocalSttModel(request, url, ctx);
+      return auditResponse(request, url, response, startedAt, "public");
     }
 
     if (url.pathname === "/_vinext/image") {

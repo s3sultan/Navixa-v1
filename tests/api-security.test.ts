@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { GET as getAdminSession } from "../app/api/auth/admin-session/route.ts";
 import { createAdminSessionToken, makeAdminSessionCookie } from "../worker/adminAuth.ts";
 import { POST as googleLogin } from "../app/api/auth/google/route.ts";
@@ -217,6 +218,15 @@ test("performance telemetry rejects cross-origin input and stores only bounded a
     const invalid = await reportPerformance(post("/api/performance", { path: "/admin", ttfbMs: 1, loadMs: 2 }));
     assert.equal(invalid.status, 400);
   } finally { if (prior === undefined) delete host.DB; else host.DB = prior; }
+});
+
+test("local STT model relay is a strict public-file allowlist and never receives audio", async () => {
+  const workerSource = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
+  assert.match(workerSource, /LOCAL_STT_MODELS = new Set\(\["Xenova\/whisper-tiny", "Xenova\/whisper-base"\]\)/);
+  assert.match(workerSource, /LOCAL_STT_MODEL_FILES = new Set/);
+  assert.match(workerSource, /url\.search\) return null/);
+  assert.match(workerSource, /https:\/\/huggingface\.co\/\$\{source\.model\}\/resolve\/main\/\$\{source\.file\}/);
+  assert.doesNotMatch(workerSource, /request\.text\(|request\.json\(|request\.arrayBuffer\(/);
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {
