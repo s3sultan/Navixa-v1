@@ -416,3 +416,8 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
   .navixa-topbar .topbar-assistant{display:inline-flex!important;align-items:center;gap:4px;min-height:32px;padding:0 8px!important;border-radius:10px!important;font-size:10px!important;white-space:nowrap}
   .navixa-topbar .topbar-assistant span{display:inline!important}
 }
+
+/* مدخل ثانوي لميزة المحاضرات: يبقى أسفل الأدوات الأساسية لتفادي ازدحام الواجهة. */
+.secondary-footer-tools.data-only{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.meeting-data-link{color:inherit;text-decoration:none}.meeting-data-link:hover{border-color:rgba(104,216,202,.44)!important;background:rgba(230,251,247,.76)!important}.meeting-data-link>i{color:#137f80!important}
+@media(max-width:650px){.secondary-footer-tools.data-only{grid-template-columns:1fr!important}.secondary-footer-tools.data-only .secondary-data-link{min-height:66px}}

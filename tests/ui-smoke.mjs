@@ -146,6 +146,24 @@ async function main() {
     assert.equal(adminGuard.path, "/admin/login", "يجب أن يعيد حارس الإدارة الزائر غير المصرح إلى صفحة الدخول");
     assert.equal(adminGuard.reason, "session", "يجب أن يوضح الحارس سبب إعادة التوجيه");
 
+    await navigate(cdp, `${BASE_URL}/meetings`);
+    const meetingLanding = await evaluate(cdp, `(() => {
+      const page = document.querySelector(".meeting-page");
+      const consent = document.querySelector(".meeting-consent input");
+      const start = [...document.querySelectorAll("button")].find(button => button.textContent?.includes("ابدأ التسجيل"));
+      const resources = performance.getEntriesByType("resource").map(entry => entry.name);
+      return {
+        found: Boolean(page && consent && start),
+        consentUnchecked: consent instanceof HTMLInputElement && !consent.checked,
+        startVisible: start ? getComputedStyle(start).display !== "none" : false,
+        transcriptionLoaded: resources.some(name => /transcription\\.worker|transformers|onnx/i.test(name)),
+      };
+    })()`);
+    assert.equal(meetingLanding.found, true, "يجب أن تظهر واجهة المحاضرات الأساسية");
+    assert.equal(meetingLanding.consentUnchecked, true, "يجب ألا تفترض الصفحة موافقة تسجيل مسبقة");
+    assert.equal(meetingLanding.startVisible, true, "يجب أن يكون زر التسجيل واضحًا على الجوال");
+    assert.equal(meetingLanding.transcriptionLoaded, false, "يجب ألا يحمل محرك التفريغ قبل طلب المستخدم");
+
     console.log(JSON.stringify({
       status: "passed",
       checks: {
@@ -153,6 +171,7 @@ async function main() {
         assistantOpened,
         loginLayout,
         adminGuard,
+        meetingLanding,
       },
     }, null, 2));
   } finally {
