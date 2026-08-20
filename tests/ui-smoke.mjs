@@ -112,7 +112,16 @@ async function main() {
 
     const assistantOpened = await evaluate(cdp, `(() => {
       document.querySelector(".assistant-bubble")?.click();
-      return new Promise(resolve => setTimeout(() => resolve({ expanded: document.querySelector(".assistant-bubble")?.getAttribute("aria-expanded"), panel: Boolean(document.querySelector(".assistant-panel")), assistantOff: document.documentElement.classList.contains("assistant-off") }), 120));
+      return new Promise(resolve => {
+        const deadline = performance.now() + 1_200;
+        const check = () => {
+          const button = document.querySelector(".assistant-bubble");
+          const state = { expanded: button?.getAttribute("aria-expanded"), panel: Boolean(document.querySelector(".assistant-panel")), assistantOff: document.documentElement.classList.contains("assistant-off") };
+          if (state.expanded === "true" || performance.now() >= deadline) return resolve(state);
+          setTimeout(check, 50);
+        };
+        check();
+      });
     })()`);
     assert.equal(assistantOpened.expanded, "true", "يجب أن يفتح زر المساعد المحادثة");
     assert.equal(assistantOpened.panel, true, "يجب أن تظهر لوحة المحادثة بعد الضغط");
