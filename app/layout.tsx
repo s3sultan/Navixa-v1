@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PerformanceReporter from "./PerformanceReporter";
 import "./globals.css";
 
 const siteUrl = "https://navixa.s2shug.workers.dev";
@@ -52,5 +53,5 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />{children}</body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><PerformanceReporter />{children}</body></html>;
 }

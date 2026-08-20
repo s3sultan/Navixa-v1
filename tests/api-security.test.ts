@@ -18,6 +18,7 @@ import { GET as getSubscriptions } from "../app/api/admin/subscriptions/route.ts
 import { GET as getBillingSettings } from "../app/api/admin/billing-settings/route.ts";
 import { GET as getBillingWebhook, POST as billingWebhook } from "../app/api/billing/webhook/route.ts";
 import { POST as registerPlusInterest } from "../app/api/plus/interest/route.ts";
+import { POST as reportPerformance } from "../app/api/performance/route.ts";
 import { GET as getAdminReferrals } from "../app/api/admin/referrals/route.ts";
 import { createCode } from "../app/referrals.ts";
 
@@ -198,6 +199,24 @@ test("Plus interest records only a contact through the same-origin endpoint", as
   const host = globalThis as typeof globalThis & { DB?: typeof database };const prior=host.DB;host.DB=database;
   try { const response=await registerPlusInterest(post("/api/plus/interest",{email:"early@example.com",name:"مستخدم مبكر"}));assert.equal(response.status,200);assert.equal((await response.json() as {ok:boolean}).ok,true);assert.ok(statements.some(item=>item.sql.startsWith("INSERT INTO navixa_subscribers"))); }
   finally { if(prior===undefined) delete host.DB; else host.DB=prior; }
+});
+
+test("performance telemetry rejects cross-origin input and stores only bounded anonymous timings", async () => {
+  const statements: Array<{sql:string;values:unknown[]}> = [];
+  const database = { prepare(sql:string) { const statement = { bind(...values:unknown[]) { statements.push({sql,values}); return statement; }, async run() { return {}; } }; return statement; } };
+  const host = globalThis as typeof globalThis & { DB?: typeof database }; const prior = host.DB; host.DB = database;
+  try {
+    const denied = await reportPerformance(new Request(`${appOrigin}/api/performance`, { method: "POST", headers: { origin: "https://attacker.example", "content-type": "application/json" }, body: JSON.stringify({ path: "/health", ttfbMs: 10, loadMs: 20 }) }));
+    assert.equal(denied.status, 403);
+    const accepted = await reportPerformance(post("/api/performance", { path: "/health", ttfbMs: 123.4, loadMs: 456.7, visitorId: "ignored" }));
+    assert.equal(accepted.status, 200);
+    const insert = statements.find(item => item.sql.startsWith("INSERT INTO navixa_performance_samples"));
+    assert.ok(insert);
+    assert.deepEqual(insert.values.slice(0,3), ["/health",123,457]);
+    assert.equal(insert.values.some(value => value === "ignored"), false);
+    const invalid = await reportPerformance(post("/api/performance", { path: "/admin", ttfbMs: 1, loadMs: 2 }));
+    assert.equal(invalid.status, 400);
+  } finally { if (prior === undefined) delete host.DB; else host.DB = prior; }
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {
