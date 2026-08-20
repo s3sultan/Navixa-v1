@@ -84,7 +84,7 @@ async function main() {
 
   try {
     await waitForUrl(`${BASE_URL}/`, "خادم NAVIXA المحلي");
-    chrome = start("chromium", [
+    chrome = start(process.env.CHROME_BIN || "chromium", [
       "--headless=new", "--no-sandbox", "--disable-gpu",
       `--remote-debugging-port=${DEBUG_PORT}`, "--remote-debugging-address=127.0.0.1",
       `--user-data-dir=${profileDir}`, "about:blank",

@@ -40,7 +40,10 @@ jobs:
         run: npm ci
 
       - name: Run NAVIXA security and UI tests
+        env:
+          CHROME_BIN: google-chrome
         run: |
+          google-chrome --version
           npm test
           npm run test:ui
 
