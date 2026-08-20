@@ -240,8 +240,8 @@ footer .counters b{font-size:22px;line-height:1;color:var(--ink);direction:ltr;t
   .today-grid.primary-paths>a,.today-grid.primary-paths>button,.today-grid.primary-paths>*:last-child{grid-column:auto!important;grid-row:auto!important}
   .today-grid.primary-paths{direction:rtl!important;grid-auto-flow:row!important;align-content:start!important}
   .today-grid.primary-paths>a,.today-grid.primary-paths>button{place-self:stretch!important}
-  /* The full assistant remains reachable from navigation; hide the floating bubble on phones to avoid covering primary cards. */
-  .floating-assistant{display:none!important}
+  /* يبقى المساعد مرئيًا على الجوال؛ تموضعه الثابت يجنّب تغطية بطاقات الصفحة. */
+  .floating-assistant{display:block!important}
 }
 
 /* Mobile card content reset: fixed rows prevent icon/title collisions. */
@@ -251,6 +251,9 @@ footer .counters b{font-size:22px;line-height:1;color:var(--ink);direction:ltr;t
   .today-grid.primary-paths small{grid-row:2!important;align-self:start!important;margin:0!important;padding:0!important;line-height:14px!important}
   .today-grid.primary-paths b{grid-row:3!important;align-self:start!important;display:block!important;height:34px!important;min-height:34px!important;margin:0!important;padding:0!important;line-height:17px!important;overflow:hidden!important}
   .today-grid.primary-paths em{grid-row:4!important;align-self:end!important;display:block!important;height:24px!important;min-height:24px!important;margin:0!important;padding:0!important;line-height:12px!important;overflow:hidden!important}
+  /* مدخل المساعد: واضح أعلى اليسار، خارج مسار البطاقات ومهيأ للمس. */
+  .floating-assistant{display:block!important;position:fixed!important;left:12px!important;right:auto!important;top:96px!important;bottom:auto!important;z-index:300!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent;transform:none!important}
+  .floating-assistant .assistant-bubble{touch-action:manipulation!important;pointer-events:auto!important}
 }
 
 /* Gentle, occasional dhikr companion for focus sessions. */

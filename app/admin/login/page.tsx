@@ -31,6 +31,7 @@ export default function AdminLogin() {
       const response = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        credentials: "same-origin",
         cache: "no-store",
         body: JSON.stringify({ credential }),
       });
@@ -41,7 +42,19 @@ export default function AdminLogin() {
         return;
       }
 
-      window.location.replace("/admin");
+      // نتحقق من تثبيت Cookie أولًا؛ هذا يمنع حلقة العودة إلى /admin/login في متصفحات الجوال.
+      const session = await fetch(`/api/auth/admin-session?fresh=${Date.now()}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "cache-control": "no-cache" },
+      });
+      const sessionResult = await session.json().catch(() => ({})) as { authenticated?: boolean };
+      if (!session.ok || sessionResult.authenticated !== true) {
+        setError("تم التحقق من حسابك، لكن لم تكتمل جلسة الإدارة. أعد المحاولة من نفس المتصفح.");
+        setState("ready");
+        return;
+      }
+      window.location.assign("/admin");
     } catch {
       setError("تعذر الاتصال بخدمة التحقق. تحقق من الشبكة ثم أعد المحاولة.");
       setState("ready");
@@ -71,7 +84,7 @@ export default function AdminLogin() {
           text: "continue_with",
           shape: "rectangular",
           logo_alignment: "left",
-          width: 360,
+          width: Math.max(240, Math.min(360, Math.floor(mount.getBoundingClientRect().width || 360))),
           locale: "ar",
         });
         setState("ready");
@@ -158,7 +171,7 @@ export default function AdminLogin() {
           <p>اختر حساب Google المصرّح له للوصول إلى لوحة الإدارة.</p>
         </div>
         <div className="google-login-box shown" aria-busy={state === "loading" || state === "authorizing"}>
-          <div ref={googleButton} />
+          <div ref={googleButton} aria-label="زر الدخول بحساب Google" />
           {statusText && <span className="google-status">{statusText}</span>}
         </div>
         {state === "error" && <button className="google-retry" onClick={() => setReloadKey(key => key + 1)}>إعادة تجهيز الدخول</button>}

@@ -26,6 +26,7 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([initialMessage()]);
   const [position, setPosition] = useState({ x: 24, y: 0 });
+  const [compactLauncher, setCompactLauncher] = useState(false);
   const [clears, setClears] = useState(0);
   const [memory, setMemory] = useState<MemoryItem[]>([]);
   const [learningEnabled, setLearningEnabled] = useState(true);
@@ -46,7 +47,17 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
 
   useEffect(() => {
     document.documentElement.classList.toggle("assistant-off", localStorage.getItem("navixa-assistant-enabled") === "false");
-    setPosition(current => ({ ...current, y: Math.max(90, innerHeight - 108) }));
+    const mobileQuery = window.matchMedia("(max-width: 650px)");
+    const syncLauncherLayout = () => {
+      const isCompact = window.innerWidth <= 650 || mobileQuery.matches;
+      setCompactLauncher(isCompact);
+      if (!isCompact) setPosition(current => ({ ...current, y: Math.max(90, window.innerHeight - 108) }));
+    };
+    syncLauncherLayout();
+    // بعض متصفحات الجوال تثبت viewport بعد تهيئة React بلحظة؛ المزامنة الثانية تمنع موضعًا خارج الشاشة.
+    const settleTimer = window.setTimeout(syncLauncherLayout, 180);
+    mobileQuery.addEventListener("change", syncLauncherLayout);
+    window.addEventListener("resize", syncLauncherLayout);
     try {
       const savedChat = JSON.parse(localStorage.getItem("navixa-chat") || "[]");
       const savedMemory = JSON.parse(localStorage.getItem(memoryKey) || "[]");
@@ -60,6 +71,11 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
       setGlobalLearning(localStorage.getItem("navixa-assistant-global-learning") === "true");
     } catch {}
     void fetch("/api/assistant-patterns").then(response => response.ok ? response.json() : { patterns: [] }).then((data: { patterns?: GlobalPattern[] }) => setGlobalPatterns(Array.isArray(data.patterns) ? data.patterns.slice(0, 40) : [])).catch(() => setGlobalPatterns([]));
+    return () => {
+      window.clearTimeout(settleTimer);
+      mobileQuery.removeEventListener("change", syncLauncherLayout);
+      window.removeEventListener("resize", syncLauncherLayout);
+    };
   }, []);
 
   useEffect(() => {
@@ -152,6 +168,13 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
     return respond("general", `${stylePrefix()}فهمت عليك${preferenceHint} ${context}`);
   };
 
+  const toggleAssistant = () => {
+    // يضمن أن المستخدم يستطيع دائمًا إعادة تشغيل المساعد من الزر العائم على جهازه.
+    localStorage.removeItem("navixa-assistant-enabled");
+    document.documentElement.classList.remove("assistant-off");
+    setOpen(value => !value);
+  };
+
   const send = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const input = event.currentTarget.elements.namedItem("message") as HTMLTextAreaElement;
@@ -171,8 +194,16 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
     setLastIntent("welcome");
     setMessages([makeMessage("navixa", "بدأنا من جديد. خذ راحتك، وش حاب تقول؟")]);
   };
-  const down = (event: PointerEvent<HTMLButtonElement>) => { drag.current = { x: event.clientX, y: event.clientY, left: position.x, top: position.y }; event.currentTarget.setPointerCapture(event.pointerId); };
-  const move = (event: PointerEvent<HTMLButtonElement>) => { if (drag.current) setPosition({ x: Math.max(10, Math.min(innerWidth - 76, drag.current.left + event.clientX - drag.current.x)), y: Math.max(72, Math.min(innerHeight - 76, drag.current.top + event.clientY - drag.current.y)) }); };
+  // السحب ميزة للماوس فقط؛ التقاط اللمس على الجوال كان قد يمنع حدث click في بعض المتصفحات.
+  const down = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType !== "mouse") return;
+    drag.current = { x: event.clientX, y: event.clientY, left: position.x, top: position.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const move = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType !== "mouse" || !drag.current) return;
+    setPosition({ x: Math.max(10, Math.min(innerWidth - 76, drag.current.left + event.clientX - drag.current.x)), y: Math.max(72, Math.min(innerHeight - 76, drag.current.top + event.clientY - drag.current.y)) });
+  };
   const long = messages.length >= MAX_MESSAGES;
   const lastAssistantMessageId = useMemo(() => [...messages].reverse().find(message => message.from === "navixa")?.id || "", [messages]);
   const quickFollowUps = useMemo(() => {
@@ -190,13 +221,15 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
     return choices[lastIntent];
   }, [lastIntent]);
 
-  return <div className="floating-assistant" style={{ left: position.x, top: position.y }} dir="rtl">
+  const launcherStyle = compactLauncher ? { left: 12, top: 96 } : { left: position.x, top: position.y };
+
+  return <div className="floating-assistant" style={launcherStyle} dir="rtl">
     {open && <section className="assistant-panel" aria-label="محادثة NAVIXA">
       <header><div><img className="assistant-logo-mark" src="/navixa-mark.webp" alt="" /><span><b>NAVIXA</b><small><i className="assistant-online-dot"/>{learningEnabled ? "محادثة خاصة على جهازك" : "الذاكرة المحلية متوقفة"}</small></span></div><div className="assistant-header-actions"><button className="assistant-memory-button" type="button" aria-label="فتح الذاكرة" onClick={() => setShowMemory(value => !value)}>⌁</button><button type="button" aria-label="إغلاق المساعد" onClick={() => setOpen(false)}>×</button></div></header>
       {showMemory && <aside className="assistant-memory" aria-label="ذاكرة المساعد المحلية"><div><b>ذاكرتي المحلية</b><button type="button" onClick={() => setMemory([])}>مسح الكل</button></div><p>لا تُحفظ إلا التفضيلات أو العبارات التي توافق عليها، وتبقى على هذا الجهاز.</p><label className="assistant-learning-toggle"><input type="checkbox" checked={learningEnabled} onChange={event => setLearningEnabled(event.target.checked)} /> تعلّم محلي بإذني</label><label className="assistant-learning-toggle"><input type="checkbox" checked={globalLearning} onChange={event => { setGlobalLearning(event.target.checked); setShareStatus(""); }} /> أساهم اختياريًا في تحسين الردود العامة</label>{globalLearning&&<div className="assistant-global-learning"><p>لا نشارك شيئًا تلقائيًا. أنت تختار آخر سؤال ورد لإرساله للمراجعة قبل اعتماده للجميع.</p><small className="assistant-beta-note">نسخة تجريبية: {betaUsageLabel("assistantContribution")} للمساهمات العالمية الاختيارية. المحادثة والذاكرة المحلية بلا حدود.</small><label><input type="checkbox" checked={sensitiveShareConsent} onChange={event => setSensitiveShareConsent(event.target.checked)} /> أوافق بشكل مستقل إذا احتوت المساهمة معلومات شخصية</label><button type="button" onClick={() => void shareLatestExchange()}>مشاركة آخر سؤال ورد للمراجعة</button>{shareStatus&&<small>{shareStatus}</small>}</div>}<label className="assistant-style"><span>أسلوب الرد</span><select value={assistantStyle} onChange={event => setAssistantStyle(event.target.value as AssistantStyle)}><option value="warm">ودود وقريب</option><option value="calm">هادئ ومتزن</option><option value="direct">مختصر ومباشر</option></select></label><div className="assistant-memory-list">{memory.length ? memory.slice().reverse().map(item => <div key={item.id}><span><small>{memoryTitle[item.kind]}</small>{item.value}</span><button type="button" aria-label={`حذف ${item.value}`} onClick={() => forget(item.id)}>×</button></div>) : <small>لا توجد معلومات محفوظة بعد.</small>}</div></aside>}
       <div className="assistant-chat" ref={chatRef} aria-live="polite">{messages.length<=1&&<div className="assistant-quick-replies"><small>ابدأ من هنا أو اكتب بطريقتك</small><div><button type="button" onClick={()=>sendQuickMessage("وش تقدر تسوي؟")}>وش تقدر تسوي؟</button><button type="button" onClick={()=>sendQuickMessage("أحتاج رأيك في فكرة")}>أحتاج رأيك</button><button type="button" onClick={()=>sendQuickMessage("رتب أفكاري بدون مهام")}>رتب أفكاري</button></div></div>}{messages.slice(-MAX_MESSAGES).map(message => <div className={`assistant-message-group ${message.from}`} key={message.id}><article className={`assistant-message ${message.from}`}><p>{message.text}</p><time dateTime={message.at}>{new Intl.DateTimeFormat("ar-SA",{hour:"numeric",minute:"2-digit"}).format(new Date(message.at))}{message.from === "user" && <span>✓✓</span>}</time></article>{message.id===lastAssistantMessageId&&!typing&&<div className="assistant-follow-ups" aria-label="متابعات مقترحة">{quickFollowUps.map(prompt=><button type="button" key={prompt} onClick={()=>sendQuickMessage(prompt)}>{prompt}</button>)}</div>}</div>)}{typing && <article className="assistant-message navixa assistant-typing"><i></i><i></i><i></i></article>}{long && <aside className="chat-limit"><b>نقفل هذه المحادثة ونبدأ من جديد؟</b><span>المحادثة الطويلة تبقى على جهازك فقط.</span><button disabled={clears >= CLEAR_LIMIT} onClick={clearChat}>{clears >= CLEAR_LIMIT ? "استخدمت حد الحذف اليومي" : "بدء محادثة جديدة"}</button></aside>}</div>
       <form onSubmit={send}><textarea name="message" rows={1} disabled={long} autoComplete="off" placeholder={long ? "ابدأ محادثة جديدة أولًا" : "اكتب اللي في بالك..."} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit()}}}/><button disabled={long} aria-label="إرسال الرسالة">➤</button></form>
     </section>}
-    <button className="assistant-bubble" aria-label="فتح مساعد NAVIXA" onClick={() => setOpen(value => !value)} onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }}><span className="mini-mark"><img src="/navixa-mark.webp" alt="" /></span><span className="assistant-bubble-copy"><b>المساعد</b><em>{learningEnabled ? "افتح المحادثة" : "جاهز للمساعدة"}</em></span></button>
+    <button className="assistant-bubble" type="button" aria-label="فتح مساعد NAVIXA" aria-expanded={open} onClick={toggleAssistant} onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}><span className="mini-mark"><img src="/navixa-mark.webp" alt="" /></span><span className="assistant-bubble-copy"><b>المساعد</b><em>{learningEnabled ? "افتح المحادثة" : "جاهز للمساعدة"}</em></span></button>
   </div>;
 }
