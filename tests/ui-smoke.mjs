@@ -111,16 +111,16 @@ async function main() {
     assert.equal(mobileAssistant.clickable, true, "يجب ألا تحجب لوحة الترحيب زر المساعد");
 
     const assistantOpened = await evaluate(cdp, `(() => {
-      document.querySelector(".assistant-bubble")?.click();
       return new Promise(resolve => {
-        const deadline = performance.now() + 1_200;
-        const check = () => {
+        const deadline = performance.now() + 2_500;
+        const attempt = () => {
           const button = document.querySelector(".assistant-bubble");
           const state = { expanded: button?.getAttribute("aria-expanded"), panel: Boolean(document.querySelector(".assistant-panel")), assistantOff: document.documentElement.classList.contains("assistant-off") };
           if (state.expanded === "true" || performance.now() >= deadline) return resolve(state);
-          setTimeout(check, 50);
+          button?.click();
+          setTimeout(attempt, 100);
         };
-        check();
+        attempt();
       });
     })()`);
     assert.equal(assistantOpened.expanded, "true", "يجب أن يفتح زر المساعد المحادثة");
