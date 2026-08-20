@@ -20,6 +20,12 @@ jobs:
     timeout-minutes: 30
     env:
       ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+      MOYASAR_TEST_PUBLISHABLE_KEY: ${{ secrets.MOYASAR_TEST_PUBLISHABLE_KEY }}
+      MOYASAR_TEST_SECRET_KEY: ${{ secrets.MOYASAR_TEST_SECRET_KEY }}
+      MOYASAR_TEST_WEBHOOK_SECRET: ${{ secrets.MOYASAR_TEST_WEBHOOK_SECRET }}
+      MOYASAR_LIVE_PUBLISHABLE_KEY: ${{ secrets.MOYASAR_LIVE_PUBLISHABLE_KEY }}
+      MOYASAR_LIVE_SECRET_KEY: ${{ secrets.MOYASAR_LIVE_SECRET_KEY }}
+      MOYASAR_LIVE_WEBHOOK_SECRET: ${{ secrets.MOYASAR_LIVE_WEBHOOK_SECRET }}
     steps:
       - name: Read official source
         uses: actions/checkout@v6
@@ -75,6 +81,26 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           printf '%s' "$ADMIN_JWT_SECRET" | npx --no-install wrangler secret put ADMIN_JWT_SECRET --config dist/server/wrangler.json --name navixa
+
+      - name: Upload Moyasar secrets when configured
+        if: env.ADMIN_JWT_SECRET != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          upload_secret() {
+            name="$1"
+            value="$2"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --no-install wrangler secret put "$name" --config dist/server/wrangler.json --name navixa
+            fi
+          }
+          upload_secret MOYASAR_TEST_PUBLISHABLE_KEY "$MOYASAR_TEST_PUBLISHABLE_KEY"
+          upload_secret MOYASAR_TEST_SECRET_KEY "$MOYASAR_TEST_SECRET_KEY"
+          upload_secret MOYASAR_TEST_WEBHOOK_SECRET "$MOYASAR_TEST_WEBHOOK_SECRET"
+          upload_secret MOYASAR_LIVE_PUBLISHABLE_KEY "$MOYASAR_LIVE_PUBLISHABLE_KEY"
+          upload_secret MOYASAR_LIVE_SECRET_KEY "$MOYASAR_LIVE_SECRET_KEY"
+          upload_secret MOYASAR_LIVE_WEBHOOK_SECRET "$MOYASAR_LIVE_WEBHOOK_SECRET"
 
       - name: Deploy the navixa Worker
         if: env.ADMIN_JWT_SECRET != ''
