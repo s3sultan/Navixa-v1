@@ -10,9 +10,9 @@ const BASE_URL = `http://[::1]:${APP_PORT}`;
 const DEBUG_URL = `http://127.0.0.1:${DEBUG_PORT}`;
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-async function waitForUrl(url, label) {
+async function waitForUrl(url, label, attempts = 45) {
   let lastError;
-  for (let attempt = 0; attempt < 45; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetch(url, { redirect: "manual" });
       if (response.status > 0) return response;
@@ -85,11 +85,12 @@ async function main() {
   try {
     await waitForUrl(`${BASE_URL}/`, "خادم NAVIXA المحلي");
     chrome = start(process.env.CHROME_BIN || "chromium", [
-      "--headless=new", "--no-sandbox", "--disable-gpu",
+      "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
+      "--no-first-run", "--no-default-browser-check", "--remote-allow-origins=*",
       `--remote-debugging-port=${DEBUG_PORT}`, "--remote-debugging-address=127.0.0.1",
       `--user-data-dir=${profileDir}`, "about:blank",
     ]);
-    await waitForUrl(`${DEBUG_URL}/json/list`, "متصفح الاختبار");
+    await waitForUrl(`${DEBUG_URL}/json/list`, "متصفح الاختبار", 100);
     cdp = await connectCdp();
     await cdp.call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 
