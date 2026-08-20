@@ -7,6 +7,7 @@ import "./meetings.css";
 
 type StudioState = "ready" | "recording" | "processing" | "review";
 type ModelChoice = "tiny" | "base";
+type LanguageChoice = "auto" | "ar" | "en";
 type WorkerMessage = { type: string; message?: string; percentage?: number | null; transcript?: string; segments?: TranscriptSegment[] };
 
 const ARABIC_STOP_WORDS = new Set(["في","من","على","الى","إلى","عن","هذا","هذه","ذلك","التي","الذي","ثم","مع","كان","كانت","أن","إن","او","أو","لا","ما","فيه","لها","له","كما","بعد","قبل","عند","بين","كل","قد","تم","هو","هي","نحن","أنا","انت","أنت"]);
@@ -67,18 +68,25 @@ async function decodeAndResample(blob: Blob) {
       return mono;
     })();
     const targetRate = 16000;
-    if (decoded.sampleRate === targetRate) return new Float32Array(source);
-    const targetLength = Math.ceil(source.length * targetRate / decoded.sampleRate);
-    const output = new Float32Array(targetLength);
-    const ratio = decoded.sampleRate / targetRate;
-    for (let index = 0; index < targetLength; index += 1) {
-      const position = index * ratio;
-      const left = Math.floor(position);
-      const right = Math.min(left + 1, source.length - 1);
-      const weight = position - left;
-      output[index] = source[left] * (1 - weight) + source[right] * weight;
-    }
-    return output;
+    const resampled = decoded.sampleRate === targetRate ? new Float32Array(source) : (() => {
+      const targetLength = Math.ceil(source.length * targetRate / decoded.sampleRate);
+      const output = new Float32Array(targetLength);
+      const ratio = decoded.sampleRate / targetRate;
+      for (let index = 0; index < targetLength; index += 1) {
+        const position = index * ratio;
+        const left = Math.floor(position);
+        const right = Math.min(left + 1, source.length - 1);
+        const weight = position - left;
+        output[index] = source[left] * (1 - weight) + source[right] * weight;
+      }
+      return output;
+    })();
+    // تسوية خفيفة محلية تمنع التسجيل الهادئ جدًا من إرباك النموذج، من دون تغيير كلام المستخدم أو رفعه.
+    let peak = 0;
+    for (const sample of resampled) peak = Math.max(peak, Math.abs(sample));
+    const gain = peak > 0.015 ? Math.min(3, 0.92 / peak) : 1;
+    if (gain > 1.02) for (let index = 0; index < resampled.length; index += 1) resampled[index] = Math.max(-1, Math.min(1, resampled[index] * gain));
+    return resampled;
   } finally {
     await context.close();
   }
@@ -91,6 +99,7 @@ export default function MeetingStudio() {
   const [elapsed, setElapsed] = useState(0);
   const [notice, setNotice] = useState("لا يبدأ التسجيل أو تنزيل النموذج إلا بعد موافقتك.");
   const [model, setModel] = useState<ModelChoice>("tiny");
+  const [language, setLanguage] = useState<LanguageChoice>("auto");
   const [draft, setDraft] = useState<MeetingSession | null>(null);
   const [savedSessions, setSavedSessions] = useState<MeetingSession[]>([]);
   const [progress, setProgress] = useState<number | null>(null);
@@ -185,7 +194,7 @@ export default function MeetingStudio() {
       setState("processing"); setProgress(0); setNotice("جارٍ تجهيز الصوت للتفريغ المحلي…");
       const audio = await decodeAndResample(draft.audio);
       const worker = ensureWorker();
-      worker.postMessage({ type: "transcribe", audio, model }, [audio.buffer]);
+      worker.postMessage({ type: "transcribe", audio, model, language }, [audio.buffer]);
     } catch { setState("review"); setProgress(null); setNotice("تعذر تجهيز الملف محليًا. جرّب ملفًا أقصر أو صيغة صوت أخرى."); }
   };
 
@@ -205,6 +214,35 @@ export default function MeetingStudio() {
     const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `navixa-summary-${draft.id.slice(0, 8)}.md`; link.click(); URL.revokeObjectURL(url);
     setNotice("تم تصدير النص والملخص إلى ملف محلي.");
+  };
+
+  const exportPdf = () => {
+    if (!draft) return;
+    setNotice("سيظهر مربع الطباعة المحلي الآن. اختر «حفظ بصيغة PDF» لإخراج الملخص من جهازك.");
+    window.setTimeout(() => window.print(), 80);
+  };
+
+  const exportWord = async () => {
+    if (!draft) return;
+    try {
+      setNotice("جارٍ تجهيز ملف Word محليًا…");
+      const { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
+      const heading = (text: string) => new Paragraph({ text, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.RIGHT });
+      const bulletLines = (items: string[], fallback: string) => (items.length ? items : [fallback]).map((text) => new Paragraph({ text: `• ${text}`, alignment: AlignmentType.RIGHT }));
+      const doc = new Document({ sections: [{ children: [
+        new Paragraph({ children: [new TextRun({ text: "NAVIXA — محاضراتك واجتماعاتك", bold: true, size: 30 })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ text: draft.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.RIGHT }),
+        new Paragraph({ text: `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")} · أُنشئ محليًا على جهازك`, alignment: AlignmentType.RIGHT }),
+        heading("الخلاصة"), new Paragraph({ text: draft.summary || "لا يوجد ملخص بعد.", alignment: AlignmentType.RIGHT }),
+        heading("القرارات"), ...bulletLines(draft.decisions, "لا يوجد"),
+        heading("المهام"), ...bulletLines(draft.tasks, "لا يوجد"),
+        heading("الأسئلة"), ...bulletLines(draft.questions, "لا يوجد"),
+        heading("النص الزمني"), ...(draft.segments.length ? draft.segments.map((segment) => new Paragraph({ text: `[${formatMinute(segment.start)}] ${segment.text}`, alignment: AlignmentType.RIGHT })) : [new Paragraph({ text: draft.transcript || "لا يوجد نص بعد.", alignment: AlignmentType.RIGHT })]),
+      ] }] });
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `navixa-summary-${draft.id.slice(0, 8)}.docx`; link.click(); URL.revokeObjectURL(url);
+      setNotice("تم إنشاء ملف Word محليًا على جهازك.");
+    } catch { setNotice("تعذر إنشاء Word محليًا. تأكد من مساحة الجهاز ثم حاول مجددًا."); }
   };
 
   return <main className="meeting-page" dir="rtl">
@@ -230,15 +268,16 @@ export default function MeetingStudio() {
         </div>}
         {state === "recording" && <div className="meeting-recording-area"><div className="meeting-wave" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 17) % 54)}px` }} />)}</div><p>التسجيل ظاهر ومحلي. يمكنك الإيقاف في أي وقت.</p><button type="button" className="meeting-stop" onClick={stopRecording}>■ أوقف التسجيل</button></div>}
         {state === "processing" && <div className="meeting-processing"><div className="meeting-spinner" aria-hidden="true" /><p>{notice}</p>{progress !== null && <div className="meeting-progress"><i style={{ width: `${Math.max(3, progress)}%` }} /><span>{progress}%</span></div>}</div>}
-        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"}</small></div><div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={transcribe} disabled={state === "processing"}>⌁ تفريغ محلي</button><button type="button" className="meeting-secondary" onClick={saveDraft} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>حذف الجلسة</button></div></div>}
+        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"}</small></div>          <div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={transcribe} disabled={state === "processing"}>⌁ تفريغ محلي</button><button type="button" className="meeting-secondary" onClick={saveDraft} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>حذف الجلسة</button></div></div>}
+
         <p className="meeting-notice" role="status">{notice}</p>
       </div>
 
-      <aside className="meeting-model-panel"><small>محرك محلي</small><h3>اختر الحجم قبل التنزيل</h3><p>يُنزل النموذج مرة واحدة إلى ذاكرة المتصفح عند أول تفريغ. بعد ذلك يعمل التفريغ محليًا من ذاكرة التخزين المتاحة.</p><label className={model === "tiny" ? "selected" : ""}><input type="radio" name="model" checked={model === "tiny"} onChange={() => setModel("tiny")} /><b>خفيف</b><span>تجربة أسرع، أدقّته أقل</span></label><label className={model === "base" ? "selected" : ""}><input type="radio" name="model" checked={model === "base"} onChange={() => setModel("base")} /><b>متوازن</b><span>أبطأ وأكبر، مناسب للنص الأفضل</span></label><div className="meeting-model-note">لا تفتح الصفحة النموذج، ولا تحمل أي مكتبة تفريغ، قبل الضغط على «تفريغ محلي».</div></aside>
+      <aside className="meeting-model-panel"><small>محرك محلي</small><h3>اختر الدقة واللغة قبل التنزيل</h3><p>يُنزل النموذج مرة واحدة إلى ذاكرة المتصفح عند أول تفريغ. بعد ذلك يعمل التفريغ محليًا من ذاكرة التخزين المتاحة.</p><label className={model === "tiny" ? "selected" : ""}><input type="radio" name="model" checked={model === "tiny"} onChange={() => setModel("tiny")} /><b>خفيف</b><span>تجربة أسرع، أدقّته أقل</span></label><label className={model === "base" ? "selected" : ""}><input type="radio" name="model" checked={model === "base"} onChange={() => setModel("base")} /><b>متوازن</b><span>أبطأ وأكبر، مناسب للنص الأفضل</span></label><div className="meeting-language"><b>لغة الجلسة</b><div><label className={language === "auto" ? "selected" : ""}><input type="radio" name="language" value="auto" checked={language === "auto"} onChange={() => setLanguage("auto")} />تلقائي عربي/English</label><label className={language === "ar" ? "selected" : ""}><input type="radio" name="language" value="ar" checked={language === "ar"} onChange={() => setLanguage("ar")} />العربية</label><label className={language === "en" ? "selected" : ""}><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label></div></div><div className="meeting-model-note">اختر «تلقائي» عند خلط العربية والإنجليزية. لا تفتح الصفحة النموذج، ولا تحمل أي مكتبة تفريغ، قبل الضغط على «تفريغ محلي».</div></aside>
     </section>
 
     {draft && state === "review" && <section className="meeting-output">
-      <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><button type="button" className="meeting-secondary" onClick={exportText}>↓ تصدير نص</button></div>
+      <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions"><button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button><button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button><button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button></div></div>
       <div className="meeting-output-grid">
         <section className="meeting-summary-pane"><label>الخلاصة<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="سيظهر هنا ملخص محلي بعد التفريغ…" /></label><div className="meeting-lists"><div><h3>قرارات</h3>{draft.decisions.length ? draft.decisions.map((item, index) => <p key={`${item}-${index}`}>✓ {item}</p>) : <p className="empty">ستظهر القرارات المحتملة هنا بعد التفريغ.</p>}</div><div><h3>مهام</h3>{draft.tasks.length ? draft.tasks.map((item, index) => <p key={`${item}-${index}`}>→ {item}</p>) : <p className="empty">ستظهر المهام المحتملة هنا بعد التفريغ.</p>}</div></div></section>
         <section className="meeting-transcript-pane"><label>النص الزمني<textarea value={draft.transcript} onChange={(event) => { const next = event.target.value; const local = buildLocalSummary(next); setDraft({ ...draft, transcript: next, summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions }); }} placeholder="سيظهر النص هنا بعد التفريغ…" /></label><div className="meeting-timeline">{draft.segments.length ? draft.segments.slice(0, 8).map((segment, index) => <button type="button" key={`${segment.start}-${index}`} onClick={() => setNotice(`المقطع عند ${formatMinute(segment.start)} محفوظ داخل النص المحلي.`)}><time>{formatMinute(segment.start)}</time><span>{segment.text}</span></button>) : <p>لا توجد طوابع زمنية بعد.</p>}</div></section>

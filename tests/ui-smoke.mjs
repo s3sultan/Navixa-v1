@@ -156,13 +156,17 @@ async function main() {
         found: Boolean(page && consent && start),
         consentUnchecked: consent instanceof HTMLInputElement && !consent.checked,
         startVisible: start ? getComputedStyle(start).display !== "none" : false,
-        transcriptionLoaded: resources.some(name => /transcription\\.worker|transformers|onnx/i.test(name)),
+        transcriptionLoaded: resources.some(name => /transcription\.worker|transformers|onnx/i.test(name)),
+        languageChoices: [...document.querySelectorAll('.meeting-language input')].map(input => input instanceof HTMLInputElement ? input.value : ''),
+        docxLoaded: resources.some(name => /docx/i.test(name)),
       };
     })()`);
     assert.equal(meetingLanding.found, true, "يجب أن تظهر واجهة المحاضرات الأساسية");
     assert.equal(meetingLanding.consentUnchecked, true, "يجب ألا تفترض الصفحة موافقة تسجيل مسبقة");
     assert.equal(meetingLanding.startVisible, true, "يجب أن يكون زر التسجيل واضحًا على الجوال");
     assert.equal(meetingLanding.transcriptionLoaded, false, "يجب ألا يحمل محرك التفريغ قبل طلب المستخدم");
+    assert.deepEqual(meetingLanding.languageChoices, ["auto", "ar", "en"], "يجب أن تظهر خيارات اللغة التلقائية والعربية والإنجليزية");
+    assert.equal(meetingLanding.docxLoaded, false, "يجب ألا تحمل مكتبة Word قبل أن يطلب المستخدم التصدير");
 
     console.log(JSON.stringify({
       status: "passed",

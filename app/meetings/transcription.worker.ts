@@ -4,6 +4,7 @@ type WorkerRequest = {
   type: "transcribe";
   audio: Float32Array;
   model: "tiny" | "base";
+  language: "auto" | "ar" | "en";
 };
 
 type ModelChoice = {
@@ -69,13 +70,16 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
   try {
     const worker = await getTranscriber(event.data.model);
     send({ type: "state", state: "transcribing", message: "جارٍ تحويل الصوت إلى نص داخل جهازك…" });
-    const output = await worker(event.data.audio, {
-      language: "arabic",
+    const options: Record<string, unknown> = {
       task: "transcribe",
       chunk_length_s: 30,
       stride_length_s: 5,
       return_timestamps: true,
-    }) as { text?: string; chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }> };
+    };
+    // عند اختيار «تلقائي» لا نفرض لغة واحدة على Whisper، فتتحسن الجلسات المختلطة عربي/English.
+    if (event.data.language === "ar") options.language = "arabic";
+    if (event.data.language === "en") options.language = "english";
+    const output = await worker(event.data.audio, options) as { text?: string; chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }> };
     const segments = (output.chunks || []).map((chunk) => ({
       start: Number(chunk.timestamp?.[0] || 0),
       end: Number(chunk.timestamp?.[1] || chunk.timestamp?.[0] || 0),
