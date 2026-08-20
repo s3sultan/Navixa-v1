@@ -153,12 +153,13 @@ test("Push subscription stores every selected alert time without duplicates", as
   const host = globalThis as typeof globalThis & { DB?: typeof database };
   const prior = host.DB; host.DB = database;
   try {
-    const response = await savePushSubscription(post("/api/push/subscriptions", { endpoint:"https://push.example/device", keys:{p256dh:"1234567890123456",auth:"12345678"}, competitions:["rsl"], teams:["الهلال"], beforeMinutesList:[5,30,15,5,0] }));
+    const response = await savePushSubscription(post("/api/push/subscriptions", { endpoint:"https://push.example/device", keys:{p256dh:"1234567890123456",auth:"12345678"}, competitions:["rsl"], teams:["الهلال"], beforeMinutesList:[5,30,15,5,0], plan:"plus", paymentVerified:true, subscriberId:"attempted-escalation" }));
     assert.equal(response.status,200);
     const insert = statements.find(item=>item.sql.startsWith("INSERT INTO navixa_push_subscriptions"));
     assert.ok(insert);
     assert.equal(insert.values[6],30);
     assert.equal(insert.values[7],"[30,15,5,0]");
+    assert.equal(statements.some(item=>item.sql.includes("navixa_subscribers")||item.sql.includes("billing")),false);
   } finally { if(prior===undefined) delete host.DB; else host.DB=prior; }
 });
 

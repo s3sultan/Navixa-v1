@@ -3,6 +3,8 @@ import { isTrustedSameOriginRequest } from "../../../../worker/adminAuth.ts";
 
 type D1Statement={bind:(...values:unknown[])=>D1Statement;run:()=>Promise<unknown>};
 type D1Database={prepare:(sql:string)=>D1Statement};
+// Push endpoints are delivery channels only. They are never an account identity,
+// payment proof, or source of NAVIXA Plus access; entitlement checks must use verified billing records.
 type SubscriptionPayload={endpoint?:unknown;keys?:{p256dh?:unknown;auth?:unknown};competitions?:unknown;teams?:unknown;beforeMinutes?:unknown;beforeMinutesList?:unknown};
 const allowedCompetitions=new Set(["rsl","kings-cup","gulf-cup","premier-league","la-liga","bundesliga","serie-a","ligue-1","champions-league"]);
 const plainArray=(value:unknown,limit:number,maxLength:number)=>Array.isArray(value)?value.filter((item):item is string=>typeof item==="string").map(item=>item.trim()).filter(Boolean).slice(0,limit).map(item=>item.slice(0,maxLength)):[];
