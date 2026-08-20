@@ -7,9 +7,9 @@ type BillingSetting={setting_key:string;setting_value:string};
 type BillingEvent={id:string;provider_event_id:string;event_type:string;mode:string;created_at:string;processed_at:string};
 type Env=Record<string,string|undefined>;
 
-const settingKeys=["provider","mode","public_checkout","test_webhook_enabled","live_payments_enabled"] as const;
+const settingKeys=["provider","mode","public_checkout","test_webhook_enabled","live_payments_enabled","apple_pay_enabled","stc_pay_enabled"] as const;
 type SettingKey=(typeof settingKeys)[number];
-const defaults:Record<SettingKey,string>={provider:"moyasar",mode:"test",public_checkout:"false",test_webhook_enabled:"false",live_payments_enabled:"false"};
+const defaults:Record<SettingKey,string>={provider:"moyasar",mode:"test",public_checkout:"false",test_webhook_enabled:"false",live_payments_enabled:"false",apple_pay_enabled:"false",stc_pay_enabled:"false"};
 const clean=(value:unknown,limit:number)=>typeof value==="string"?value.replace(/\s+/g," ").trim().slice(0,limit):"";
 const flag=(value:unknown)=>value===true||value==="true";
 
@@ -34,7 +34,7 @@ export async function GET(request:Request){
 
 export async function POST(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
-  const body=await request.json().catch(()=>({})) as {provider?:unknown;mode?:unknown;publicCheckout?:unknown;testWebhookEnabled?:unknown;livePaymentsEnabled?:unknown};
+  const body=await request.json().catch(()=>({})) as {provider?:unknown;mode?:unknown;publicCheckout?:unknown;testWebhookEnabled?:unknown;livePaymentsEnabled?:unknown;applePayEnabled?:unknown;stcPayEnabled?:unknown};
   const database=await db();if(!database)return NextResponse.json({error:"التخزين غير مهيأ"},{status:503,headers:{"Cache-Control":"no-store"}});
   const current=await readSettings(database),secrets=await env();
   const next={
@@ -43,11 +43,14 @@ export async function POST(request:Request){
     public_checkout:String(flag(body.publicCheckout)),
     test_webhook_enabled:String(flag(body.testWebhookEnabled)),
     live_payments_enabled:String(flag(body.livePaymentsEnabled)),
+    apple_pay_enabled:String(flag(body.applePayEnabled)),
+    stc_pay_enabled:String(flag(body.stcPayEnabled)),
   };
   if(next.provider!=="moyasar"||!["test","live"].includes(next.mode))return NextResponse.json({error:"إعداد بوابة الدفع غير صالح"},{status:400});
   if(next.public_checkout==="true"&&next.live_payments_enabled!=="true")return NextResponse.json({error:"لا يمكن إظهار الدفع للزوار قبل تفعيل الوضع الحي من الإدارة"},{status:400});
   if(next.live_payments_enabled==="true"&&next.mode!=="live")return NextResponse.json({error:"فعّل وضع الحي أولًا قبل فتح الدفع الحي"},{status:400});
   if(next.live_payments_enabled==="true"&&(!secrets.MOYASAR_LIVE_SECRET_KEY||!secrets.MOYASAR_LIVE_WEBHOOK_SECRET))return NextResponse.json({error:"مفاتيح الدفع الحي غير مضافة بعد، لذلك بقي النظام مقفلًا"},{status:409});
+  if((next.apple_pay_enabled==="true"||next.stc_pay_enabled==="true")&&(next.mode!=="live"||next.live_payments_enabled!=="true"))return NextResponse.json({error:"فعّل وضع الحي ومعالجة الدفع الحي أولًا قبل تجهيز طرق الدفع الإضافية"},{status:400});
   const now=new Date().toISOString();
   for(const key of settingKeys)await database.prepare("INSERT INTO navixa_billing_settings (setting_key,setting_value,updated_at) VALUES (?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at").bind(key,next[key],now).run();
   return NextResponse.json({ok:true,message:next.public_checkout==="true"?"تم تجهيز ظهور الدفع العام":next.mode==="test"?"تم حفظ إعدادات الاختبار مع إبقاء الدفع العام مخفيًا":"تم حفظ إعدادات الدفع"},{headers:{"Cache-Control":"no-store"}});
