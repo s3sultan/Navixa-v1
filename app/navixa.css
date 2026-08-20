@@ -421,3 +421,16 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
 .secondary-footer-tools.data-only{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 .meeting-data-link{color:inherit;text-decoration:none}.meeting-data-link:hover{border-color:rgba(104,216,202,.44)!important;background:rgba(230,251,247,.76)!important}.meeting-data-link>i{color:#137f80!important}
 @media(max-width:650px){.secondary-footer-tools.data-only{grid-template-columns:1fr!important}.secondary-footer-tools.data-only .secondary-data-link{min-height:66px}}
+
+/* بطاقة «لخّص اجتماعك»: ميزة رئيسية دون تحميل محرك التسجيل أو التفريغ قبل فتحها. */
+.priority-feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.meeting-feature{background:linear-gradient(145deg,#123047 0%,#17264d 54%,#2f2763 100%);border-color:rgba(163,146,255,.34);color:#eef5fb}
+.meeting-feature .priority-feature-top small,.meeting-feature p{color:#cad5e7}
+.meeting-feature .priority-icon{background:linear-gradient(145deg,#8f79f1,#5cd7ca);color:#fff;box-shadow:0 12px 30px rgba(86,94,211,.32)}
+.meeting-feature .priority-status{border-color:rgba(190,184,255,.25)}
+.meeting-feature .priority-cta{background:linear-gradient(100deg,#6654c9,#219e9a);color:#fff;text-decoration:none}
+.meeting-card-rings{position:absolute;width:230px;height:230px;left:-102px;bottom:-118px;border:1px solid rgba(159,146,255,.28);border-radius:50%;box-shadow:0 0 0 26px rgba(112,98,208,.08),0 0 0 54px rgba(72,210,196,.06);z-index:-1}
+.meeting-card-steps{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:#e6e2ff;font-size:11px;font-weight:800}.meeting-card-steps span{border:1px solid rgba(174,164,255,.35);background:rgba(255,255,255,.07);padding:7px 8px;border-radius:9px}.meeting-card-steps i{font-style:normal;color:#74d8d0}
+@media(max-width:1100px) and (min-width:801px){.priority-feature-grid{grid-template-columns:1fr 1fr}.meeting-feature{grid-column:1/-1;min-height:300px}.meeting-feature .meeting-card-steps{justify-content:flex-start}}
+@media(max-width:800px){.priority-feature-grid{grid-template-columns:1fr}.meeting-feature{grid-column:auto}.meeting-card-steps{gap:6px}.meeting-card-steps span{padding:6px 7px;font-size:10px}}
+@media(max-width:390px){.meeting-card-steps{display:grid;grid-template-columns:1fr auto 1fr;gap:5px}.meeting-card-steps span{white-space:nowrap;padding:6px 4px;text-align:center;font-size:9px}}

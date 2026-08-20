@@ -52,12 +52,15 @@ function localSttModelPath(url: URL) {
   return { model, file };
 }
 
+function edgeCache(){return typeof caches!=="undefined"?caches.default:null;}
+
 async function relayLocalSttModel(request: Request, url: URL, ctx: ExecutionContext) {
   const source = localSttModelPath(url);
   if (!source) return new Response(JSON.stringify({ error: "ملف نموذج غير مسموح" }), { status: 404, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
   const cacheKey = new Request(url.toString(), { method: "GET" });
-  const cached = await caches.default.match(cacheKey);
+  const cache = edgeCache();
+  const cached = cache ? await cache.match(cacheKey) : undefined;
   if (cached) {
     const hit = new Response(cached.body, cached);
     hit.headers.set("X-NAVIXA-Local-STT-Cache", "HIT");
@@ -75,7 +78,7 @@ async function relayLocalSttModel(request: Request, url: URL, ctx: ExecutionCont
       "X-NAVIXA-Local-STT-Cache": "MISS",
     },
   });
-  ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+  if (cache) ctx.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
 }
 
@@ -266,8 +269,9 @@ const worker = {
 
     const publicDocumentCacheable = isPublicDocumentCacheable(request, url);
     const cacheKey = publicDocumentCacheable ? publicDocumentCacheKey(url) : null;
-    if (cacheKey) {
-      const cached = await caches.default.match(cacheKey);
+    const cache = edgeCache();
+    if (cacheKey && cache) {
+      const cached = await cache.match(cacheKey);
       if (cached) {
         const hit = new Response(cached.body, cached);
         hit.headers.set("Cache-Control", `public, max-age=0, s-maxage=${PUBLIC_DOCUMENT_TTL_SECONDS}`);
@@ -281,7 +285,7 @@ const worker = {
     if (cacheKey && canStorePublicDocument(response)) {
       response.headers.set("Cache-Control", `public, max-age=0, s-maxage=${PUBLIC_DOCUMENT_TTL_SECONDS}`);
       response.headers.set("X-NAVIXA-Edge-Cache", "MISS");
-      ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+      if (cache) ctx.waitUntil(cache.put(cacheKey, response.clone()));
     }
     return auditResponse(request, url, response, startedAt, requiresAdminSession ? "admin" : "public");
   },

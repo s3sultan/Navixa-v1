@@ -11,6 +11,9 @@ type LanguageChoice = "auto" | "ar" | "en";
 type WorkerMessage = { type: string; message?: string; percentage?: number | null; transcript?: string; segments?: TranscriptSegment[] };
 
 const ARABIC_STOP_WORDS = new Set(["في","من","على","الى","إلى","عن","هذا","هذه","ذلك","التي","الذي","ثم","مع","كان","كانت","أن","إن","او","أو","لا","ما","فيه","لها","له","كما","بعد","قبل","عند","بين","كل","قد","تم","هو","هي","نحن","أنا","انت","أنت"]);
+const NAVIXA_URL = "https://navixa.s2shug.workers.dev";
+type MeetingPolicy={enabled:boolean;baseModelEnabled:boolean;autoLanguageEnabled:boolean;maxFileMb:number;exportPdfEnabled:boolean;exportWordEnabled:boolean;tutorialEnabled:boolean;usageNoticeEnabled:boolean};
+const DEFAULT_POLICY:MeetingPolicy={enabled:true,baseModelEnabled:true,autoLanguageEnabled:true,maxFileMb:250,exportPdfEnabled:true,exportWordEnabled:true,tutorialEnabled:true,usageNoticeEnabled:true};
 
 function newId() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `meeting-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -104,6 +107,7 @@ export default function MeetingStudio() {
   const [savedSessions, setSavedSessions] = useState<MeetingSession[]>([]);
   const [progress, setProgress] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [policy,setPolicy]=useState<MeetingPolicy>(DEFAULT_POLICY);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const startedAtRef = useRef(0);
@@ -117,6 +121,8 @@ export default function MeetingStudio() {
   };
 
   useEffect(() => { void refreshSessions(); }, []);
+  useEffect(()=>{let active=true;fetch("/api/meetings/policy",{cache:"no-store"}).then(response=>response.ok?response.json():DEFAULT_POLICY).then((next:MeetingPolicy)=>{if(active)setPolicy({...DEFAULT_POLICY,...next})}).catch(()=>{});return()=>{active=false}},[]);
+  useEffect(()=>{if(!policy.baseModelEnabled&&model==="base")setModel("tiny");if(!policy.autoLanguageEnabled&&language==="auto")setLanguage("ar")},[policy,model,language]);
   useEffect(() => () => {
     if (timerRef.current) window.clearInterval(timerRef.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -132,7 +138,8 @@ export default function MeetingStudio() {
   };
 
   const startRecording = async () => {
-    if (!consent) { setNotice("أكد أولًا أن لديك حق التسجيل وموافقة الحاضرين عند الحاجة."); return; }
+    if (!policy.enabled) { setNotice("ميزة التلخيص متوقفة مؤقتًا من إعدادات NAVIXA."); return; }
+    if (policy.usageNoticeEnabled&&!consent) { setNotice("أكد أولًا أن لديك حق التسجيل وموافقة الحاضرين عند الحاجة."); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setNotice("لا يدعم هذا المتصفح التسجيل المحلي. جرّب متصفحًا حديثًا مثل Chrome أو Edge أو Safari."); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -164,9 +171,9 @@ export default function MeetingStudio() {
   const importAudio = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; event.target.value = "";
     if (!file) return;
-    if (!consent) { setNotice("أكد الموافقة قبل استيراد ملف صوت خاص."); return; }
+    if (policy.usageNoticeEnabled&&!consent) { setNotice("أكد الموافقة قبل استيراد ملف صوت خاص."); return; }
     if (!file.type.startsWith("audio/")) { setNotice("اختر ملفًا صوتيًا صالحًا فقط."); return; }
-    if (file.size > 250 * 1024 * 1024) { setNotice("حجم الملف أكبر من الحد المحلي التجريبي (250MB). قسّمه إلى جلسات أقصر."); return; }
+    if (file.size > policy.maxFileMb * 1024 * 1024) { setNotice(`حجم الملف أكبر من الحد المحلي الحالي (${policy.maxFileMb}MB). قسّمه إلى جلسات أقصر.`); return; }
     finishCapture(file, 0); setNotice("تمت إضافة الملف محليًا. لن يُرفع إلى NAVIXA.");
   };
 
@@ -189,6 +196,7 @@ export default function MeetingStudio() {
   };
 
   const transcribe = async () => {
+    if (!policy.enabled) { setNotice("ميزة التلخيص متوقفة مؤقتًا من إعدادات NAVIXA."); return; }
     if (!draft?.audio) { setNotice("أضف تسجيلًا أو ملفًا صوتيًا أولًا."); return; }
     try {
       setState("processing"); setProgress(0); setNotice("جارٍ تجهيز الصوت للتفريغ المحلي…");
@@ -210,7 +218,7 @@ export default function MeetingStudio() {
   const removeSaved = async (id: string) => { await deleteMeetingSession(id); await refreshSessions(); setNotice("تم حذف الجلسة من هذا الجهاز."); };
   const exportText = () => {
     if (!draft) return;
-    const content = [`# ${draft.title}`, `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")}`, "", "## الخلاصة", draft.summary || "لا يوجد ملخص بعد.", "", "## القرارات", ...(draft.decisions.length ? draft.decisions.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## المهام", ...(draft.tasks.length ? draft.tasks.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## النص الزمني", ...(draft.segments.length ? draft.segments.map((segment) => `[${formatMinute(segment.start)}] ${segment.text}`) : [draft.transcript || "لا يوجد نص بعد."])].join("\n");
+    const content = ["NAVIXA — سجّل ولخّص", NAVIXA_URL, "", `# ${draft.title}`, `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")}`, "", "## الخلاصة", draft.summary || "لا يوجد ملخص بعد.", "", "## القرارات", ...(draft.decisions.length ? draft.decisions.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## المهام", ...(draft.tasks.length ? draft.tasks.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## النص الزمني", ...(draft.segments.length ? draft.segments.map((segment) => `[${formatMinute(segment.start)}] ${segment.text}`) : [draft.transcript || "لا يوجد نص بعد."]), "", `أُنشئ محليًا عبر NAVIXA · ${NAVIXA_URL}`].join("\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `navixa-summary-${draft.id.slice(0, 8)}.md`; link.click(); URL.revokeObjectURL(url);
     setNotice("تم تصدير النص والملخص إلى ملف محلي.");
@@ -226,11 +234,15 @@ export default function MeetingStudio() {
     if (!draft) return;
     try {
       setNotice("جارٍ تجهيز ملف Word محليًا…");
-      const { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
+      const { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } = await import("docx");
+      const logoResponse = await fetch("/navixa-export-logo.png");
+      if (!logoResponse.ok) throw new Error("logo");
+      const logo = new ImageRun({ data: await logoResponse.arrayBuffer(), transformation: { width: 38, height: 38 }, type: "png" });
       const heading = (text: string) => new Paragraph({ text, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.RIGHT });
       const bulletLines = (items: string[], fallback: string) => (items.length ? items : [fallback]).map((text) => new Paragraph({ text: `• ${text}`, alignment: AlignmentType.RIGHT }));
       const doc = new Document({ sections: [{ children: [
-        new Paragraph({ children: [new TextRun({ text: "NAVIXA — محاضراتك واجتماعاتك", bold: true, size: 30 })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ children: [logo, new TextRun({ text: "  NAVIXA — سجّل ولخّص", bold: true, size: 30 })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ children: [new TextRun({ text: NAVIXA_URL, color: "178F90", underline: {} })], alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: draft.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")} · أُنشئ محليًا على جهازك`, alignment: AlignmentType.RIGHT }),
         heading("الخلاصة"), new Paragraph({ text: draft.summary || "لا يوجد ملخص بعد.", alignment: AlignmentType.RIGHT }),
@@ -253,7 +265,7 @@ export default function MeetingStudio() {
     </header>
 
     <section className="meeting-hero">
-      <div><small>محاضرات واجتماعات</small><h2>من أول دقيقة إلى آخر دقيقة، <em>على جهازك</em></h2><p>سجّل بإذن واضح، ثم حوّل الصوت إلى نص وملخص قابل للمراجعة. لا يُرفع ملفك الصوتي إلى NAVIXA.</p></div>
+      <div><small>محاضرات واجتماعات</small><h2>من أول دقيقة إلى آخر دقيقة، <em>على جهازك</em></h2><p>{policy.enabled?"سجّل بإذن واضح، ثم حوّل الصوت إلى نص وملخص قابل للمراجعة. لا يُرفع ملفك الصوتي إلى NAVIXA.":"الميزة متوقفة مؤقتًا من إعدادات NAVIXA. تبقى جلساتك المحفوظة محليًا على جهازك."}</p></div>
       <div className="meeting-hero-stats"><span>⌁ التسجيل بإذنك</span><span>◌ لا رفع افتراضي</span><span>↯ تحميل عند الطلب</span></div>
     </section>
 
@@ -263,21 +275,22 @@ export default function MeetingStudio() {
         {!draft && state !== "recording" && <div className="meeting-start-area">
           <div className="meeting-record-circle" aria-hidden="true">●</div>
           <p>لن نطلب إذن الميكروفون أو ننزّل أي نموذج قبل أن تبدأ أنت.</p>
-          <label className="meeting-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>أؤكد أن لدي حق التسجيل، وأنني سأحصل على موافقة الحاضرين عند الحاجة.</span></label>
-          <div className="meeting-start-actions"><button type="button" className="meeting-primary" onClick={startRecording}>● ابدأ التسجيل</button><button type="button" className="meeting-secondary" onClick={() => audioInputRef.current?.click()}>↑ استورد ملفًا صوتيًا</button><input ref={audioInputRef} type="file" accept="audio/*" hidden onChange={importAudio} /></div>
+          {policy.usageNoticeEnabled&&<label className="meeting-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>أؤكد أن لدي حق التسجيل، وأنني سأحصل على موافقة الحاضرين عند الحاجة.</span></label>}
+          <div className="meeting-start-actions"><button type="button" className="meeting-primary" disabled={!policy.enabled} onClick={startRecording}>● ابدأ التسجيل</button><button type="button" className="meeting-secondary" disabled={!policy.enabled} onClick={() => audioInputRef.current?.click()}>↑ استورد ملفًا صوتيًا</button><input ref={audioInputRef} type="file" accept="audio/*" hidden onChange={importAudio} /></div>
         </div>}
         {state === "recording" && <div className="meeting-recording-area"><div className="meeting-wave" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 17) % 54)}px` }} />)}</div><p>التسجيل ظاهر ومحلي. يمكنك الإيقاف في أي وقت.</p><button type="button" className="meeting-stop" onClick={stopRecording}>■ أوقف التسجيل</button></div>}
         {state === "processing" && <div className="meeting-processing"><div className="meeting-spinner" aria-hidden="true" /><p>{notice}</p>{progress !== null && <div className="meeting-progress"><i style={{ width: `${Math.max(3, progress)}%` }} /><span>{progress}%</span></div>}</div>}
-        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"}</small></div>          <div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={transcribe} disabled={state === "processing"}>⌁ تفريغ محلي</button><button type="button" className="meeting-secondary" onClick={saveDraft} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>حذف الجلسة</button></div></div>}
+        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"}</small></div>          <div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={transcribe} disabled={state === "processing"||!policy.enabled}>⌁ تفريغ محلي</button><button type="button" className="meeting-secondary" onClick={saveDraft} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>حذف الجلسة</button></div></div>}
 
         <p className="meeting-notice" role="status">{notice}</p>
       </div>
 
-      <aside className="meeting-model-panel"><small>محرك محلي</small><h3>اختر الدقة واللغة قبل التنزيل</h3><p>يُنزل النموذج مرة واحدة إلى ذاكرة المتصفح عند أول تفريغ. بعد ذلك يعمل التفريغ محليًا من ذاكرة التخزين المتاحة.</p><label className={model === "tiny" ? "selected" : ""}><input type="radio" name="model" checked={model === "tiny"} onChange={() => setModel("tiny")} /><b>خفيف</b><span>تجربة أسرع، أدقّته أقل</span></label><label className={model === "base" ? "selected" : ""}><input type="radio" name="model" checked={model === "base"} onChange={() => setModel("base")} /><b>متوازن</b><span>أبطأ وأكبر، مناسب للنص الأفضل</span></label><div className="meeting-language"><b>لغة الجلسة</b><div><label className={language === "auto" ? "selected" : ""}><input type="radio" name="language" value="auto" checked={language === "auto"} onChange={() => setLanguage("auto")} />تلقائي عربي/English</label><label className={language === "ar" ? "selected" : ""}><input type="radio" name="language" value="ar" checked={language === "ar"} onChange={() => setLanguage("ar")} />العربية</label><label className={language === "en" ? "selected" : ""}><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label></div></div><div className="meeting-model-note">اختر «تلقائي» عند خلط العربية والإنجليزية. لا تفتح الصفحة النموذج، ولا تحمل أي مكتبة تفريغ، قبل الضغط على «تفريغ محلي».</div></aside>
+      <aside className="meeting-model-panel"><small>محرك محلي</small><h3>اختر الدقة واللغة قبل التنزيل</h3><p>يُنزل النموذج مرة واحدة إلى ذاكرة المتصفح عند أول تفريغ. بعد ذلك يعمل التفريغ محليًا من ذاكرة التخزين المتاحة.</p><label className={model === "tiny" ? "selected" : ""}><input type="radio" name="model" checked={model === "tiny"} onChange={() => setModel("tiny")} /><b>خفيف</b><span>تجربة أسرع، أدقّته أقل</span></label>{policy.baseModelEnabled&&<label className={model === "base" ? "selected" : ""}><input type="radio" name="model" checked={model === "base"} onChange={() => setModel("base")} /><b>متوازن</b><span>أبطأ وأكبر، مناسب للنص الأفضل</span></label>}<div className="meeting-language"><b>لغة الجلسة</b><div>{policy.autoLanguageEnabled&&<label className={language === "auto" ? "selected" : ""}><input type="radio" name="language" value="auto" checked={language === "auto"} onChange={() => setLanguage("auto")} />تلقائي عربي/English</label>}<label className={language === "ar" ? "selected" : ""}><input type="radio" name="language" value="ar" checked={language === "ar"} onChange={() => setLanguage("ar")} />العربية</label><label className={language === "en" ? "selected" : ""}><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label></div></div><div className="meeting-model-note">اختر «تلقائي» عند خلط العربية والإنجليزية. لا تفتح الصفحة النموذج، ولا تحمل أي مكتبة تفريغ، قبل الضغط على «تفريغ محلي».</div></aside>
     </section>
 
     {draft && state === "review" && <section className="meeting-output">
-      <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions"><button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button><button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button><button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button></div></div>
+      <div className="meeting-print-brand"><img src="/navixa-export-logo.png" alt="NAVIXA" /><div><b>NAVIXA — سجّل ولخّص</b><a href={NAVIXA_URL}>{NAVIXA_URL}</a></div></div>
+      <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions"><button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button>{policy.exportPdfEnabled&&<button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button>}{policy.exportWordEnabled&&<button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button>}</div></div>
       <div className="meeting-output-grid">
         <section className="meeting-summary-pane"><label>الخلاصة<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="سيظهر هنا ملخص محلي بعد التفريغ…" /></label><div className="meeting-lists"><div><h3>قرارات</h3>{draft.decisions.length ? draft.decisions.map((item, index) => <p key={`${item}-${index}`}>✓ {item}</p>) : <p className="empty">ستظهر القرارات المحتملة هنا بعد التفريغ.</p>}</div><div><h3>مهام</h3>{draft.tasks.length ? draft.tasks.map((item, index) => <p key={`${item}-${index}`}>→ {item}</p>) : <p className="empty">ستظهر المهام المحتملة هنا بعد التفريغ.</p>}</div></div></section>
         <section className="meeting-transcript-pane"><label>النص الزمني<textarea value={draft.transcript} onChange={(event) => { const next = event.target.value; const local = buildLocalSummary(next); setDraft({ ...draft, transcript: next, summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions }); }} placeholder="سيظهر النص هنا بعد التفريغ…" /></label><div className="meeting-timeline">{draft.segments.length ? draft.segments.slice(0, 8).map((segment, index) => <button type="button" key={`${segment.start}-${index}`} onClick={() => setNotice(`المقطع عند ${formatMinute(segment.start)} محفوظ داخل النص المحلي.`)}><time>{formatMinute(segment.start)}</time><span>{segment.text}</span></button>) : <p>لا توجد طوابع زمنية بعد.</p>}</div></section>

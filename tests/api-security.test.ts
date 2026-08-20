@@ -21,6 +21,8 @@ import { GET as getBillingWebhook, POST as billingWebhook } from "../app/api/bil
 import { POST as registerPlusInterest } from "../app/api/plus/interest/route.ts";
 import { POST as reportPerformance } from "../app/api/performance/route.ts";
 import { GET as getAdminReferrals } from "../app/api/admin/referrals/route.ts";
+import { GET as getAdminMeetingSettings, POST as saveAdminMeetingSettings } from "../app/api/admin/meeting-settings/route.ts";
+import { GET as getMeetingPolicy } from "../app/api/meetings/policy/route.ts";
 import { createCode } from "../app/referrals.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
@@ -218,6 +220,20 @@ test("performance telemetry rejects cross-origin input and stores only bounded a
     const invalid = await reportPerformance(post("/api/performance", { path: "/admin", ttfbMs: 1, loadMs: 2 }));
     assert.equal(invalid.status, 400);
   } finally { if (prior === undefined) delete host.DB; else host.DB = prior; }
+});
+
+test("meeting settings remain admin-only and the public policy never exposes local session content", async () => {
+  const admin = await getAdminMeetingSettings(new Request(`${appOrigin}/api/admin/meeting-settings`));
+  assert.equal(admin.status, 401);
+  const mutation = await saveAdminMeetingSettings(new Request(`${appOrigin}/api/admin/meeting-settings`, { method:"POST", headers:{origin:"https://attacker.example","content-type":"application/json"}, body:JSON.stringify({ featureEnabled:true, transcript:"attempt", audio:"attempt", visitorId:"attempt" }) }));
+  assert.equal(mutation.status, 401);
+  const policy = await getMeetingPolicy();
+  assert.equal(policy.status, 200);
+  const body = await policy.json() as Record<string,unknown>;
+  assert.equal(body.enabled, true);
+  assert.equal("transcript" in body, false);
+  assert.equal("audio" in body, false);
+  assert.equal("visitorId" in body, false);
 });
 
 test("local STT model relay is a strict public-file allowlist and never receives audio", async () => {
