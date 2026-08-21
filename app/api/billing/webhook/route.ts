@@ -17,7 +17,7 @@ async function schema(database:D1Database){
   const now=new Date().toISOString();for(const [key,value] of Object.entries(defaults))await database.prepare("INSERT OR IGNORE INTO navixa_billing_settings (setting_key,setting_value,updated_at) VALUES (?,?,?)").bind(key,value,now).run();
 }
 async function settings(database:D1Database){await schema(database);const rows=await database.prepare("SELECT setting_key,setting_value FROM navixa_billing_settings").all<{setting_key:string;setting_value:string}>();const next={...defaults};for(const row of rows.results)if(row.setting_key in next)next[row.setting_key as keyof Settings]=row.setting_value;return next;}
-function webhookSecret(request:Request,body:Record<string,unknown>){return clean(request.headers.get("x-navixa-webhook-secret")||body.secret_token,180);}
+function webhookSecret(request:Request){return clean(request.headers.get("x-navixa-webhook-secret"),180);}
 
 export async function GET(){return NextResponse.json({billing:"disabled",mode:"test",message:"بوابة الدفع مخفية ومقفلة حتى يفعّلها المدير. لا يتم قبول أي دفعات أو بيانات بطاقات الآن."},{headers:{"Cache-Control":"no-store"}})}
 
@@ -29,7 +29,8 @@ export async function POST(request:Request){
   const expectedSecret=requestedLive?secrets.MOYASAR_LIVE_WEBHOOK_SECRET:secrets.MOYASAR_TEST_WEBHOOK_SECRET;
   const enabled=requestedLive?current.live_payments_enabled==="true":current.test_webhook_enabled==="true";
   if(!expectedSecret||!enabled)return NextResponse.json({error:"بوابة الدفع مقفلة من الإدارة"},{status:503,headers:{"Cache-Control":"no-store"}});
-  if(webhookSecret(request,body)!==expectedSecret)return NextResponse.json({error:"توقيع Webhook غير صالح"},{status:401,headers:{"Cache-Control":"no-store"}});
+  const suppliedSecret=webhookSecret(request);
+  if(!suppliedSecret||suppliedSecret!==expectedSecret)return NextResponse.json({error:"توقيع Webhook غير صالح"},{status:401,headers:{"Cache-Control":"no-store"}});
   if(requestedLive&&(current.mode!=="live"||current.public_checkout!=="true"))return NextResponse.json({error:"الدفع الحي غير مفعل للزوار"},{status:409,headers:{"Cache-Control":"no-store"}});
   const eventId=clean(body.id||body.eventId,120),eventType=clean(body.type||body.eventType,40);
   const data=(body.data&&typeof body.data==="object"?body.data:{}) as Record<string,unknown>;
