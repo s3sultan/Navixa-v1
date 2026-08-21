@@ -16,6 +16,8 @@ export type UserAuthSettings = {
   emailOtpEnabled: boolean;
   passkeysEnabled: boolean;
   earlyAccessEnabled: boolean;
+  telegramBotEnabled: boolean;
+  telegramBackgroundAlertsEnabled: boolean;
   trialDays: number;
 };
 
@@ -31,6 +33,8 @@ const defaults: UserAuthSettings = {
   emailOtpEnabled: false,
   passkeysEnabled: false,
   earlyAccessEnabled: false,
+  telegramBotEnabled: false,
+  telegramBackgroundAlertsEnabled: false,
   trialDays: 14,
 };
 
@@ -67,6 +71,8 @@ export async function getUserAuthSettings(database: D1Database): Promise<UserAut
     emailOtpEnabled: values.get("email_otp_enabled") === "true",
     passkeysEnabled: values.get("passkeys_enabled") === "true",
     earlyAccessEnabled: values.get("early_access_enabled") === "true",
+    telegramBotEnabled: values.get("telegram_bot_enabled") === "true",
+    telegramBackgroundAlertsEnabled: values.get("telegram_background_alerts_enabled") === "true",
     trialDays: Number.isInteger(trialValue) && trialValue >= 1 && trialValue <= 31 ? trialValue : defaults.trialDays,
   };
 }

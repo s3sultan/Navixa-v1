@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearTelegramConfig, getTelegramConfig, setTelegramConfig } from "../app/alertPrefs.ts";
 
 const values = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", {
@@ -13,17 +12,24 @@ Object.defineProperty(globalThis, "localStorage", {
   },
 });
 
-test("Telegram credentials stay in memory and legacy local storage is purged", () => {
+const originalFetch = globalThis.fetch;
+let submitted: unknown = null;
+globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+  submitted = init?.body ? JSON.parse(String(init.body)) : null;
+  return new Response("{}", { status: 200 });
+}) as typeof fetch;
+
+const { purgeLegacyTelegramConfig, sendTelegramMessage } = await import("../app/alertPrefs.ts");
+
+test("legacy Telegram credentials are deleted and the browser sends only the alert payload", async () => {
   values.clear();
   values.set("navixa-telegram-config", JSON.stringify({ token: "123:legacy-token", chatId: "100" }));
-
-  assert.equal(getTelegramConfig(), null);
+  purgeLegacyTelegramConfig();
   assert.equal(values.has("navixa-telegram-config"), false);
 
-  setTelegramConfig({ token: "123:session-token", chatId: "200" });
-  assert.deepEqual(getTelegramConfig(), { token: "123:session-token", chatId: "200" });
-  assert.equal(values.has("navixa-telegram-config"), false);
-
-  clearTelegramConfig();
-  assert.equal(getTelegramConfig(), null);
+  const sent = await sendTelegramMessage("تنبيه اختبار", "water");
+  assert.equal(sent, true);
+  assert.deepEqual(submitted, { message: "تنبيه اختبار", type: "water" });
 });
+
+test.after(() => { globalThis.fetch = originalFetch; });
