@@ -82,6 +82,14 @@ jobs:
           fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
           NODE
 
+      - name: Deploy the navixa Worker
+        if: env.ADMIN_JWT_SECRET != ''
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config dist/server/wrangler.json --name navixa
+
       - name: Upload admin JWT secret
         if: env.ADMIN_JWT_SECRET != ''
         env:
@@ -109,11 +117,3 @@ jobs:
           upload_secret MOYASAR_LIVE_PUBLISHABLE_KEY "$MOYASAR_LIVE_PUBLISHABLE_KEY"
           upload_secret MOYASAR_LIVE_SECRET_KEY "$MOYASAR_LIVE_SECRET_KEY"
           upload_secret MOYASAR_LIVE_WEBHOOK_SECRET "$MOYASAR_LIVE_WEBHOOK_SECRET"
-
-      - name: Deploy the navixa Worker
-        if: env.ADMIN_JWT_SECRET != ''
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config dist/server/wrangler.json --name navixa
