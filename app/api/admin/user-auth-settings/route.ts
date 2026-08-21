@@ -1,0 +1,57 @@
+import { NextResponse } from "next/server.js";
+import { ADMIN_SESSION_COOKIE, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../worker/adminAuth.ts";
+import { getUserAuthSettings, type D1Database } from "../../../../worker/userAuth.ts";
+
+type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
+type Database = D1Database & { prepare: (sql: string) => D1Statement };
+type Env = Record<string, string | undefined>;
+type AuthSetting = { setting_key: string; setting_value: string };
+
+const settingKeys = ["user_auth_enabled", "email_otp_enabled", "passkeys_enabled", "early_access_enabled", "trial_days"] as const;
+const defaults: Record<(typeof settingKeys)[number], string> = { user_auth_enabled: "false", email_otp_enabled: "false", passkeys_enabled: "false", early_access_enabled: "false", trial_days: "14" };
+const flag = (value: unknown) => value === true || value === "true";
+
+async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
+async function env(): Promise<Env> { try { return (await import("cloudflare:workers") as { env?: Env }).env || {}; } catch { return globalThis as Env; } }
+async function allowed(request: Request) { const secret = await resolveAdminJwtSecret(); return Boolean(secret && isTrustedSameOriginRequest(request) && await verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret)); }
+
+async function schema(database: Database) {
+  await database.prepare("CREATE TABLE IF NOT EXISTS navixa_user_auth_settings (setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
+  const now = new Date().toISOString();
+  for (const key of settingKeys) await database.prepare("INSERT OR IGNORE INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES (?,?,?)").bind(key, defaults[key], now).run();
+}
+
+async function snapshot(database: Database, secrets: Env) {
+  await schema(database);
+  const [settings, users, sessions] = await Promise.all([
+    getUserAuthSettings(database),
+    database.prepare("SELECT COUNT(*) AS count FROM navixa_users").all<{ count: number }>().catch(() => ({ results: [{ count: 0 }] })),
+    database.prepare("SELECT COUNT(*) AS count FROM navixa_user_sessions WHERE revoked_at='' AND expires_at>? ").bind(new Date().toISOString()).all<{ count: number }>().catch(() => ({ results: [{ count: 0 }] })),
+  ]);
+  return { settings, readiness: { emailProviderConfigured: Boolean(secrets.RESEND_API_KEY && secrets.NAVIXA_AUTH_FROM && secrets.NAVIXA_AUTH_CODE_PEPPER), users: Number(users.results[0]?.count || 0), activeSessions: Number(sessions.results[0]?.count || 0) } };
+}
+
+export async function GET(request: Request) {
+  if (!await allowed(request)) return NextResponse.json({ error: "غير مصرح" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const database = await db();
+  if (!database) return NextResponse.json({ error: "التخزين غير مهيأ" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(await snapshot(database, await env()), { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function POST(request: Request) {
+  if (!await allowed(request)) return NextResponse.json({ error: "غير مصرح" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const database = await db();
+  if (!database) return NextResponse.json({ error: "التخزين غير مهيأ" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const body = await request.json().catch(() => ({})) as { userAuthEnabled?: unknown; passkeysEnabled?: unknown; earlyAccessEnabled?: unknown; trialDays?: unknown };
+  const secrets = await env();
+  const wantsAuth = flag(body.userAuthEnabled), wantsPasskeys = flag(body.passkeysEnabled), wantsEarlyAccess = flag(body.earlyAccessEnabled);
+  const trialDays = Math.min(31, Math.max(1, Number.parseInt(String(body.trialDays || "14"), 10) || 14));
+  if (wantsAuth && (!secrets.RESEND_API_KEY || !secrets.NAVIXA_AUTH_FROM || !secrets.NAVIXA_AUTH_CODE_PEPPER)) return NextResponse.json({ error: "أضف أولًا مزود البريد وعنوان الإرسال قبل فتح حسابات المستخدمين" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  if (wantsPasskeys && !wantsAuth) return NextResponse.json({ error: "فعّل حسابات المستخدمين أولًا قبل Passkeys" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  if (wantsEarlyAccess && !wantsAuth) return NextResponse.json({ error: "فعّل حسابات المستخدمين أولًا قبل تجربة Plus" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  await schema(database);
+  const next: Record<(typeof settingKeys)[number], string> = { user_auth_enabled: String(wantsAuth), email_otp_enabled: String(wantsAuth), passkeys_enabled: String(wantsPasskeys), early_access_enabled: String(wantsEarlyAccess), trial_days: String(trialDays) };
+  const now = new Date().toISOString();
+  for (const key of settingKeys) await database.prepare("INSERT INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES (?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at").bind(key, next[key], now).run();
+  return NextResponse.json({ ok: true, message: wantsAuth ? "تم حفظ إعدادات حسابات المستخدمين" : "بقيت حسابات المستخدمين وتجربة Plus مقفلة" }, { headers: { "Cache-Control": "no-store" } });
+}

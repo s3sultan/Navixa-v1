@@ -29,6 +29,11 @@ import { createCode } from "../app/referrals.ts";
 import { mergeMeetingParts, pendingMeetingParts } from "../app/meetings/meetingSummary.ts";
 import type { MeetingPart } from "../app/meetings/meetingStore.ts";
 import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, parseGlossaryInput } from "../app/meetings/meetingGlossary.ts";
+import { GET as getAccountSession } from "../app/api/account/session/route.ts";
+import { POST as requestAccountCode } from "../app/api/account/code/request/route.ts";
+import { POST as verifyAccountCode } from "../app/api/account/code/verify/route.ts";
+import { POST as registerPasskeyOptions } from "../app/api/account/passkeys/register/options/route.ts";
+import { makeUserSessionCookie } from "../worker/userAuth.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -260,6 +265,20 @@ test("local meeting parts merge with chronological timestamps and preserve pendi
   assert.equal(merged.segments[1].start, 1805);
   assert.deepEqual(merged.decisions, ["تم الاتفاق على بداية المشروع.", "قرر الفريق مراجعة النتيجة."]);
   assert.equal(pendingMeetingParts([first, second, pending])[0].id, "p3");
+});
+
+test("user account endpoints keep anonymous state private and reject cross-origin login or Passkey requests", async () => {
+  const session = await getAccountSession(new Request(`${appOrigin}/api/account/session`));
+  assert.ok([200,503].includes(session.status));
+  if (session.status === 200) assert.deepEqual(await session.json(), { enabled: false, signedIn: false });
+  const code = await requestAccountCode(new Request(`${appOrigin}/api/account/code/request`, { method:"POST", headers:{origin:"https://attacker.example","content-type":"application/json"}, body:JSON.stringify({email:"user@example.com"}) }));
+  assert.equal(code.status, 403);
+  const verify = await verifyAccountCode(new Request(`${appOrigin}/api/account/code/verify`, { method:"POST", headers:{origin:"https://attacker.example","content-type":"application/json"}, body:JSON.stringify({email:"user@example.com",code:"123456"}) }));
+  assert.equal(verify.status, 403);
+  const passkey = await registerPasskeyOptions(new Request(`${appOrigin}/api/account/passkeys/register/options`, { method:"POST", headers:{origin:appOrigin,cookie:makeUserSessionCookie("x".repeat(43)).split(";")[0]} }));
+  assert.ok([401,404,503].includes(passkey.status));
+  assert.match(makeUserSessionCookie("x".repeat(43)), /HttpOnly/);
+  assert.match(makeUserSessionCookie("x".repeat(43)), /SameSite=Lax/);
 });
 
 test("meeting glossary review remains protected by the server-side admin session", async () => {
