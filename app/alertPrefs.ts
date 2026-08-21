@@ -29,9 +29,29 @@ export const isScreenEnabled=(type:AlertType)=>isChannelEnabled(type,"screen");
 export const isTelegramEnabled=(type:AlertType)=>isChannelEnabled(type,"telegram");
 
 export type TelegramConfig={token:string;chatId:string};
-export const getTelegramConfig=():TelegramConfig|null=>{try{const c=JSON.parse(localStorage.getItem("navixa-telegram-config")||"null");return c?.token&&c?.chatId?c:null}catch{return null}};
-export const setTelegramConfig=(config:TelegramConfig)=>localStorage.setItem("navixa-telegram-config",JSON.stringify(config));
-export const clearTelegramConfig=()=>localStorage.removeItem("navixa-telegram-config");
+const LEGACY_TELEGRAM_STORAGE_KEY="navixa-telegram-config";
+let sessionTelegramConfig:TelegramConfig|null=null;
+
+// Telegram credentials are intentionally session-only. A prior localStorage value
+// is deleted on first access so it cannot continue to survive browser restarts.
+function clearLegacyTelegramConfig(){
+  try{localStorage.removeItem(LEGACY_TELEGRAM_STORAGE_KEY)}catch{}
+}
+export const getTelegramConfig=():TelegramConfig|null=>{
+  clearLegacyTelegramConfig();
+  return sessionTelegramConfig;
+};
+export const setTelegramConfig=(config:TelegramConfig)=>{
+  clearLegacyTelegramConfig();
+  const token=config.token.trim();
+  const chatId=config.chatId.trim();
+  sessionTelegramConfig=token&&chatId?{token,chatId}:null;
+};
+export const clearTelegramConfig=()=>{
+  sessionTelegramConfig=null;
+  clearLegacyTelegramConfig();
+};
+export const isTelegramConfigSessionOnly=()=>true;
 
 export const sendTelegramMessage=async(config:TelegramConfig,message:string):Promise<boolean>=>{
   try{
