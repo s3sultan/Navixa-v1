@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { deleteMeetingSession, listMeetingSessions, saveMeetingSession, type MeetingPart, type MeetingSession, type TranscriptSegment } from "./meetingStore";
 import { buildLocalSummary, mergeMeetingParts, pendingMeetingParts } from "./meetingSummary";
+import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, mergeGlossaries, parseGlossaryInput, type GlossaryTerm } from "./meetingGlossary";
 import "./meetings.css";
 
 type StudioState = "ready" | "recording" | "processing" | "review";
@@ -12,8 +13,8 @@ type LanguageChoice = "auto" | "ar" | "en";
 type WorkerMessage = { type: string; partId?: string; message?: string; percentage?: number | null; transcript?: string; segments?: TranscriptSegment[] };
 
 const NAVIXA_URL = "https://navixa.s2shug.workers.dev";
-type MeetingPolicy={enabled:boolean;baseModelEnabled:boolean;autoLanguageEnabled:boolean;maxFileMb:number;exportPdfEnabled:boolean;exportWordEnabled:boolean;tutorialEnabled:boolean;usageNoticeEnabled:boolean};
-const DEFAULT_POLICY:MeetingPolicy={enabled:true,baseModelEnabled:true,autoLanguageEnabled:true,maxFileMb:250,exportPdfEnabled:true,exportWordEnabled:true,tutorialEnabled:true,usageNoticeEnabled:true};
+type MeetingPolicy={enabled:boolean;baseModelEnabled:boolean;autoLanguageEnabled:boolean;globalLearningEnabled:boolean;maxFileMb:number;exportPdfEnabled:boolean;exportWordEnabled:boolean;tutorialEnabled:boolean;usageNoticeEnabled:boolean};
+const DEFAULT_POLICY:MeetingPolicy={enabled:true,baseModelEnabled:true,autoLanguageEnabled:true,globalLearningEnabled:true,maxFileMb:250,exportPdfEnabled:true,exportWordEnabled:true,tutorialEnabled:true,usageNoticeEnabled:true};
 const CHUNK_OPTIONS = [15, 30, 45] as const;
 
 function newId() {
@@ -107,6 +108,12 @@ export default function MeetingStudio() {
   const [savedSessions, setSavedSessions] = useState<MeetingSession[]>([]);
   const [progress, setProgress] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [glossaryInput, setGlossaryInput] = useState("");
+  const [globalGlossary, setGlobalGlossary] = useState<GlossaryTerm[]>([]);
+  const [globalLearningConsent, setGlobalLearningConsent] = useState(false);
+  const [manualWrong, setManualWrong] = useState("");
+  const [manualCorrect, setManualCorrect] = useState("");
+  const [sharingLearning, setSharingLearning] = useState(false);
   const [policy,setPolicy]=useState<MeetingPolicy>(DEFAULT_POLICY);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -126,6 +133,7 @@ export default function MeetingStudio() {
 
   useEffect(() => { void refreshSessions(); }, []);
   useEffect(()=>{let active=true;fetch("/api/meetings/policy",{cache:"no-store"}).then(response=>response.ok?response.json():DEFAULT_POLICY).then((next:MeetingPolicy)=>{if(active)setPolicy({...DEFAULT_POLICY,...next})}).catch(()=>{});return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;fetch("/api/meetings/glossary",{cache:"force-cache"}).then(response=>response.ok?response.json():{terms:[]}).then((data:{terms?:GlossaryTerm[]})=>{if(active)setGlobalGlossary(Array.isArray(data.terms)?data.terms:[])}).catch(()=>{});return()=>{active=false}},[]);
   useEffect(()=>{if(!policy.baseModelEnabled&&model==="base")setModel("tiny");if(!policy.autoLanguageEnabled&&language==="auto")setLanguage("ar")},[policy,model,language]);
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { currentModelRef.current = model; }, [model]);
@@ -151,10 +159,43 @@ export default function MeetingStudio() {
     if (message) setNotice(message);
   };
 
+  const shareGlossaryTerms = async (terms: GlossaryTerm[], source: "correction" | "approved", consented: boolean) => {
+    if (!policy.globalLearningEnabled || !consented || !terms.length) return false;
+    const response = await fetch("/api/meetings/glossary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consent: true, source, terms }) }).catch(() => null);
+    if (!response?.ok) return false;
+    setGlobalGlossary((current) => mergeGlossaries(current, terms));
+    return true;
+  };
+
+  const addGlossaryCorrection = (wrong: string, correct: string) => {
+    if (!draft || !wrong.trim() || !correct.trim()) return;
+    const term: GlossaryTerm = { canonical: correct.trim(), aliases: [wrong.trim()] };
+    const session = normalizeSession(draft);
+    const next = { ...session, glossary: mergeGlossaries(session.glossary || [], [term]) };
+    persist(next, "أُضيف التصحيح إلى قاموس هذه الجلسة ويُطبّق على الأجزاء القادمة.");
+    setManualWrong(""); setManualCorrect("");
+    void shareGlossaryTerms([term], "correction", Boolean(next.globalLearningConsent));
+  };
+
+  const approveLearning = async () => {
+    if (!draft?.transcript.trim()) { setNotice("أكمل التفريغ أولًا قبل اعتماد النتيجة."); return; }
+    const session = normalizeSession(draft);
+    const learned = mergeGlossaries(session.glossary || [], extractFrequentTerms(session.transcript));
+    const next = { ...session, glossary: learned };
+    if (!next.globalLearningConsent || !policy.globalLearningEnabled) {
+      persist(next, "اعتمدت النتيجة محليًا. فعّل موافقة مشاركة المصطلحات إن أردت أن يستفيد الآخرون من القاموس المنقّح.");
+      return;
+    }
+    setSharingLearning(true);
+    const shared = await shareGlossaryTerms(learned, "approved", true);
+    setSharingLearning(false);
+    persist({ ...next, learningShared: shared || next.learningShared }, shared ? "اعتمدت النتيجة وتعلم NAVIXA من المصطلحات المنقّحة فقط، من دون إرسال الصوت أو النص." : "اعتمدت النتيجة محليًا، وتعذر إرسال المصطلحات العامة الآن. يمكنك المحاولة لاحقًا.");
+  };
+
   const createSession = (nextTitle: string, nextChunkMinutes: number): MeetingSession => ({
     id: newId(), title: nextTitle.trim() || "جلسة بلا عنوان", createdAt: new Date().toISOString(), durationMs: 0,
     audio: null, transcript: "", segments: [], summary: "", decisions: [], tasks: [], questions: [], model: null,
-    parts: [], chunkMinutes: nextChunkMinutes,
+    parts: [], chunkMinutes: nextChunkMinutes, glossary: parseGlossaryInput(glossaryInput), globalLearningConsent,
   });
 
   const appendRecordedPart = (final = false) => {
@@ -243,10 +284,13 @@ export default function MeetingStudio() {
         setProgress(null); setState("review"); return;
       }
       if (data.type === "complete") {
-        const local = buildLocalSummary(data.transcript || "");
-        const nextWithPart = { ...normalized, parts: (normalized.parts || []).map((part) => part.id === data.partId ? { ...part, status: "complete" as const, transcript: data.transcript || "", segments: data.segments || [], summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions, model: currentModelRef.current, error: undefined } : part) };
+        const glossary = mergeGlossaries(globalGlossary, normalized.glossary || []);
+        const correctedTranscript = applyGlossary(data.transcript || "", glossary);
+        const local = buildLocalSummary(correctedTranscript);
+        const nextWithPart = { ...normalized, parts: (normalized.parts || []).map((part) => part.id === data.partId ? { ...part, status: "complete" as const, transcript: correctedTranscript, segments: (data.segments || []).map((segment) => ({ ...segment, text: applyGlossary(segment.text, glossary) })), summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions, model: currentModelRef.current, error: undefined } : part) };
         const merged = mergeMeetingParts(nextWithPart.parts || []);
-        const next = { ...nextWithPart, ...merged, model: currentModelRef.current };
+        const repeated = extractFrequentTerms(merged.transcript);
+        const next = { ...nextWithPart, ...merged, glossary: mergeGlossaries(nextWithPart.glossary || [], repeated), model: currentModelRef.current };
         const remaining = pendingMeetingParts(next.parts || []);
         persist(next, remaining.length ? `اكتمل جزء. سيبدأ تفريغ الجزء التالي تلقائيًا (${remaining.length} متبقٍ).` : "اكتمل تفريغ جميع الأجزاء ودمجها محليًا.");
         setProgress(null);
@@ -282,6 +326,18 @@ export default function MeetingStudio() {
     const nextPart = pendingMeetingParts(session.parts || [])[0];
     if (!nextPart) { setNotice("تم تفريغ جميع الأجزاء المحفوظة بالفعل."); return; }
     await transcribePart(session, nextPart.id);
+  };
+
+  const updateTranscript = (nextText: string) => {
+    if (!draft) return;
+    const correction = detectSingleWordCorrection(draft.transcript, nextText);
+    const local = buildLocalSummary(nextText);
+    const session = normalizeSession(draft);
+    if (!correction) { setDraft({ ...session, transcript: nextText, summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions }); return; }
+    const term: GlossaryTerm = { canonical: correction.to, aliases: [correction.from] };
+    const next = { ...session, transcript: nextText, summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions, glossary: mergeGlossaries(session.glossary || [], [term]) };
+    persist(next, `تعلّم NAVIXA محليًا تصحيح «${correction.from}» إلى «${correction.to}».`);
+    void shareGlossaryTerms([term], "correction", Boolean(next.globalLearningConsent));
   };
 
   const saveDraft = async () => {
@@ -362,12 +418,13 @@ export default function MeetingStudio() {
           <div className="meeting-record-circle" aria-hidden="true">●</div>
           <p>لن نطلب إذن الميكروفون أو ننزّل أي نموذج قبل أن تبدأ أنت.</p>
           {policy.usageNoticeEnabled&&<label className="meeting-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>أؤكد أن لدي حق التسجيل، وأنني سأحصل على موافقة الحاضرين عند الحاجة.</span></label>}
+          <div className="meeting-glossary-intake"><label>مصطلحات مهمة لهذا الاجتماع <small>اختياري · سطر لكل مصطلح: الاسم الصحيح — النطق أو الكتابة البديلة</small><textarea value={glossaryInput} onChange={(event) => setGlossaryInput(event.target.value)} maxLength={1800} placeholder={"NAVIXA — نافيكسا\nCloudflare Workers — كلاودفلير ووركرز\nDr. Sarah Al-Harbi — د. سارة الحربي"} /></label><p>يُحفظ هذا القاموس داخل هذه الجلسة على جهازك ويصحح النص قبل التلخيص.</p>{policy.globalLearningEnabled&&<label className="meeting-global-learning"><input type="checkbox" checked={globalLearningConsent} onChange={(event) => setGlobalLearningConsent(event.target.checked)} /><span><b>ساهم في تحسين القاموس العام</b><small>نشارك المصطلحات المنقّحة التي تعتمدها فقط؛ لا نشارك الصوت أو النص الكامل أو عنوان الاجتماع.</small></span></label>}</div>
           <div className="meeting-chunk-explainer"><label className="meeting-chunk-control"><span>مدة الجزء التلقائي</span><select value={chunkMinutes} onChange={(event) => setChunkMinutes(Number(event.target.value))}><option value={15}>15 دقيقة — أنسب للجوال أو المساحة المحدودة</option><option value={30}>30 دقيقة — الخيار المتوازن الموصى به</option><option value={45}>45 دقيقة — كمبيوتر قوي ومساحة مريحة</option></select></label><p><b>اختر 15 دقيقة</b> لاجتماع طويل على جوال، أو <b>30 دقيقة</b> كخيار متوازن، أو <b>45 دقيقة</b> عند استخدام كمبيوتر قوي.</p></div>
           <div className="meeting-start-actions"><button type="button" className="meeting-primary" disabled={!policy.enabled} onClick={startRecording}>● ابدأ التسجيل</button><button type="button" className="meeting-secondary" disabled={!policy.enabled} onClick={() => audioInputRef.current?.click()}>↑ استورد ملفًا صوتيًا</button><input ref={audioInputRef} type="file" accept="audio/*" hidden onChange={importAudio} /></div>
         </div>}
         {state === "recording" && <div className="meeting-recording-area"><div className="meeting-wave" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 17) % 54)}px` }} />)}</div><p>يحفظ NAVIXA جزءًا محليًا كل {chunkMinutes} دقيقة. إذا أغلقت الصفحة، تبقى الأجزاء المحفوظة ويمكن استئناف التفريغ عند العودة.</p><button type="button" className="meeting-stop" onClick={stopRecording}>■ أوقف التسجيل</button></div>}
         {state === "processing" && <div className="meeting-processing"><div className="meeting-spinner" aria-hidden="true" /><p>{notice}</p>{progress !== null && <div className="meeting-progress"><i style={{ width: `${Math.max(3, progress)}%` }} /><span>{progress}%</span></div>}</div>}
-        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"} · {completedParts}/{parts.length} أجزاء مفرّغة</small></div><div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={() => void transcribe()} disabled={state === "processing"||!policy.enabled||!parts.length}>⌁ {completedParts === parts.length && parts.length ? "تم التفريغ" : "تفريغ الأجزاء المحفوظة"}</button><button type="button" className="meeting-secondary" onClick={() => void saveDraft()} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>إغلاق الجلسة</button></div></div>}
+        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"} · {completedParts}/{parts.length} أجزاء مفرّغة</small>{draft.glossary?.length ? <p className="meeting-glossary-state">قاموس الجلسة: {draft.glossary.slice(0,4).map((term) => <b key={term.canonical}>{term.canonical}</b>)}{draft.glossary.length>4&&<span>+{draft.glossary.length-4}</span>}</p> : <p className="meeting-glossary-state muted">لا توجد مصطلحات مخصصة بعد.</p>}</div><div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={() => void transcribe()} disabled={state === "processing"||!policy.enabled||!parts.length}>⌁ {completedParts === parts.length && parts.length ? "تم التفريغ" : "تفريغ الأجزاء المحفوظة"}</button><button type="button" className="meeting-secondary" onClick={() => void saveDraft()} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>إغلاق الجلسة</button></div></div>}
         {parts.length > 0 && <div className="meeting-part-list" aria-label="أجزاء الجلسة">{parts.map((part) => <div key={part.id} className={`meeting-part ${part.status}`}><b>الجزء {part.index + 1}</b><span>{formatDuration(part.startMs)} — {formatDuration(part.startMs + part.durationMs)}</span><em>{part.status === "complete" ? "مفرّغ" : part.status === "processing" ? "جارٍ التفريغ" : part.status === "error" ? "أعد المحاولة" : "محفوظ"}</em></div>)}</div>}
         <p className="meeting-notice" role="status">{notice}</p>
       </div>
@@ -377,13 +434,13 @@ export default function MeetingStudio() {
 
     {draft && state === "review" && <section className="meeting-output">
       <div className="meeting-print-brand"><img src="/navixa-export-logo.png" alt="NAVIXA" /><div><b>NAVIXA — سجّل ولخّص</b><a href={NAVIXA_URL}>{NAVIXA_URL}</a></div></div>
-      <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions"><button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button>{policy.exportPdfEnabled&&<button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button>}{policy.exportWordEnabled&&<button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button>}</div></div>
+      <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions">{policy.globalLearningEnabled&&<button type="button" className="meeting-secondary meeting-approve-learning" onClick={() => void approveLearning()} disabled={sharingLearning||!draft.transcript.trim()}>{sharingLearning?"جارٍ الاعتماد…":draft.learningShared?"✓ نتيجة معتمدة":"✓ اعتماد النتيجة"}</button>}<button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button>{policy.exportPdfEnabled&&<button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button>}{policy.exportWordEnabled&&<button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button>}</div></div>
       <div className="meeting-output-grid">
         <section className="meeting-summary-pane"><label>الخلاصة<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="سيظهر هنا ملخص محلي بعد التفريغ…" /></label><div className="meeting-lists"><div><h3>قرارات</h3>{draft.decisions.length ? draft.decisions.map((item, index) => <p key={`${item}-${index}`}>✓ {item}</p>) : <p className="empty">ستظهر القرارات المحتملة هنا بعد التفريغ.</p>}</div><div><h3>مهام</h3>{draft.tasks.length ? draft.tasks.map((item, index) => <p key={`${item}-${index}`}>→ {item}</p>) : <p className="empty">ستظهر المهام المحتملة هنا بعد التفريغ.</p>}</div></div></section>
-        <section className="meeting-transcript-pane"><label>النص الزمني<textarea value={draft.transcript} onChange={(event) => { const next = event.target.value; const local = buildLocalSummary(next); setDraft({ ...draft, transcript: next, summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions }); }} placeholder="سيظهر النص هنا بعد التفريغ…" /></label><div className="meeting-timeline">{draft.segments.length ? draft.segments.slice(0, 8).map((segment, index) => <button type="button" key={`${segment.start}-${index}`} onClick={() => setNotice(`المقطع عند ${formatMinute(segment.start)} محفوظ داخل النص المحلي.`)}><time>{formatMinute(segment.start)}</time><span>{segment.text}</span></button>) : <p>لا توجد طوابع زمنية بعد.</p>}</div></section>
+        <section className="meeting-transcript-pane"><label>النص الزمني<textarea value={draft.transcript} onChange={(event) => updateTranscript(event.target.value)} placeholder="سيظهر النص هنا بعد التفريغ…" /></label><div className="meeting-correction-form"><b>صحّح مصطلحًا</b><input value={manualWrong} onChange={(event) => setManualWrong(event.target.value)} placeholder="الكتابة الخاطئة" maxLength={80}/><input value={manualCorrect} onChange={(event) => setManualCorrect(event.target.value)} placeholder="الكتابة الصحيحة" maxLength={80}/><button type="button" onClick={() => addGlossaryCorrection(manualWrong,manualCorrect)} disabled={!manualWrong.trim()||!manualCorrect.trim()}>أضف للقاموس</button><small>يُصحح محليًا الآن. لا يشارك مع الجميع إلا إذا فعّلت الموافقة قبل التسجيل.</small></div><div className="meeting-timeline">{draft.segments.length ? draft.segments.slice(0, 8).map((segment, index) => <button type="button" key={`${segment.start}-${index}`} onClick={() => setNotice(`المقطع عند ${formatMinute(segment.start)} محفوظ داخل النص المحلي.`)}><time>{formatMinute(segment.start)}</time><span>{segment.text}</span></button>) : <p>لا توجد طوابع زمنية بعد.</p>}</div></section>
       </div>
     </section>}
 
-    <section className="meeting-library"><div><small>على هذا الجهاز فقط</small><h2>جلساتك المحفوظة</h2></div>{savedSessions.length ? <div className="meeting-library-list">{savedSessions.slice(0, 8).map((session) => <article key={session.id}><div><b>{session.title}</b><small>{new Date(session.createdAt).toLocaleDateString("ar-SA")} · {(session.parts || []).filter((part) => part.status === "complete").length}/{(session.parts || []).length} أجزاء مفرّغة</small></div><div><button type="button" onClick={() => { const normalized = normalizeSession(session); setDraft(normalized); draftRef.current = normalized; setTitle(normalized.title); setElapsed(normalized.durationMs); setChunkMinutes(normalized.chunkMinutes || 30); setState("review"); setNotice("فُتحت الجلسة من تخزين هذا الجهاز. يمكنك استئناف الأجزاء المتبقية."); }}>فتح</button><button type="button" className="danger" onClick={() => void removeSaved(session.id)}>حذف</button></div></article>)}</div> : <p className="meeting-library-empty">لا توجد جلسات محفوظة. ستبقى الأجزاء التي تحفظها داخل متصفحك على هذا الجهاز.</p>}</section>
+    <section className="meeting-library"><div><small>على هذا الجهاز فقط</small><h2>جلساتك المحفوظة</h2></div>{savedSessions.length ? <div className="meeting-library-list">{savedSessions.slice(0, 8).map((session) => <article key={session.id}><div><b>{session.title}</b><small>{new Date(session.createdAt).toLocaleDateString("ar-SA")} · {(session.parts || []).filter((part) => part.status === "complete").length}/{(session.parts || []).length} أجزاء مفرّغة</small></div><div><button type="button" onClick={() => { const normalized = normalizeSession(session); setDraft(normalized); draftRef.current = normalized; setTitle(normalized.title); setElapsed(normalized.durationMs); setChunkMinutes(normalized.chunkMinutes || 30); setGlossaryInput((normalized.glossary || []).map((term) => [term.canonical, ...term.aliases].join(" — ")).join("\n")); setGlobalLearningConsent(Boolean(normalized.globalLearningConsent)); setState("review"); setNotice("فُتحت الجلسة من تخزين هذا الجهاز. يمكنك استئناف الأجزاء المتبقية."); }}>فتح</button><button type="button" className="danger" onClick={() => void removeSaved(session.id)}>حذف</button></div></article>)}</div> : <p className="meeting-library-empty">لا توجد جلسات محفوظة. ستبقى الأجزاء التي تحفظها داخل متصفحك على هذا الجهاز.</p>}</section>
   </main>;
 }

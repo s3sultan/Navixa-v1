@@ -23,9 +23,11 @@ import { POST as reportPerformance } from "../app/api/performance/route.ts";
 import { GET as getAdminReferrals } from "../app/api/admin/referrals/route.ts";
 import { GET as getAdminMeetingSettings, POST as saveAdminMeetingSettings } from "../app/api/admin/meeting-settings/route.ts";
 import { GET as getMeetingPolicy } from "../app/api/meetings/policy/route.ts";
+import { POST as shareMeetingGlossary } from "../app/api/meetings/glossary/route.ts";
 import { createCode } from "../app/referrals.ts";
 import { mergeMeetingParts, pendingMeetingParts } from "../app/meetings/meetingSummary.ts";
 import type { MeetingPart } from "../app/meetings/meetingStore.ts";
+import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, parseGlossaryInput } from "../app/meetings/meetingGlossary.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -257,6 +259,19 @@ test("local meeting parts merge with chronological timestamps and preserve pendi
   assert.equal(merged.segments[1].start, 1805);
   assert.deepEqual(merged.decisions, ["تم الاتفاق على بداية المشروع.", "قرر الفريق مراجعة النتيجة."]);
   assert.equal(pendingMeetingParts([first, second, pending])[0].id, "p3");
+});
+
+test("meeting glossary stays opt-in and corrects only known local term aliases", async () => {
+  const crossOrigin = await shareMeetingGlossary(new Request(`${appOrigin}/api/meetings/glossary`, { method:"POST", headers:{origin:"https://attacker.example","content-type":"application/json"}, body:JSON.stringify({consent:true,terms:[{canonical:"NAVIXA",aliases:["نافكسا"]}]}) }));
+  assert.equal(crossOrigin.status,403);
+  const noConsent = await shareMeetingGlossary(post("/api/meetings/glossary",{consent:false,terms:[{canonical:"NAVIXA",aliases:["نافكسا"]}]}));
+  assert.equal(noConsent.status,409);
+  const privateInput = await shareMeetingGlossary(post("/api/meetings/glossary",{consent:true,terms:[{canonical:"test@example.com",aliases:[]}]}));
+  assert.equal(privateInput.status,400);
+  const terms = parseGlossaryInput("NAVIXA — نافكسا, نافيكسا\nCloudflare Workers — كلاود فلير ووركرز");
+  assert.equal(applyGlossary("بدأت نافكسا على كلاود فلير ووركرز",terms),"بدأت NAVIXA على Cloudflare Workers");
+  assert.deepEqual(detectSingleWordCorrection("نافكسا تعمل","نافيكسا تعمل"),{from:"نافكسا",to:"نافيكسا"});
+  assert.equal(extractFrequentTerms("NAVIXA NAVIXA NAVIXA مهمة")[0].canonical,"NAVIXA");
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {

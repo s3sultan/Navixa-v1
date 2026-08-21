@@ -1,3 +1,5 @@
+import type { GlossaryTerm } from "./meetingGlossary";
+
 export type TranscriptSegment = {
   start: number;
   end: number;
@@ -38,6 +40,9 @@ export type MeetingSession = {
   model: "tiny" | "base" | null;
   parts?: MeetingPart[];
   chunkMinutes?: number;
+  glossary?: GlossaryTerm[];
+  globalLearningConsent?: boolean;
+  learningShared?: boolean;
 };
 
 const DB_NAME = "navixa-local-meetings";

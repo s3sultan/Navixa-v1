@@ -6,10 +6,10 @@ type Database={prepare:(sql:string)=>Statement};
 type Row={setting_key:string;setting_value:string};
 type Env=Record<string,unknown>;
 
-const keys=["feature_enabled","base_model_enabled","auto_language_enabled","max_file_mb","export_pdf_enabled","export_word_enabled","tutorial_enabled","usage_notice_enabled"] as const;
+const keys=["feature_enabled","base_model_enabled","auto_language_enabled","global_learning_enabled","max_file_mb","export_pdf_enabled","export_word_enabled","tutorial_enabled","usage_notice_enabled"] as const;
 type Key=(typeof keys)[number];
 type Settings=Record<Key,string>;
-const defaults:Settings={feature_enabled:"true",base_model_enabled:"true",auto_language_enabled:"true",max_file_mb:"250",export_pdf_enabled:"true",export_word_enabled:"true",tutorial_enabled:"true",usage_notice_enabled:"true"};
+const defaults:Settings={feature_enabled:"true",base_model_enabled:"true",auto_language_enabled:"true",global_learning_enabled:"true",max_file_mb:"250",export_pdf_enabled:"true",export_word_enabled:"true",tutorial_enabled:"true",usage_notice_enabled:"true"};
 const isFlag=(value:unknown)=>value===true||value==="true";
 const asMb=(value:unknown)=>{const number=Number(value);return Number.isInteger(number)&&number>=25&&number<=500?String(number):""};
 
@@ -37,6 +37,7 @@ export async function POST(request:Request){
     feature_enabled:String(isFlag(body.featureEnabled)),
     base_model_enabled:String(isFlag(body.baseModelEnabled)),
     auto_language_enabled:String(isFlag(body.autoLanguageEnabled)),
+    global_learning_enabled:String(isFlag(body.globalLearningEnabled)),
     max_file_mb:asMb(body.maxFileMb)||current.max_file_mb,
     export_pdf_enabled:String(isFlag(body.exportPdfEnabled)),
     export_word_enabled:String(isFlag(body.exportWordEnabled)),
