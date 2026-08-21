@@ -24,6 +24,7 @@ import { GET as getAdminReferrals } from "../app/api/admin/referrals/route.ts";
 import { GET as getAdminMeetingSettings, POST as saveAdminMeetingSettings } from "../app/api/admin/meeting-settings/route.ts";
 import { GET as getMeetingPolicy } from "../app/api/meetings/policy/route.ts";
 import { POST as shareMeetingGlossary } from "../app/api/meetings/glossary/route.ts";
+import { GET as getAdminMeetingGlossary } from "../app/api/admin/meeting-glossary/route.ts";
 import { createCode } from "../app/referrals.ts";
 import { mergeMeetingParts, pendingMeetingParts } from "../app/meetings/meetingSummary.ts";
 import type { MeetingPart } from "../app/meetings/meetingStore.ts";
@@ -259,6 +260,11 @@ test("local meeting parts merge with chronological timestamps and preserve pendi
   assert.equal(merged.segments[1].start, 1805);
   assert.deepEqual(merged.decisions, ["تم الاتفاق على بداية المشروع.", "قرر الفريق مراجعة النتيجة."]);
   assert.equal(pendingMeetingParts([first, second, pending])[0].id, "p3");
+});
+
+test("meeting glossary review remains protected by the server-side admin session", async () => {
+  const response = await getAdminMeetingGlossary(new Request(`${appOrigin}/api/admin/meeting-glossary`));
+  assert.equal(response.status,401);
 });
 
 test("meeting glossary stays opt-in and corrects only known local term aliases", async () => {
