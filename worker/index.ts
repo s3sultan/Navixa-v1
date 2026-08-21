@@ -3,10 +3,16 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath, isProtectedAdminPath, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "./adminAuth";
 import { deliverDueMatchPushes } from "./matchPush";
+import { checkDomainExpiry } from "./domainExpiryAlert";
 
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  NAVIXA_TELEGRAM_BOT_TOKEN?: string;
+  NAVIXA_ADMIN_TELEGRAM_CHAT_ID?: string;
+  RESEND_API_KEY?: string;
+  NAVIXA_ADMIN_EMAIL?: string;
+  RESEND_FROM_EMAIL?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -230,6 +236,7 @@ const worker = {
   async scheduled(_controller: { cron: string }, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(deliverDueMatchPushes(env).then(result => console.log(JSON.stringify({ event: "match_push_scheduled", delivered: result.delivered, skipped: result.skipped }))));
     ctx.waitUntil(aggregatePerformanceWindows(env).catch(error => console.log(JSON.stringify({ event: "performance_aggregation_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(checkDomainExpiry(env).catch(error => console.log(JSON.stringify({ event: "domain_expiry_check_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);

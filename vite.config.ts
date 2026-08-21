@@ -17,6 +17,7 @@ const localBindingConfig = {
   name: "navixa",
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  triggers: { crons: ["0 3 * * *"] },
   d1_databases: [
     {
       binding: "DB",
