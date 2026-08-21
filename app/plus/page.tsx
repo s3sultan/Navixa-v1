@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ar } from "../content/ar";
+import { arCta } from "../content/cta/ar";
+import { languageIdentity } from "../content/languages";
 import "./plus.css";
 import InterestForm from "./InterestForm";
 import ReferralCapture from "./ReferralCapture";
@@ -20,7 +22,7 @@ const included = [
 ];
 
 export default function NavixaPlusPage() {
-  return <main className="plus-page" dir="rtl"><ReferralCapture/>
+  return <main className="plus-page" dir={languageIdentity.ar.direction}><ReferralCapture/>
     <nav className="plus-nav">
       <Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt=""/><span><b>NAVIXA</b><small>يفهم يومك</small></span></Link>
       <Link href="/" className="plus-back">العودة للرئيسية ←</Link>
@@ -30,7 +32,7 @@ export default function NavixaPlusPage() {
       <span className="plus-eyebrow">{ar.plus.eyebrow}</span>
       <h1>{ar.plus.heroFirst}<br/><strong>{ar.plus.heroEmphasis}</strong></h1>
       <p>{ar.plus.heroDescription}</p>
-      <div className="plus-hero-actions"><a href="#plans">{ar.plus.explorePlans}</a><a className="ghost" href="#included">{ar.plus.includedLink}</a></div>
+      <div className="plus-hero-actions"><a href="#plans">{arCta.explorePlans}</a><a className="ghost" href="#included">{arCta.whatsIncluded}</a></div>
       <div className="plus-trust"><span>✓ {ar.plus.trialTrust}</span><span>✓ {ar.plus.noChargeTrust}</span><span>✓ {ar.plus.cancellationTrust}</span></div>
       <div className="plus-orbit a"/><div className="plus-orbit b"/><div className="plus-mark"><img src="/navixa-mark.webp" alt=""/></div>
     </section>
