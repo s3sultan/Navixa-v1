@@ -449,3 +449,58 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
 .screen-feature .priority-feature-top small{border-color:rgba(118,86,214,.17)!important;background:rgba(255,255,255,.74)!important;color:#49616e!important}
 .meeting-feature .priority-feature-top small{background:rgba(23,26,71,.26)!important}
 @media(max-width:650px){.priority-feature-top small{padding:5px 8px!important;font-size:9px!important}}
+
+/* رأس موحد لبطاقات الميزات الثلاث: أيقونة ثم Plus ثم وصف الخصوصية */
+.priority-feature-top{
+  grid-template-columns:48px minmax(0,1fr)!important;
+  min-height:50px!important;
+}
+.priority-feature-top .priority-feature-meta{
+  grid-column:2!important;
+  grid-row:1!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:7px!important;
+  min-width:0!important;
+  direction:rtl!important;
+}
+.priority-feature-top .priority-feature-meta .plus-badge{
+  order:0!important;
+  flex:0 0 auto!important;
+  margin:0!important;
+}
+.priority-feature-top .priority-feature-meta small{
+  display:block!important;
+  flex:0 1 auto!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:inherit!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:10px!important;
+  line-height:1.3!important;
+}
+@media(max-width:650px){
+  .priority-feature-top{grid-template-columns:42px minmax(0,1fr)!important;min-height:44px!important}
+  .priority-feature-top .priority-feature-meta{gap:6px!important}
+  .priority-feature-top .priority-feature-meta small{font-size:8.5px!important}
+}
+
+/* لا تسمح لزينة التلخيص بحجز صف داخل Grid البطاقة */
+.meeting-feature > .meeting-card-rings{
+  position:absolute!important;
+  left:-102px!important;
+  bottom:-118px!important;
+  width:230px!important;
+  height:230px!important;
+  z-index:0!important;
+  pointer-events:none!important;
+}
+.meeting-feature > :not(.meeting-card-rings){position:relative;z-index:1}
