@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ar } from "../content/ar";
 import "./plus.css";
 import InterestForm from "./InterestForm";
 import ReferralCapture from "./ReferralCapture";
@@ -26,21 +27,21 @@ export default function NavixaPlusPage() {
     </nav>
 
     <section className="plus-hero">
-      <span className="plus-eyebrow">NAVIXA PLUS · قريبًا</span>
-      <h1>يومك نفسه،<br/><strong>لكن بعمق أكبر.</strong></h1>
-      <p>Plus هي الطبقة الاختيارية لمن يريد من NAVIXA مساعدًا أذكى وتخصيصًا أوسع، من دون المساس بالأساسيات اليومية المجانية.</p>
-      <div className="plus-hero-actions"><a href="#plans">استكشف الباقات</a><a className="ghost" href="#included">ماذا يتضمن؟</a></div>
-      <div className="plus-trust"><span>✓ تجربة 14 يومًا بلا بطاقة</span><span>✓ لا تحصيل مالي الآن</span><span>✓ إلغاء واضح عند الإطلاق</span></div>
+      <span className="plus-eyebrow">{ar.plus.eyebrow}</span>
+      <h1>{ar.plus.heroFirst}<br/><strong>{ar.plus.heroEmphasis}</strong></h1>
+      <p>{ar.plus.heroDescription}</p>
+      <div className="plus-hero-actions"><a href="#plans">{ar.plus.explorePlans}</a><a className="ghost" href="#included">{ar.plus.includedLink}</a></div>
+      <div className="plus-trust"><span>✓ {ar.plus.trialTrust}</span><span>✓ {ar.plus.noChargeTrust}</span><span>✓ {ar.plus.cancellationTrust}</span></div>
       <div className="plus-orbit a"/><div className="plus-orbit b"/><div className="plus-mark"><img src="/navixa-mark.webp" alt=""/></div>
     </section>
 
     <section className="plus-value" id="included" aria-labelledby="included-title">
-      <header><small>مصمم لمن يريد المزيد</small><h2 id="included-title">ماذا ستحصل عليه في Plus؟</h2><p>الأدوات اليومية الأساسية تبقى متاحة للجميع. Plus يمنحك راحة أكثر وذكاء أعمق.</p></header>
+      <header><small>{ar.plus.includedEyebrow}</small><h2 id="included-title">{ar.plus.includedTitle}</h2><p>{ar.plus.includedDescription}</p></header>
       <div className="plus-feature-grid">{included.map(([icon,title,description])=><article key={title}><span>{icon}</span><div><h3>{title}</h3><p>{description}</p></div></article>)}</div>
     </section>
 
     <section className="plus-plans" id="plans" aria-labelledby="plans-title">
-      <header><small>خطط الإطلاق المقترحة</small><h2 id="plans-title">اختر ما يناسبك لاحقًا</h2><p>هذه باقات تعريفية في النسخة التجريبية. لن يتم طلب دفع أو بطاقة الآن.</p></header>
+      <header><small>{ar.plus.plansEyebrow}</small><h2 id="plans-title">{ar.plus.plansTitle}</h2><p>{ar.plus.plansDescription}</p></header>
       <div className="plan-grid">
         <article className="plan-card trial"><span className="plan-tag">ابدأ هنا</span><h3>تجربة Plus</h3><div className="plan-price"><b>14</b><span>يومًا<br/>بلا بطاقة</span></div><p>تعرف على المساعد الأذكى وميزات Plus قبل أي قرار.</p><a href="#interest">أرغب في التجربة</a></article>
         <article className="plan-card featured"><span className="plan-tag">الأقرب للإطلاق</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>للشخص الذي يريد ذكاءً أعمق وتخصيصًا مستمرًا.</p><a href="#interest">سجّل اهتمامك</a></article>
