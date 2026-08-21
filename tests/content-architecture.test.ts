@@ -9,7 +9,7 @@ import { languageIdentity } from "../app/content/languages.ts";
 import { arMessages } from "../app/content/messages/ar.ts";
 import { copyCatalog } from "../app/content/catalog.ts";
 
-const root = "/home/ubuntu/Navixa-v1";
+const root = process.cwd();
 
 test("static copy dictionaries contain no dynamic formatter functions", () => {
   const arabic = readFileSync(`${root}/app/content/ar.ts`, "utf8");
