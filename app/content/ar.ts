@@ -1,12 +1,13 @@
-// NAVIXA Arabic copy source
-// عدّل النصوص الثابتة هنا. لا تضع أرقامًا أو أحداثًا غير موثقة؛
-// الرسائل الديناميكية تستقبل بياناتها من الواجهة أو التخزين المحلي فقط.
+// قاموس NAVIXA الرسمي للنصوص الثابتة — العربية
+// القاعدة: لا تضع هنا أي اسم مستخدم أو وقت أو مكان أو عدد أو نتيجة أو حالة جلسة.
+// هذه القيم تُصاغ داخل المكوّن عبر دوال ديناميكية مستقلة تعتمد على بيانات حقيقية.
 
 export const ar = {
-  brand: {
+  navixa: {
     name: "NAVIXA",
     tagline: "يفهم يومك",
     dailyAssistant: "مساعدك اليومي",
+    beta: "تجريبي",
   },
   home: {
     welcome: {
@@ -23,63 +24,75 @@ export const ar = {
       title: "هذا ما يحتاج انتباهك اليوم",
       description: "NAVIXA يجمع لك ما يهمك في مكان واحد: نداء اسمك، متابعة شاشة، أو تسجيل اجتماع وتلخيصه محليًا بعد إذنك.",
     },
-    listener: {
-      label: "سماع نداء الاسم",
-      readyTitle: "ينبهك عندما يسمع اسمًا يهمك",
-      readyDescription: "اكتب اسمًا واحدًا أو عدة أسماء، ثم فعّل الاستماع عندما تحتاجه.",
-      idleStatus: "لا شيء مهم سُمع حتى الآن",
-      permissionNote: "الإذن بيدك دائمًا",
-      configure: "إعداد نداء الاسم",
-      tutorialTitle: "شاهد الشرح في 25 ثانية",
-      tutorialDescription: "كيف تضيف الاسم وتفعّل التنبيه",
-      heardTitle: (name: string) => `تم سماع ${name}`,
-      heardDescription: "التقط NAVIXA الاسم الذي اخترته. افتح التفاصيل لمراجعة ما سُمع.",
-    },
-    screen: {
-      label: "متابعة الشاشة",
-      title: "راقب شاشة كاملة أو جزءًا ترسمه بنفسك",
-      description: "شارك الشاشة، ارسم الإطار الذي يهمك، ودع NAVIXA ينبهك عند تغير المحتوى أو ظهور النص الذي تحدده.",
-      idleStatus: "جاهز للمشاركة",
-      privacyNote: "لا تُرفع صور الشاشة",
-      configure: "اختيار شاشة أو منطقة",
-      tutorialTitle: "شاهد الشرح في 25 ثانية",
-      tutorialDescription: "كيف تشارك الشاشة وتحدد المنطقة",
-    },
-    meeting: {
-      label: "لخّص اجتماعك",
-      title: "سجّل، فرّغ، وخذ أهم النقاط معك",
-      description: "ابدأ بموافقة واضحة، ثم راجع النص والمهام والقرارات قبل حفظها أو تصديرها.",
-      privacyNote: "لا يُرفع صوتك إلى NAVIXA",
-      open: "افتح التلخيص المحلي",
-      tutorialTitle: "شاهد الشرح في 25 ثانية",
-      tutorialDescription: "كيف تسجّل وتفرّغ وتصدّر",
-    },
-    privacy: {
-      title: "خصوصيتك أولًا",
-      description: "لا يبدأ الميكروفون أو مشاركة الشاشة إلا بعد ضغطك وموافقتك. المعالجة الأساسية تتم محليًا في المتصفح.",
-      dataLink: "كيف تُحفظ بياناتي؟",
-    },
-    secondary: {
-      productivity: "إنتاجيتك",
-      health: "صحتي",
-      worship: "عبادتي",
-      tasks: "مهامي",
-      notifications: "التنبيهات",
-      appearance: "المظهر",
-      meetings: "محاضراتك واجتماعاتك",
-      dataAndSync: "البيانات والمزامنة",
-    },
-    contact: {
-      eyebrow: "NAVIXA COMMUNITY",
-      title: "تابع NAVIXA",
-      description: "سنعلن الحسابات الرسمية ووسائل الدعم هنا عند اكتمال الهوية الرسمية.",
-    },
-    trust: {
-      microphone: "لا يبدأ الميكروفون دون موافقتك",
-      screen: "لا تُرفع لقطات الشاشة إلى NAVIXA",
-      noCharge: "لا يوجد تحصيل مالي في النسخة التجريبية",
-      personalStats: "إحصاءاتك من نشاطك المسجل فقط",
-    },
+  },
+  tasks: {
+    label: "مهامي",
+    organization: "تنظيم",
+    emptyState: "أضف أول مهمة لليوم",
+  },
+  notifications: {
+    label: "التنبيهات",
+    settings: "إعداداتك",
+    personalReminders: "تذكيراتك الشخصية",
+  },
+  listener: {
+    label: "سماع نداء الاسم",
+    readyTitle: "ينبهك عندما يسمع اسمًا يهمك",
+    readyDescription: "اكتب اسمًا واحدًا أو عدة أسماء، ثم فعّل الاستماع عندما تحتاجه.",
+    idleStatus: "لا شيء مهم سُمع حتى الآن",
+    permissionNote: "الإذن بيدك دائمًا",
+    configure: "إعداد نداء الاسم",
+    tutorialTitle: "شاهد الشرح في 25 ثانية",
+    tutorialDescription: "كيف تضيف الاسم وتفعّل التنبيه",
+    heardDescription: "التقط NAVIXA الاسم الذي اخترته. افتح التفاصيل لمراجعة ما سُمع.",
+  },
+  screenWatch: {
+    label: "متابعة الشاشة",
+    title: "راقب شاشة كاملة أو جزءًا ترسمه بنفسك",
+    description: "شارك الشاشة، ارسم الإطار الذي يهمك، ودع NAVIXA ينبهك عند تغير المحتوى أو ظهور النص الذي تحدده.",
+    idleStatus: "جاهز للمشاركة",
+    privacyNote: "لا تُرفع صور الشاشة",
+    configure: "اختيار شاشة أو منطقة",
+    tutorialTitle: "شاهد الشرح في 25 ثانية",
+    tutorialDescription: "كيف تشارك الشاشة وتحدد المنطقة",
+  },
+  productivity: {
+    label: "إنتاجيتك",
+    focus: "جلسة التركيز",
+    ready: "جاهز عندما تبدأ",
+    startShortSession: "ابدأ جلسة تركيز قصيرة",
+  },
+  health: {
+    label: "صحتي",
+    care: "عنايتك",
+  },
+  water: {
+    label: "ماء اليوم",
+    goalReached: "أكملت هدف اليوم",
+    reminder: "سجل كوبًا عند كل استراحة",
+  },
+  worship: {
+    label: "عبادتي",
+    description: "مواقيت وذكر وقرآن",
+  },
+  prayer: {
+    nextPrayer: "الصلاة القادمة",
+    adhan: "الأذان",
+    remaining: "المتبقي",
+  },
+  assistant: {
+    label: "المساعد",
+    prompt: "لخّص لي نقاط الاجتماع واقترح الإجراءات التالية",
+  },
+  meetings: {
+    label: "لخّص اجتماعك",
+    title: "سجّل، فرّغ، وخذ أهم النقاط معك",
+    description: "ابدأ بموافقة واضحة، ثم راجع النص والمهام والقرارات قبل حفظها أو تصديرها.",
+    privacyNote: "لا يُرفع صوتك إلى NAVIXA",
+    open: "افتح التلخيص المحلي",
+    tutorialTitle: "شاهد الشرح في 25 ثانية",
+    tutorialDescription: "كيف تسجّل وتفرّغ وتصدّر",
+    personal: "محاضراتك واجتماعاتك",
   },
   plus: {
     eyebrow: "NAVIXA PLUS · قريبًا",
@@ -98,6 +111,25 @@ export const ar = {
     plansTitle: "اختر ما يناسبك لاحقًا",
     plansDescription: "هذه باقات تعريفية في النسخة التجريبية. لن يتم طلب دفع أو بطاقة الآن.",
   },
+  privacy: {
+    title: "خصوصيتك أولًا",
+    description: "لا يبدأ الميكروفون أو مشاركة الشاشة إلا بعد ضغطك وموافقتك. المعالجة الأساسية تتم محليًا في المتصفح.",
+    dataLink: "كيف تُحفظ بياناتي؟",
+    localAndPrivate: "محلي وخاص",
+    dataAndSync: "البيانات والمزامنة",
+  },
+  community: {
+    eyebrow: "NAVIXA COMMUNITY",
+    title: "تابع NAVIXA",
+    description: "سنعلن الحسابات الرسمية ووسائل الدعم هنا عند اكتمال الهوية الرسمية.",
+  },
+  general: {
+    noCharge: "لا يوجد تحصيل مالي في النسخة التجريبية",
+    personalStats: "إحصاءاتك من نشاطك المسجل فقط",
+    appearance: "المظهر",
+    colorsAndDarkMode: "ألوان ووضع ليلي",
+    matches: "مبارياتك",
+  },
   account: {
     eyebrow: "دخول آمن بلا كلمة مرور",
     titleFirst: "حسابك يثبت",
@@ -109,3 +141,5 @@ export const ar = {
     clearLogout: "تسجيل خروج واضح",
   },
 } as const;
+
+export type NavixaArabicCopy = typeof ar;
