@@ -28,7 +28,7 @@ test("static copy, CTA labels, dynamic messages, and catalog IDs remain separate
   assert.equal(en.smartListening.label, "Name listener");
   assert.equal(arCta.watchTutorial, "شاهد الشرح في 25 ثانية");
   assert.equal(enCta.watchTutorial, "Watch the 25-second guide");
-  assert.equal(arMessages.smartListening.detectedName("سلمان"), "تم سماع سلمان");
+  assert.equal(arMessages.smartListening.detectedName("سلمان"), "تم رصد سلمان");
   assert.equal(copyCatalog["plus.heroTitle"].category, "subscription");
   assert.equal(copyCatalog["smartListening.detectedName"].category, "dynamic");
 });
