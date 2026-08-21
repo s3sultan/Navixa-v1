@@ -4,6 +4,25 @@ export type TranscriptSegment = {
   text: string;
 };
 
+export type MeetingPartStatus = "pending" | "processing" | "complete" | "error";
+
+export type MeetingPart = {
+  id: string;
+  index: number;
+  startMs: number;
+  durationMs: number;
+  audio: Blob | null;
+  status: MeetingPartStatus;
+  transcript: string;
+  segments: TranscriptSegment[];
+  summary: string;
+  decisions: string[];
+  tasks: string[];
+  questions: string[];
+  model: "tiny" | "base" | null;
+  error?: string;
+};
+
 export type MeetingSession = {
   id: string;
   title: string;
@@ -17,6 +36,8 @@ export type MeetingSession = {
   tasks: string[];
   questions: string[];
   model: "tiny" | "base" | null;
+  parts?: MeetingPart[];
+  chunkMinutes?: number;
 };
 
 const DB_NAME = "navixa-local-meetings";

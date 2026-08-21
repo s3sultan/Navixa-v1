@@ -24,6 +24,8 @@ import { GET as getAdminReferrals } from "../app/api/admin/referrals/route.ts";
 import { GET as getAdminMeetingSettings, POST as saveAdminMeetingSettings } from "../app/api/admin/meeting-settings/route.ts";
 import { GET as getMeetingPolicy } from "../app/api/meetings/policy/route.ts";
 import { createCode } from "../app/referrals.ts";
+import { mergeMeetingParts, pendingMeetingParts } from "../app/meetings/meetingSummary.ts";
+import type { MeetingPart } from "../app/meetings/meetingStore.ts";
 
 const secret = "test-secret-with-at-least-thirty-two-characters";
 const appOrigin = "https://navixa.example";
@@ -243,6 +245,18 @@ test("local STT model relay is a strict public-file allowlist and never receives
   assert.match(workerSource, /url\.search\) return null/);
   assert.match(workerSource, /https:\/\/huggingface\.co\/\$\{source\.model\}\/resolve\/main\/\$\{source\.file\}/);
   assert.doesNotMatch(workerSource, /request\.text\(|request\.json\(|request\.arrayBuffer\(/);
+});
+
+test("local meeting parts merge with chronological timestamps and preserve pending work for resumption", () => {
+  const first: MeetingPart = { id:"p1",index:0,startMs:0,durationMs:1_800_000,audio:null,status:"complete",transcript:"تم الاتفاق على بداية المشروع. المهمة: أرسل الخطة اليوم.",segments:[{start:0,end:4,text:"تم الاتفاق على بداية المشروع."}],summary:"بداية المشروع.",decisions:["تم الاتفاق على بداية المشروع."],tasks:["أرسل الخطة اليوم."],questions:[],model:"tiny" };
+  const second: MeetingPart = { id:"p2",index:1,startMs:1_800_000,durationMs:1_800_000,audio:null,status:"complete",transcript:"قرر الفريق مراجعة النتيجة. يجب متابعة التنفيذ.",segments:[{start:5,end:9,text:"قرر الفريق مراجعة النتيجة."}],summary:"مراجعة النتيجة.",decisions:["قرر الفريق مراجعة النتيجة."],tasks:["متابعة التنفيذ."],questions:[],model:"tiny" };
+  const pending: MeetingPart = { id:"p3",index:2,startMs:3_600_000,durationMs:300_000,audio:null,status:"pending",transcript:"",segments:[],summary:"",decisions:[],tasks:[],questions:[],model:null };
+  const merged = mergeMeetingParts([first, second, pending]);
+  assert.match(merged.transcript, /بداية المشروع/);
+  assert.match(merged.transcript, /مراجعة النتيجة/);
+  assert.equal(merged.segments[1].start, 1805);
+  assert.deepEqual(merged.decisions, ["تم الاتفاق على بداية المشروع.", "قرر الفريق مراجعة النتيجة."]);
+  assert.equal(pendingMeetingParts([first, second, pending])[0].id, "p3");
 });
 
 test("Telegram API blocks cross-origin requests and temporarily limits a sixth request", async () => {

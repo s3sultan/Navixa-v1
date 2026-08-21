@@ -2,6 +2,7 @@
 
 type WorkerRequest = {
   type: "transcribe";
+  partId?: string;
   audio: Float32Array;
   model: "tiny" | "base";
   language: "auto" | "ar" | "en";
@@ -85,9 +86,9 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
       end: Number(chunk.timestamp?.[1] || chunk.timestamp?.[0] || 0),
       text: String(chunk.text || "").trim(),
     })).filter((chunk) => chunk.text);
-    send({ type: "complete", transcript: String(output.text || "").trim(), segments });
+    send({ type: "complete", partId: event.data.partId, transcript: String(output.text || "").trim(), segments });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";
-    send({ type: "error", message: "تعذر تشغيل التفريغ المحلي. تحقق من الاتصال لأول تنزيل للنموذج أو من ذاكرة الجهاز.", detail });
+    send({ type: "error", partId: event.data.partId, message: "تعذر تشغيل التفريغ المحلي. تحقق من الاتصال لأول تنزيل للنموذج أو من ذاكرة الجهاز.", detail });
   }
 });

@@ -2,18 +2,19 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { deleteMeetingSession, listMeetingSessions, saveMeetingSession, type MeetingSession, type TranscriptSegment } from "./meetingStore";
+import { deleteMeetingSession, listMeetingSessions, saveMeetingSession, type MeetingPart, type MeetingSession, type TranscriptSegment } from "./meetingStore";
+import { buildLocalSummary, mergeMeetingParts, pendingMeetingParts } from "./meetingSummary";
 import "./meetings.css";
 
 type StudioState = "ready" | "recording" | "processing" | "review";
 type ModelChoice = "tiny" | "base";
 type LanguageChoice = "auto" | "ar" | "en";
-type WorkerMessage = { type: string; message?: string; percentage?: number | null; transcript?: string; segments?: TranscriptSegment[] };
+type WorkerMessage = { type: string; partId?: string; message?: string; percentage?: number | null; transcript?: string; segments?: TranscriptSegment[] };
 
-const ARABIC_STOP_WORDS = new Set(["في","من","على","الى","إلى","عن","هذا","هذه","ذلك","التي","الذي","ثم","مع","كان","كانت","أن","إن","او","أو","لا","ما","فيه","لها","له","كما","بعد","قبل","عند","بين","كل","قد","تم","هو","هي","نحن","أنا","انت","أنت"]);
 const NAVIXA_URL = "https://navixa.s2shug.workers.dev";
 type MeetingPolicy={enabled:boolean;baseModelEnabled:boolean;autoLanguageEnabled:boolean;maxFileMb:number;exportPdfEnabled:boolean;exportWordEnabled:boolean;tutorialEnabled:boolean;usageNoticeEnabled:boolean};
 const DEFAULT_POLICY:MeetingPolicy={enabled:true,baseModelEnabled:true,autoLanguageEnabled:true,maxFileMb:250,exportPdfEnabled:true,exportWordEnabled:true,tutorialEnabled:true,usageNoticeEnabled:true};
+const CHUNK_OPTIONS = [15, 30, 45] as const;
 
 function newId() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `meeting-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -32,30 +33,29 @@ function formatMinute(seconds: number) {
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-function splitSentences(text: string) {
-  return text.replace(/\s+/g, " ").split(/(?<=[.!؟])\s+|\n+/).map((sentence) => sentence.trim()).filter((sentence) => sentence.length > 12);
+function createPart(index: number, startMs: number, durationMs: number, audio: Blob | null): MeetingPart {
+  return { id: newId(), index, startMs, durationMs, audio, status: "pending", transcript: "", segments: [], summary: "", decisions: [], tasks: [], questions: [], model: null };
 }
 
-function buildLocalSummary(transcript: string) {
-  const sentences = splitSentences(transcript);
-  const tokens = transcript.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || [];
-  const counts = new Map<string, number>();
-  for (const token of tokens) {
-    if (!ARABIC_STOP_WORDS.has(token)) counts.set(token, (counts.get(token) || 0) + 1);
-  }
-  const ranked = sentences.map((sentence, index) => {
-    const score = (sentence.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []).reduce((sum, token) => sum + (counts.get(token) || 0), 0);
-    return { sentence, index, score };
-  }).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 3).sort((a, b) => a.index - b.index);
-  const decisions = sentences.filter((sentence) => /قرر|اتفق|اعتمد|تمت الموافقة|سنبدأ|نؤجل|اختار/i.test(sentence)).slice(0, 5);
-  const tasks = sentences.filter((sentence) => /مهمة|إجراء|سوف|يجب|مطلوب|تابع|أرسل|جهز|راجع/i.test(sentence)).slice(0, 6);
-  const questions = sentences.filter((sentence) => /[؟?]|هل |كيف |متى |لماذا /i.test(sentence)).slice(0, 5);
-  return {
-    summary: ranked.length ? ranked.map((item) => item.sentence).join(" ") : "لا يوجد نص كافٍ لإنتاج خلاصة محلية.",
-    decisions,
-    tasks,
-    questions,
+function normalizeSession(session: MeetingSession): MeetingSession {
+  if (session.parts?.length) return { ...session, parts: session.parts };
+  if (!session.audio) return { ...session, parts: [] };
+  const legacyPart: MeetingPart = {
+    id: `legacy-${session.id}`,
+    index: 0,
+    startMs: 0,
+    durationMs: session.durationMs,
+    audio: session.audio,
+    status: session.transcript ? "complete" : "pending",
+    transcript: session.transcript,
+    segments: session.segments,
+    summary: session.summary,
+    decisions: session.decisions,
+    tasks: session.tasks,
+    questions: session.questions,
+    model: session.model,
   };
+  return { ...session, parts: [legacyPart] };
 }
 
 async function decodeAndResample(blob: Blob) {
@@ -84,7 +84,6 @@ async function decodeAndResample(blob: Blob) {
       }
       return output;
     })();
-    // تسوية خفيفة محلية تمنع التسجيل الهادئ جدًا من إرباك النموذج، من دون تغيير كلام المستخدم أو رفعه.
     let peak = 0;
     for (const sample of resampled) peak = Math.max(peak, Math.abs(sample));
     const gain = peak > 0.015 ? Math.min(3, 0.92 / peak) : 1;
@@ -103,6 +102,7 @@ export default function MeetingStudio() {
   const [notice, setNotice] = useState("لا يبدأ التسجيل أو تنزيل النموذج إلا بعد موافقتك.");
   const [model, setModel] = useState<ModelChoice>("tiny");
   const [language, setLanguage] = useState<LanguageChoice>("auto");
+  const [chunkMinutes, setChunkMinutes] = useState<number>(30);
   const [draft, setDraft] = useState<MeetingSession | null>(null);
   const [savedSessions, setSavedSessions] = useState<MeetingSession[]>([]);
   const [progress, setProgress] = useState<number | null>(null);
@@ -111,30 +111,71 @@ export default function MeetingStudio() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const startedAtRef = useRef(0);
+  const partStartedAtRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const flushRequestedRef = useRef(false);
   const workerRef = useRef<Worker | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const draftRef = useRef<MeetingSession | null>(null);
+  const currentModelRef = useRef<ModelChoice>(model);
 
   const refreshSessions = async () => {
-    try { setSavedSessions(await listMeetingSessions()); } catch { setNotice("تعذر قراءة الجلسات المحلية على هذا المتصفح."); }
+    try { setSavedSessions((await listMeetingSessions()).map(normalizeSession)); } catch { setNotice("تعذر قراءة الجلسات المحلية على هذا المتصفح."); }
   };
 
   useEffect(() => { void refreshSessions(); }, []);
   useEffect(()=>{let active=true;fetch("/api/meetings/policy",{cache:"no-store"}).then(response=>response.ok?response.json():DEFAULT_POLICY).then((next:MeetingPolicy)=>{if(active)setPolicy({...DEFAULT_POLICY,...next})}).catch(()=>{});return()=>{active=false}},[]);
   useEffect(()=>{if(!policy.baseModelEnabled&&model==="base")setModel("tiny");if(!policy.autoLanguageEnabled&&language==="auto")setLanguage("ar")},[policy,model,language]);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { currentModelRef.current = model; }, [model]);
   useEffect(() => () => {
     if (timerRef.current) window.clearInterval(timerRef.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
     workerRef.current?.terminate();
   }, []);
+  useEffect(() => {
+    const flushBeforeBackground = () => {
+      const recorder = recorderRef.current;
+      if (document.visibilityState === "hidden" && recorder?.state === "recording") { flushRequestedRef.current = true; recorder.requestData(); }
+    };
+    document.addEventListener("visibilitychange", flushBeforeBackground);
+    return () => document.removeEventListener("visibilitychange", flushBeforeBackground);
+  }, []);
+
+  const persist = (session: MeetingSession, message?: string) => {
+    const normalized = normalizeSession(session);
+    draftRef.current = normalized;
+    setDraft(normalized);
+    void saveMeetingSession(normalized).then(() => void refreshSessions()).catch(() => setNotice("تعذر حفظ آخر جزء محليًا. تحقق من مساحة تخزين المتصفح قبل المتابعة."));
+    if (message) setNotice(message);
+  };
+
+  const createSession = (nextTitle: string, nextChunkMinutes: number): MeetingSession => ({
+    id: newId(), title: nextTitle.trim() || "جلسة بلا عنوان", createdAt: new Date().toISOString(), durationMs: 0,
+    audio: null, transcript: "", segments: [], summary: "", decisions: [], tasks: [], questions: [], model: null,
+    parts: [], chunkMinutes: nextChunkMinutes,
+  });
+
+  const appendRecordedPart = (final = false) => {
+    const items = chunksRef.current;
+    const current = draftRef.current;
+    if (!items.length || !current) return;
+    chunksRef.current = [];
+    const durationMs = Math.max(1000, Date.now() - partStartedAtRef.current);
+    const audio = new Blob(items, { type: recorderRef.current?.mimeType || "audio/webm" });
+    const normalized = normalizeSession(current);
+    const part = createPart(normalized.parts?.length || 0, Math.max(0, partStartedAtRef.current - startedAtRef.current), durationMs, audio);
+    const next: MeetingSession = { ...normalized, title: title.trim() || normalized.title, durationMs: Math.max(Date.now() - startedAtRef.current, normalized.durationMs), parts: [...(normalized.parts || []), part], chunkMinutes };
+    partStartedAtRef.current = Date.now();
+    persist(next, final ? "اكتمل الحفظ المحلي. يمكنك الآن تفريغ الأجزاء بالتتابع أو العودة لاحقًا." : `حُفظ الجزء ${part.index + 1} محليًا، والتسجيل مستمر.`);
+  };
 
   const finishCapture = (audio: Blob, durationMs: number) => {
-    const next: MeetingSession = {
-      id: draft?.id || newId(), title: title.trim() || "جلسة بلا عنوان", createdAt: new Date().toISOString(), durationMs,
-      audio, transcript: "", segments: [], summary: "", decisions: [], tasks: [], questions: [], model: null,
-    };
-    setDraft(next); setElapsed(durationMs); setState("review"); setNotice("تم حفظ التسجيل داخل هذه الجلسة محليًا. اختر «تفريغ محلي» عندما تكون جاهزًا.");
+    const session = createSession(title, chunkMinutes);
+    const part = createPart(0, 0, durationMs, audio);
+    persist({ ...session, durationMs, parts: [part] }, "تمت إضافة الجلسة محليًا. يمكنك تفريغها الآن أو العودة إليها لاحقًا.");
+    setElapsed(durationMs); setState("review");
   };
 
   const startRecording = async () => {
@@ -145,16 +186,25 @@ export default function MeetingStudio() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       const mimeType = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((candidate) => MediaRecorder.isTypeSupported(candidate));
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const session = createSession(title, chunkMinutes);
       chunksRef.current = [];
-      recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
+      flushRequestedRef.current = false;
+      persist(session);
+      recorder.ondataavailable = (event) => {
+        if (!event.data.size) return;
+        chunksRef.current.push(event.data);
+        if (flushRequestedRef.current || Date.now() - partStartedAtRef.current >= chunkMinutes * 60 * 1000) { flushRequestedRef.current = false; appendRecordedPart(false); }
+      };
       recorder.onstop = () => {
-        const type = recorder.mimeType || "audio/webm";
-        finishCapture(new Blob(chunksRef.current, { type }), Date.now() - startedAtRef.current);
+        appendRecordedPart(true);
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null; recorderRef.current = null;
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        timerRef.current = null;
+        setState("review");
       };
-      recorder.start(1000); recorderRef.current = recorder; streamRef.current = stream; startedAtRef.current = Date.now();
-      setElapsed(0); setDraft(null); setState("recording"); setNotice("يتم التسجيل على جهازك فقط. أوقفه في أي وقت.");
+      recorder.start(10_000); recorderRef.current = recorder; streamRef.current = stream; startedAtRef.current = Date.now(); partStartedAtRef.current = startedAtRef.current;
+      setElapsed(0); setState("recording"); setNotice(`يُحفظ جزء مستقل كل ${chunkMinutes} دقيقة على جهازك.`);
       timerRef.current = window.setInterval(() => setElapsed(Date.now() - startedAtRef.current), 250);
     } catch (error) {
       setNotice(error instanceof DOMException && error.name === "NotAllowedError" ? "لم تُمنح صلاحية الميكروفون. غيّرها من إعدادات المتصفح ثم حاول مجددًا." : "تعذر بدء التسجيل. تحقق من الميكروفون ثم حاول مجددًا.");
@@ -164,8 +214,8 @@ export default function MeetingStudio() {
   const stopRecording = () => {
     if (timerRef.current) window.clearInterval(timerRef.current);
     timerRef.current = null;
+    setState("processing"); setNotice("جارٍ حفظ الجزء الأخير محليًا…");
     recorderRef.current?.stop();
-    setState("processing"); setNotice("جارٍ إنهاء ملف التسجيل محليًا…");
   };
 
   const importAudio = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -174,7 +224,7 @@ export default function MeetingStudio() {
     if (policy.usageNoticeEnabled&&!consent) { setNotice("أكد الموافقة قبل استيراد ملف صوت خاص."); return; }
     if (!file.type.startsWith("audio/")) { setNotice("اختر ملفًا صوتيًا صالحًا فقط."); return; }
     if (file.size > policy.maxFileMb * 1024 * 1024) { setNotice(`حجم الملف أكبر من الحد المحلي الحالي (${policy.maxFileMb}MB). قسّمه إلى جلسات أقصر.`); return; }
-    finishCapture(file, 0); setNotice("تمت إضافة الملف محليًا. لن يُرفع إلى NAVIXA.");
+    finishCapture(file, 0);
   };
 
   const ensureWorker = () => {
@@ -184,41 +234,72 @@ export default function MeetingStudio() {
       const data = event.data;
       if (data.type === "progress") { setProgress(typeof data.percentage === "number" ? data.percentage : null); return; }
       if (data.type === "state") { setNotice(data.message || "جارٍ التحضير…"); return; }
-      if (data.type === "error") { setState("review"); setProgress(null); setNotice(data.message || "تعذر التفريغ المحلي."); return; }
+      const current = draftRef.current;
+      if (!current || !data.partId) return;
+      const normalized = normalizeSession(current);
+      if (data.type === "error") {
+        const next = { ...normalized, parts: (normalized.parts || []).map((part) => part.id === data.partId ? { ...part, status: "error" as const, error: data.message || "تعذر التفريغ" } : part) };
+        persist(next, data.message || "تعذر تفريغ هذا الجزء. يمكنك استئنافه لاحقًا.");
+        setProgress(null); setState("review"); return;
+      }
       if (data.type === "complete") {
-        const transcript = data.transcript || "";
-        const local = buildLocalSummary(transcript);
-        setDraft((current) => current ? { ...current, transcript, segments: data.segments || [], summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions, model } : current);
-        setProgress(null); setState("review"); setNotice("اكتمل التفريغ محليًا. راجع النص والملخص قبل الحفظ.");
+        const local = buildLocalSummary(data.transcript || "");
+        const nextWithPart = { ...normalized, parts: (normalized.parts || []).map((part) => part.id === data.partId ? { ...part, status: "complete" as const, transcript: data.transcript || "", segments: data.segments || [], summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions, model: currentModelRef.current, error: undefined } : part) };
+        const merged = mergeMeetingParts(nextWithPart.parts || []);
+        const next = { ...nextWithPart, ...merged, model: currentModelRef.current };
+        const remaining = pendingMeetingParts(next.parts || []);
+        persist(next, remaining.length ? `اكتمل جزء. سيبدأ تفريغ الجزء التالي تلقائيًا (${remaining.length} متبقٍ).` : "اكتمل تفريغ جميع الأجزاء ودمجها محليًا.");
+        setProgress(null);
+        if (remaining.length) window.setTimeout(() => void transcribePart(next, remaining[0].id), 80);
+        else setState("review");
       }
     };
     workerRef.current = worker; return worker;
   };
 
+  const transcribePart = async (session: MeetingSession, partId: string) => {
+    const normalized = normalizeSession(session);
+    const part = (normalized.parts || []).find((item) => item.id === partId);
+    if (!part?.audio) { setState("review"); setNotice("لا يوجد ملف صوت محفوظ لهذا الجزء."); return; }
+    try {
+      const preparing = { ...normalized, parts: (normalized.parts || []).map((item) => item.id === partId ? { ...item, status: "processing" as const, error: undefined } : item) };
+      persist(preparing, `جارٍ تجهيز الجزء ${part.index + 1} للتفريغ المحلي…`);
+      setState("processing"); setProgress(0);
+      const audio = await decodeAndResample(part.audio);
+      const worker = ensureWorker();
+      worker.postMessage({ type: "transcribe", partId, audio, model, language }, [audio.buffer]);
+    } catch {
+      const failed = { ...normalized, parts: (normalized.parts || []).map((item) => item.id === partId ? { ...item, status: "error" as const, error: "تعذر تجهيز الجزء" } : item) };
+      persist(failed, "تعذر تجهيز هذا الجزء محليًا. جرّبه مجددًا أو استخدم مدة جزء أقصر.");
+      setState("review"); setProgress(null);
+    }
+  };
+
   const transcribe = async () => {
     if (!policy.enabled) { setNotice("ميزة التلخيص متوقفة مؤقتًا من إعدادات NAVIXA."); return; }
-    if (!draft?.audio) { setNotice("أضف تسجيلًا أو ملفًا صوتيًا أولًا."); return; }
-    try {
-      setState("processing"); setProgress(0); setNotice("جارٍ تجهيز الصوت للتفريغ المحلي…");
-      const audio = await decodeAndResample(draft.audio);
-      const worker = ensureWorker();
-      worker.postMessage({ type: "transcribe", audio, model, language }, [audio.buffer]);
-    } catch { setState("review"); setProgress(null); setNotice("تعذر تجهيز الملف محليًا. جرّب ملفًا أقصر أو صيغة صوت أخرى."); }
+    if (!draft) { setNotice("أضف تسجيلًا أو ملفًا صوتيًا أولًا."); return; }
+    const session = normalizeSession(draft);
+    const nextPart = pendingMeetingParts(session.parts || [])[0];
+    if (!nextPart) { setNotice("تم تفريغ جميع الأجزاء المحفوظة بالفعل."); return; }
+    await transcribePart(session, nextPart.id);
   };
 
   const saveDraft = async () => {
     if (!draft) return;
     setSaving(true);
-    try { await saveMeetingSession({ ...draft, title: title.trim() || draft.title }); setDraft((current) => current ? { ...current, title: title.trim() || current.title } : current); await refreshSessions(); setNotice("حُفظت الجلسة داخل هذا الجهاز فقط."); }
-    catch { setNotice("تعذر حفظ الجلسة محليًا. تأكد من مساحة التخزين في المتصفح."); }
+    try {
+      const next = { ...normalizeSession(draft), title: title.trim() || draft.title, chunkMinutes };
+      persist(next); await refreshSessions(); setNotice("حُفظت الجلسة وأجزاؤها داخل هذا الجهاز فقط.");
+    } catch { setNotice("تعذر حفظ الجلسة محليًا. تأكد من مساحة التخزين في المتصفح."); }
     finally { setSaving(false); }
   };
 
-  const eraseDraft = () => { setDraft(null); setElapsed(0); setState("ready"); setProgress(null); setNotice("تم حذف الجلسة الحالية من الذاكرة."); };
-  const removeSaved = async (id: string) => { await deleteMeetingSession(id); await refreshSessions(); setNotice("تم حذف الجلسة من هذا الجهاز."); };
+  const eraseDraft = () => { setDraft(null); draftRef.current = null; setElapsed(0); setState("ready"); setProgress(null); setNotice("أُغلقت الجلسة الحالية. تبقى أي أجزاء محفوظة في مكتبتك المحلية."); };
+  const removeSaved = async (id: string) => { await deleteMeetingSession(id); await refreshSessions(); if (draft?.id === id) eraseDraft(); setNotice("تم حذف الجلسة وأجزائها من هذا الجهاز."); };
   const exportText = () => {
     if (!draft) return;
-    const content = ["NAVIXA — سجّل ولخّص", NAVIXA_URL, "", `# ${draft.title}`, `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")}`, "", "## الخلاصة", draft.summary || "لا يوجد ملخص بعد.", "", "## القرارات", ...(draft.decisions.length ? draft.decisions.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## المهام", ...(draft.tasks.length ? draft.tasks.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## النص الزمني", ...(draft.segments.length ? draft.segments.map((segment) => `[${formatMinute(segment.start)}] ${segment.text}`) : [draft.transcript || "لا يوجد نص بعد."]), "", `أُنشئ محليًا عبر NAVIXA · ${NAVIXA_URL}`].join("\n");
+    const parts = normalizeSession(draft).parts || [];
+    const content = ["NAVIXA — سجّل ولخّص", NAVIXA_URL, "", `# ${draft.title}`, `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")}`, "", "## أجزاء الجلسة", ...(parts.length ? parts.map((part) => `- الجزء ${part.index + 1}: ${formatDuration(part.startMs)} — ${formatDuration(part.startMs + part.durationMs)} · ${part.status === "complete" ? "مفرّغ" : "بانتظار التفريغ"}`) : ["- لا توجد أجزاء محفوظة"]), "", "## الخلاصة", draft.summary || "لا يوجد ملخص بعد.", "", "## القرارات", ...(draft.decisions.length ? draft.decisions.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## المهام", ...(draft.tasks.length ? draft.tasks.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## النص الزمني", ...(draft.segments.length ? draft.segments.map((segment) => `[${formatMinute(segment.start)}] ${segment.text}`) : [draft.transcript || "لا يوجد نص بعد."]), "", `أُنشئ محليًا عبر NAVIXA · ${NAVIXA_URL}`].join("\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `navixa-summary-${draft.id.slice(0, 8)}.md`; link.click(); URL.revokeObjectURL(url);
     setNotice("تم تصدير النص والملخص إلى ملف محلي.");
@@ -240,11 +321,13 @@ export default function MeetingStudio() {
       const logo = new ImageRun({ data: await logoResponse.arrayBuffer(), transformation: { width: 38, height: 38 }, type: "png" });
       const heading = (text: string) => new Paragraph({ text, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.RIGHT });
       const bulletLines = (items: string[], fallback: string) => (items.length ? items : [fallback]).map((text) => new Paragraph({ text: `• ${text}`, alignment: AlignmentType.RIGHT }));
+      const parts = normalizeSession(draft).parts || [];
       const doc = new Document({ sections: [{ children: [
         new Paragraph({ children: [logo, new TextRun({ text: "  NAVIXA — سجّل ولخّص", bold: true, size: 30 })], alignment: AlignmentType.RIGHT }),
         new Paragraph({ children: [new TextRun({ text: NAVIXA_URL, color: "178F90", underline: {} })], alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: draft.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")} · أُنشئ محليًا على جهازك`, alignment: AlignmentType.RIGHT }),
+        heading("أجزاء الجلسة"), ...parts.map((part) => new Paragraph({ text: `الجزء ${part.index + 1}: ${formatDuration(part.startMs)} — ${formatDuration(part.startMs + part.durationMs)} · ${part.status === "complete" ? "مفرّغ" : "بانتظار التفريغ"}`, alignment: AlignmentType.RIGHT })),
         heading("الخلاصة"), new Paragraph({ text: draft.summary || "لا يوجد ملخص بعد.", alignment: AlignmentType.RIGHT }),
         heading("القرارات"), ...bulletLines(draft.decisions, "لا يوجد"),
         heading("المهام"), ...bulletLines(draft.tasks, "لا يوجد"),
@@ -257,6 +340,9 @@ export default function MeetingStudio() {
     } catch { setNotice("تعذر إنشاء Word محليًا. تأكد من مساحة الجهاز ثم حاول مجددًا."); }
   };
 
+  const parts = draft ? normalizeSession(draft).parts || [] : [];
+  const completedParts = parts.filter((part) => part.status === "complete").length;
+
   return <main className="meeting-page" dir="rtl">
     <header className="meeting-topbar">
       <Link className="meeting-back" href="/">← العودة للرئيسية</Link>
@@ -265,8 +351,8 @@ export default function MeetingStudio() {
     </header>
 
     <section className="meeting-hero">
-      <div><small>محاضرات واجتماعات</small><h2>من أول دقيقة إلى آخر دقيقة، <em>على جهازك</em></h2><p>{policy.enabled?"سجّل بإذن واضح، ثم حوّل الصوت إلى نص وملخص قابل للمراجعة. لا يُرفع ملفك الصوتي إلى NAVIXA.":"الميزة متوقفة مؤقتًا من إعدادات NAVIXA. تبقى جلساتك المحفوظة محليًا على جهازك."}</p></div>
-      <div className="meeting-hero-stats"><span>⌁ التسجيل بإذنك</span><span>◌ لا رفع افتراضي</span><span>↯ تحميل عند الطلب</span></div>
+      <div><small>محاضرات واجتماعات</small><h2>من أول دقيقة إلى آخر دقيقة، <em>على جهازك</em></h2><p>{policy.enabled?"يسجّل NAVIXA أجزاء محلية متتابعة، ويفرّغها ويلخّصها ثم يجمعها في نتيجة واحدة قابلة للمراجعة. لا يُرفع ملفك الصوتي إلى NAVIXA.":"الميزة متوقفة مؤقتًا من إعدادات NAVIXA. تبقى جلساتك المحفوظة محليًا على جهازك."}</p></div>
+      <div className="meeting-hero-stats"><span>⌁ التسجيل بإذنك</span><span>◌ لا رفع افتراضي</span><span>↯ استئناف محلي</span></div>
     </section>
 
     <section className="meeting-studio" aria-label="استوديو التلخيص المحلي">
@@ -276,16 +362,17 @@ export default function MeetingStudio() {
           <div className="meeting-record-circle" aria-hidden="true">●</div>
           <p>لن نطلب إذن الميكروفون أو ننزّل أي نموذج قبل أن تبدأ أنت.</p>
           {policy.usageNoticeEnabled&&<label className="meeting-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>أؤكد أن لدي حق التسجيل، وأنني سأحصل على موافقة الحاضرين عند الحاجة.</span></label>}
+          <label className="meeting-chunk-control">احفظ جزءًا تلقائيًا كل <select value={chunkMinutes} onChange={(event) => setChunkMinutes(Number(event.target.value))}>{CHUNK_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} دقيقة</option>)}</select></label>
           <div className="meeting-start-actions"><button type="button" className="meeting-primary" disabled={!policy.enabled} onClick={startRecording}>● ابدأ التسجيل</button><button type="button" className="meeting-secondary" disabled={!policy.enabled} onClick={() => audioInputRef.current?.click()}>↑ استورد ملفًا صوتيًا</button><input ref={audioInputRef} type="file" accept="audio/*" hidden onChange={importAudio} /></div>
         </div>}
-        {state === "recording" && <div className="meeting-recording-area"><div className="meeting-wave" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 17) % 54)}px` }} />)}</div><p>التسجيل ظاهر ومحلي. يمكنك الإيقاف في أي وقت.</p><button type="button" className="meeting-stop" onClick={stopRecording}>■ أوقف التسجيل</button></div>}
+        {state === "recording" && <div className="meeting-recording-area"><div className="meeting-wave" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 17) % 54)}px` }} />)}</div><p>يحفظ NAVIXA جزءًا محليًا كل {chunkMinutes} دقيقة. إذا أغلقت الصفحة، تبقى الأجزاء المحفوظة ويمكن استئناف التفريغ عند العودة.</p><button type="button" className="meeting-stop" onClick={stopRecording}>■ أوقف التسجيل</button></div>}
         {state === "processing" && <div className="meeting-processing"><div className="meeting-spinner" aria-hidden="true" /><p>{notice}</p>{progress !== null && <div className="meeting-progress"><i style={{ width: `${Math.max(3, progress)}%` }} /><span>{progress}%</span></div>}</div>}
-        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"}</small></div>          <div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={transcribe} disabled={state === "processing"||!policy.enabled}>⌁ تفريغ محلي</button><button type="button" className="meeting-secondary" onClick={saveDraft} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>حذف الجلسة</button></div></div>}
-
+        {draft && state === "review" && <div className="meeting-review-actions"><div><label>عنوان الجلسة<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label><small>المدة: {draft.durationMs ? formatDuration(draft.durationMs) : "ملف مستورد"} · {completedParts}/{parts.length} أجزاء مفرّغة</small></div><div className="meeting-review-buttons"><button type="button" className="meeting-primary" onClick={() => void transcribe()} disabled={state === "processing"||!policy.enabled||!parts.length}>⌁ {completedParts === parts.length && parts.length ? "تم التفريغ" : "تفريغ الأجزاء المحفوظة"}</button><button type="button" className="meeting-secondary" onClick={() => void saveDraft()} disabled={saving}>{saving ? "جارٍ الحفظ" : "حفظ على جهازي"}</button><button type="button" className="meeting-text-button" onClick={eraseDraft}>إغلاق الجلسة</button></div></div>}
+        {parts.length > 0 && <div className="meeting-part-list" aria-label="أجزاء الجلسة">{parts.map((part) => <div key={part.id} className={`meeting-part ${part.status}`}><b>الجزء {part.index + 1}</b><span>{formatDuration(part.startMs)} — {formatDuration(part.startMs + part.durationMs)}</span><em>{part.status === "complete" ? "مفرّغ" : part.status === "processing" ? "جارٍ التفريغ" : part.status === "error" ? "أعد المحاولة" : "محفوظ"}</em></div>)}</div>}
         <p className="meeting-notice" role="status">{notice}</p>
       </div>
 
-      <aside className="meeting-model-panel"><small>محرك محلي</small><h3>اختر الدقة واللغة قبل التنزيل</h3><p>يُنزل النموذج مرة واحدة إلى ذاكرة المتصفح عند أول تفريغ. بعد ذلك يعمل التفريغ محليًا من ذاكرة التخزين المتاحة.</p><label className={model === "tiny" ? "selected" : ""}><input type="radio" name="model" checked={model === "tiny"} onChange={() => setModel("tiny")} /><b>خفيف</b><span>تجربة أسرع، أدقّته أقل</span></label>{policy.baseModelEnabled&&<label className={model === "base" ? "selected" : ""}><input type="radio" name="model" checked={model === "base"} onChange={() => setModel("base")} /><b>متوازن</b><span>أبطأ وأكبر، مناسب للنص الأفضل</span></label>}<div className="meeting-language"><b>لغة الجلسة</b><div>{policy.autoLanguageEnabled&&<label className={language === "auto" ? "selected" : ""}><input type="radio" name="language" value="auto" checked={language === "auto"} onChange={() => setLanguage("auto")} />تلقائي عربي/English</label>}<label className={language === "ar" ? "selected" : ""}><input type="radio" name="language" value="ar" checked={language === "ar"} onChange={() => setLanguage("ar")} />العربية</label><label className={language === "en" ? "selected" : ""}><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label></div></div><div className="meeting-model-note">اختر «تلقائي» عند خلط العربية والإنجليزية. لا تفتح الصفحة النموذج، ولا تحمل أي مكتبة تفريغ، قبل الضغط على «تفريغ محلي».</div></aside>
+      <aside className="meeting-model-panel"><small>محرك محلي</small><h3>اختر الدقة واللغة قبل التنزيل</h3><p>يُنزل النموذج مرة واحدة إلى ذاكرة المتصفح عند أول تفريغ. بعد ذلك يعمل التفريغ محليًا من ذاكرة التخزين المتاحة.</p><label className={model === "tiny" ? "selected" : ""}><input type="radio" name="model" checked={model === "tiny"} onChange={() => setModel("tiny")} /><b>خفيف</b><span>تجربة أسرع، أدقّته أقل</span></label>{policy.baseModelEnabled&&<label className={model === "base" ? "selected" : ""}><input type="radio" name="model" checked={model === "base"} onChange={() => setModel("base")} /><b>متوازن</b><span>أبطأ وأكبر، مناسب للنص الأفضل</span></label>}<div className="meeting-language"><b>لغة الجلسة</b><div>{policy.autoLanguageEnabled&&<label className={language === "auto" ? "selected" : ""}><input type="radio" name="language" value="auto" checked={language === "auto"} onChange={() => setLanguage("auto")} />تلقائي عربي/English</label>}<label className={language === "ar" ? "selected" : ""}><input type="radio" name="language" value="ar" checked={language === "ar"} onChange={() => setLanguage("ar")} />العربية</label><label className={language === "en" ? "selected" : ""}><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label></div></div><div className="meeting-model-note">عند الاجتماعات الطويلة، يحلل NAVIXA جزءًا واحدًا فقط في كل مرة ثم ينتقل تلقائيًا للجزء التالي. إغلاق الصفحة يوقف التفريغ فقط، ولا يحذف الأجزاء المحفوظة.</div></aside>
     </section>
 
     {draft && state === "review" && <section className="meeting-output">
@@ -297,6 +384,6 @@ export default function MeetingStudio() {
       </div>
     </section>}
 
-    <section className="meeting-library"><div><small>على هذا الجهاز فقط</small><h2>جلساتك المحفوظة</h2></div>{savedSessions.length ? <div className="meeting-library-list">{savedSessions.slice(0, 8).map((session) => <article key={session.id}><div><b>{session.title}</b><small>{new Date(session.createdAt).toLocaleDateString("ar-SA")} · {session.transcript ? "نص محفوظ" : "تسجيل محفوظ"}</small></div><div><button type="button" onClick={() => { setDraft(session); setTitle(session.title); setElapsed(session.durationMs); setState("review"); setNotice("فُتحت الجلسة من تخزين هذا الجهاز."); }}>فتح</button><button type="button" className="danger" onClick={() => void removeSaved(session.id)}>حذف</button></div></article>)}</div> : <p className="meeting-library-empty">لا توجد جلسات محفوظة. ستبقى الجلسات التي تحفظها داخل متصفحك على هذا الجهاز.</p>}</section>
+    <section className="meeting-library"><div><small>على هذا الجهاز فقط</small><h2>جلساتك المحفوظة</h2></div>{savedSessions.length ? <div className="meeting-library-list">{savedSessions.slice(0, 8).map((session) => <article key={session.id}><div><b>{session.title}</b><small>{new Date(session.createdAt).toLocaleDateString("ar-SA")} · {(session.parts || []).filter((part) => part.status === "complete").length}/{(session.parts || []).length} أجزاء مفرّغة</small></div><div><button type="button" onClick={() => { const normalized = normalizeSession(session); setDraft(normalized); draftRef.current = normalized; setTitle(normalized.title); setElapsed(normalized.durationMs); setChunkMinutes(normalized.chunkMinutes || 30); setState("review"); setNotice("فُتحت الجلسة من تخزين هذا الجهاز. يمكنك استئناف الأجزاء المتبقية."); }}>فتح</button><button type="button" className="danger" onClick={() => void removeSaved(session.id)}>حذف</button></div></article>)}</div> : <p className="meeting-library-empty">لا توجد جلسات محفوظة. ستبقى الأجزاء التي تحفظها داخل متصفحك على هذا الجهاز.</p>}</section>
   </main>;
 }
