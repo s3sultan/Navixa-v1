@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "NAVIXA | ذكاء يفهم يومك",
-    short_name: "NAVIXA",
-    description: "مساعد ذكي لحياة أكثر ترتيبًا.",
+    name: "NAVIXA SA | ذكاء يفهم يومك",
+    short_name: "NAVIXA SA",
+    description: "NAVIXA SA مساعد ذكي لحياة أكثر ترتيبًا.",
     start_url: "/",
     display: "standalone",
     background_color: "#f7fbfc",
@@ -12,7 +12,7 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "ar",
     dir: "rtl",
     icons: [
-      { src: "/navixa-mark.png", sizes: "384x347", type: "image/png", purpose: "any maskable" },
+      { src: "/navixa-sa-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
     ],
   };
 }

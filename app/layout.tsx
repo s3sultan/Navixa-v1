@@ -1,39 +1,40 @@
 import type { Metadata } from "next";
 import PerformanceReporter from "./PerformanceReporter";
+import NavixaSplash from "./NavixaSplash";
 import "./globals.css";
 
-const siteUrl = "https://navixa.s2shug.workers.dev";
+const siteUrl = "https://navixasa.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "NAVIXA — يفهم يومك",
-    template: "%s — NAVIXA",
+    default: "NAVIXA SA — يفهم يومك",
+    template: "%s — NAVIXA SA",
   },
-  description: "NAVIXA مساعد ذكي يرتب يومك، يساعدك على التركيز والصحة والمهام والأتمتة مع خصوصية محلية.",
-  applicationName: "NAVIXA",
-  keywords: ["NAVIXA", "مساعد ذكي", "تنظيم المهام", "التركيز", "الصحة", "الأتمتة", "مساعد عربي"],
-  authors: [{ name: "NAVIXA" }],
-  creator: "NAVIXA",
-  publisher: "NAVIXA",
+  description: "NAVIXA SA مساعد ذكي يرتب يومك، يساعدك على التركيز والصحة والمهام والأتمتة مع خصوصية محلية.",
+  applicationName: "NAVIXA SA",
+  keywords: ["NAVIXA SA", "NAVIXA", "مساعد ذكي", "تنظيم المهام", "التركيز", "الصحة", "الأتمتة", "مساعد عربي"],
+  authors: [{ name: "NAVIXA SA" }],
+  creator: "NAVIXA SA",
+  publisher: "NAVIXA SA",
   category: "productivity",
   alternates: { canonical: "/" },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
-  icons: { icon: "/navixa-mark.png", apple: "/navixa-mark.png" },
+  icons: { icon: "/navixa-sa-icon.svg", apple: "/navixa-sa-icon.svg", shortcut: "/navixa-sa-icon.svg" },
   openGraph: {
     type: "website",
     locale: "ar_SA",
     url: siteUrl,
-    siteName: "NAVIXA",
-    title: "NAVIXA — يفهم يومك",
+    siteName: "NAVIXA SA",
+    title: "NAVIXA SA — يفهم يومك",
     description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.",
-    images: [{ url: "/navixa-logo-clean.png", width: 720, height: 613, alt: "NAVIXA — يفهم يومك" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "NAVIXA SA — مساعدك الذكي، حاضر في التفاصيل التي تهمك" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "NAVIXA — يفهم يومك",
+    title: "NAVIXA SA — يفهم يومك",
     description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.",
-    images: ["/navixa-logo-clean.png"],
+    images: ["/opengraph-image"],
   },
 };
 
@@ -42,16 +43,16 @@ const appearanceBootstrap=`(()=>{try{const mode=localStorage.getItem("navixa-app
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "NAVIXA",
-  url: siteUrl,
-  description: "مساعد ذكي يرتب يومك ويساعدك على التركيز والصحة والمهام والأتمتة.",
+name: "NAVIXA SA",
+    url: siteUrl,
+    description: "مساعد ذكي يرتب يومك ويساعدك على التركيز والصحة والمهام والأتمتة.",
   applicationCategory: "ProductivityApplication",
   operatingSystem: "Web",
   inLanguage: "ar",
-  image: `${siteUrl}/navixa-logo-clean.png`,
+  image: `${siteUrl}/opengraph-image`,
   offers: { "@type": "Offer", price: "0", priceCurrency: "SAR" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><PerformanceReporter />{children}</body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }} /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><NavixaSplash /><PerformanceReporter />{children}</body></html>;
 }

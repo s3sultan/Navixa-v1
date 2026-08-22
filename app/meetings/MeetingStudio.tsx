@@ -12,7 +12,7 @@ type ModelChoice = "tiny" | "base";
 type LanguageChoice = "auto" | "ar" | "en";
 type WorkerMessage = { type: string; partId?: string; message?: string; percentage?: number | null; transcript?: string; segments?: TranscriptSegment[] };
 
-const NAVIXA_URL = "https://navixa.s2shug.workers.dev";
+const NAVIXA_URL = "https://navixasa.com";
 type MeetingPolicy={enabled:boolean;baseModelEnabled:boolean;autoLanguageEnabled:boolean;globalLearningEnabled:boolean;maxFileMb:number;exportPdfEnabled:boolean;exportWordEnabled:boolean;tutorialEnabled:boolean;usageNoticeEnabled:boolean};
 const DEFAULT_POLICY:MeetingPolicy={enabled:true,baseModelEnabled:true,autoLanguageEnabled:true,globalLearningEnabled:true,maxFileMb:250,exportPdfEnabled:true,exportWordEnabled:true,tutorialEnabled:true,usageNoticeEnabled:true};
 const CHUNK_OPTIONS = [15, 30, 45] as const;
@@ -354,7 +354,7 @@ export default function MeetingStudio() {
   const exportText = () => {
     if (!draft) return;
     const parts = normalizeSession(draft).parts || [];
-    const content = ["NAVIXA — سجّل ولخّص", NAVIXA_URL, "", `# ${draft.title}`, `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")}`, "", "## أجزاء الجلسة", ...(parts.length ? parts.map((part) => `- الجزء ${part.index + 1}: ${formatDuration(part.startMs)} — ${formatDuration(part.startMs + part.durationMs)} · ${part.status === "complete" ? "مفرّغ" : "بانتظار التفريغ"}`) : ["- لا توجد أجزاء محفوظة"]), "", "## الخلاصة", draft.summary || "لا يوجد ملخص بعد.", "", "## القرارات", ...(draft.decisions.length ? draft.decisions.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## المهام", ...(draft.tasks.length ? draft.tasks.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## النص الزمني", ...(draft.segments.length ? draft.segments.map((segment) => `[${formatMinute(segment.start)}] ${segment.text}`) : [draft.transcript || "لا يوجد نص بعد."]), "", `أُنشئ محليًا عبر NAVIXA · ${NAVIXA_URL}`].join("\n");
+    const content = ["NAVIXA SA — لخّص اجتماعك", NAVIXA_URL, "ختم NAVIXA SA · ملخص محلي قابل للمراجعة", "", `# ${draft.title}`, `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")}`, "", "## أجزاء الجلسة", ...(parts.length ? parts.map((part) => `- الجزء ${part.index + 1}: ${formatDuration(part.startMs)} — ${formatDuration(part.startMs + part.durationMs)} · ${part.status === "complete" ? "مفرّغ" : "بانتظار التفريغ"}`) : ["- لا توجد أجزاء محفوظة"]), "", "## الخلاصة", draft.summary || "لا يوجد ملخص بعد.", "", "## القرارات", ...(draft.decisions.length ? draft.decisions.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## المهام", ...(draft.tasks.length ? draft.tasks.map((value) => `- ${value}`) : ["- لا يوجد"]), "", "## النص الزمني", ...(draft.segments.length ? draft.segments.map((segment) => `[${formatMinute(segment.start)}] ${segment.text}`) : [draft.transcript || "لا يوجد نص بعد."]), "", `ختم NAVIXA SA · أُنشئ محليًا عبر NAVIXA SA · ${NAVIXA_URL}`].join("\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `navixa-summary-${draft.id.slice(0, 8)}.md`; link.click(); URL.revokeObjectURL(url);
     setNotice("تم تصدير النص والملخص إلى ملف محلي.");
@@ -378,7 +378,8 @@ export default function MeetingStudio() {
       const bulletLines = (items: string[], fallback: string) => (items.length ? items : [fallback]).map((text) => new Paragraph({ text: `• ${text}`, alignment: AlignmentType.RIGHT }));
       const parts = normalizeSession(draft).parts || [];
       const doc = new Document({ sections: [{ children: [
-        new Paragraph({ children: [logo, new TextRun({ text: "  NAVIXA — سجّل ولخّص", bold: true, size: 30 })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ children: [logo, new TextRun({ text: "  NAVIXA SA — لخّص اجتماعك", bold: true, size: 30 })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ children: [new TextRun({ text: "ختم NAVIXA SA · ملخص محلي قابل للمراجعة", color: "7656D6", bold: true, size: 19 })], alignment: AlignmentType.RIGHT }),
         new Paragraph({ children: [new TextRun({ text: NAVIXA_URL, color: "178F90", underline: {} })], alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: draft.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: `التاريخ: ${new Date(draft.createdAt).toLocaleString("ar-SA")} · أُنشئ محليًا على جهازك`, alignment: AlignmentType.RIGHT }),
@@ -432,7 +433,7 @@ export default function MeetingStudio() {
     </section>
 
     {draft && state === "review" && <section className="meeting-output">
-      <div className="meeting-print-brand"><img src="/navixa-export-logo.png" alt="NAVIXA" /><div><b>NAVIXA — سجّل ولخّص</b><a href={NAVIXA_URL}>{NAVIXA_URL}</a></div></div>
+      <div className="meeting-print-brand"><img src="/navixa-export-logo.png" alt="NAVIXA SA" /><div><b>NAVIXA SA — لخّص اجتماعك</b><span className="meeting-brand-seal">ختم NAVIXA SA · ملخص محلي قابل للمراجعة</span><a href={NAVIXA_URL}>{NAVIXA_URL}</a></div></div>
       <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions">{policy.globalLearningEnabled&&<button type="button" className="meeting-secondary meeting-approve-learning" onClick={() => void approveLearning()} disabled={sharingLearning||!draft.transcript.trim()}>{sharingLearning?"جارٍ الإرسال…":draft.learningShared?"✓ أُرسلت للمراجعة":"✓ اعتماد النتيجة"}</button>}<button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button>{policy.exportPdfEnabled&&<button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button>}{policy.exportWordEnabled&&<button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button>}</div></div>
       <div className="meeting-output-grid">
         <section className="meeting-summary-pane"><label>الخلاصة<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="سيظهر هنا ملخص محلي بعد التفريغ…" /></label><div className="meeting-lists"><div><h3>قرارات</h3>{draft.decisions.length ? draft.decisions.map((item, index) => <p key={`${item}-${index}`}>✓ {item}</p>) : <p className="empty">ستظهر القرارات المحتملة هنا بعد التفريغ.</p>}</div><div><h3>مهام</h3>{draft.tasks.length ? draft.tasks.map((item, index) => <p key={`${item}-${index}`}>→ {item}</p>) : <p className="empty">ستظهر المهام المحتملة هنا بعد التفريغ.</p>}</div></div></section>
