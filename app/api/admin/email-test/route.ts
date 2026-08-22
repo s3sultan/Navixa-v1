@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server.js";
-import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../../worker/adminAuth.ts";
+import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../worker/adminAuth.ts";
 
 type Env = Record<string, string | undefined>;
 const limiter = createMemoryRateLimiter();
