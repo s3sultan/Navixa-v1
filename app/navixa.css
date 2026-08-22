@@ -339,23 +339,17 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
 @media(max-width:650px){.favourite-match-countdown{grid-template-columns:1fr auto;gap:6px;padding:11px}.favourite-match-countdown>span{justify-self:start}.favourite-match-countdown>b{grid-column:1/-1;grid-row:2;font-size:11px}.favourite-match-countdown em{grid-column:1;grid-row:3;font-size:8px}.favourite-match-countdown strong{grid-column:2;grid-row:3;font-size:8px}.match-personal-controls form{display:grid;grid-template-columns:1fr}.match-personal-controls form button{min-height:36px}.match-alert-timing label{font-size:7px}.match-hide-schedule{width:100%;min-height:32px}}
 @media(prefers-reduced-motion:reduce){.favourite-match-countdown{transition:none!important}}
 
-/* Beta release status and fair-use messaging */
-.topbar-brand b { display: inline-flex; align-items: center; gap: 7px; }
-.beta-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 19px;
-  padding: 0 7px;
-  border: 1px solid color-mix(in srgb, #14b8aa 52%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, #14b8aa 12%, transparent);
-  color: #087c72;
-  font-size: 10px;
+/* علامة NAVIXA SA في الشريط العلوي. */
+.topbar-brand b { display: inline-flex; align-items: flex-start; gap: 6px; }
+.sa-badge {
+  display: inline-block;
+  margin-top: 1px;
+  color: #7656d6;
+  font-size: 9px;
   font-style: normal;
-  font-weight: 750;
-  letter-spacing: 0;
-  line-height: 1.8;
-  white-space: nowrap;
+  font-weight: 850;
+  letter-spacing: .08em;
+  line-height: 1;
 }
 .beta-usage-note {
   display: block;
@@ -364,14 +358,10 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
   font-size: 12px;
   line-height: 1.7;
 }
-[data-navixa-theme="dark"] .beta-badge {
-  border-color: rgba(112, 229, 215, .45);
-  background: rgba(112, 229, 215, .13);
-  color: #9df3e8;
-}
+[data-navixa-theme="dark"] .sa-badge { color: #cdbfff; }
 @media (max-width: 560px) {
-  .beta-badge { min-height: 17px; padding: 0 6px; font-size: 9px; }
-  .topbar-brand b { gap: 5px; }
+  .sa-badge { margin-top: 1px; font-size: 8px; }
+  .topbar-brand b { gap: 4px; }
 }
 
 /* Future Plus feature markers remain informational during beta. */
