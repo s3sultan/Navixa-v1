@@ -12,6 +12,7 @@ import AdminAssistantLearningSettings from "./settings/AdminAssistantLearningSet
 import AdminSubscriptionSettings from "./settings/AdminSubscriptionSettings";
 import AdminUserAuthSettings from "./settings/AdminUserAuthSettings";
 import AdminReferralSettings from "./settings/AdminReferralSettings";
+import AdminDiscountCodes from "./settings/AdminDiscountCodes";
 import AdminMeetingSettings from "./settings/AdminMeetingSettings";
 import AdminDomainExpiryAlert from "./settings/AdminDomainExpiryAlert";
 import { useAdminAuth } from "./useAdminAuth";
@@ -157,7 +158,7 @@ export default function AdminPage() {
             <details className="settings-group"><summary>التنبيهات والمباريات <span>القنوات · القواعد · العرض</span></summary><div className="settings-group-content"><AdminAlertSettings /><AdminMatchSettings /></div></details>
             <details className="settings-group"><summary>المساعد والاجتماعات <span>الردود · التعلم · التلخيص</span></summary><div className="settings-group-content"><AdminAssistantSettings /><AdminAssistantLearningSettings /><AdminMeetingSettings /></div></details>
             <details className="settings-group"><summary>الصحة والمحتوى <span>العافية · العدادات · التمارين</span></summary><div className="settings-group-content"><AdminHealthSettings /><AdminCounterSettings /></div></details>
-            <details className="settings-group"><summary>Plus والإحالات <span>الاشتراك · التجربة · المكافآت</span></summary><div className="settings-group-content"><AdminSubscriptionSettings /><AdminReferralSettings /></div></details>
+            <details className="settings-group"><summary>Plus والإحالات <span>الاشتراك · التجربة · المكافآت · الخصومات</span></summary><div className="settings-group-content"><AdminSubscriptionSettings /><AdminReferralSettings /><AdminDiscountCodes /></div></details>
           </div>
         </section>
 
