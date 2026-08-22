@@ -10,7 +10,7 @@ type MemoryKind = "name" | "preference" | "style" | "phrase";
 type MemoryItem = { id: string; kind: MemoryKind; value: string; createdAt: string };
 type AssistantStyle = "warm" | "calm" | "direct";
 type GlobalPattern = { id: string; trigger: string; response: string };
-type AssistantIntent = "welcome" | "identity" | "capabilities" | "privacy" | "idea" | "emotion" | "task" | "tool" | "general";
+type AssistantIntent = "welcome" | "identity" | "capabilities" | "privacy" | "idea" | "emotion" | "task" | "tool" | "summary" | "academic" | "subscription" | "general";
 
 const MAX_MESSAGES = 32;
 const CLEAR_LIMIT = 3;
@@ -146,7 +146,7 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
       if (/^(?:لا|مو الآن|مو الان|الغها|إلغاء)$/i.test(text)) { setPendingTask(null); return respond("general", "تمام، نخليها حديثًا بيننا فقط."); }
     }
     if (/^(?:من انت|مين انت|من تكون|عرفني بنفسك|وش انت)\??$/i.test(text)) return respond("identity", `أنا NAVIXA${friendlyName}. مساعد يومي يساعدك تفهم فكرتك، تتابع الأهم، وتستخدم أدواتك بخصوصية.\n\nتكلم بطريقتك؛ ما أحوّل كلامك لمهمة أو تذكير إلا إذا طلبت.`);
-    if (/(?:وش تقدر تسوي|وش تسوي|قدراتك|ساعدني في ايش)/i.test(text)) return respond("capabilities", "أقدر أرتّب فكرة، أساعدك في تذكير أو مهمة عند طلبك، وأفتح لك أدوات التركيز والصحة والمباريات والاستماع أو متابعة الشاشة. ابدأ بالشيء اللي في بالك.");
+    if (/(?:وش تقدر تسوي|وش تسوي|قدراتك|ساعدني في ايش)/i.test(text)) return respond("capabilities", "أقدر أرتّب فكرة، أساعدك في مهمة أو تذكير، ألخّص اجتماعًا أو محاضرة، ألتقط موعد كويز أو ميد، وأفتح لك أدوات التركيز والصحة والمباريات والاستماع أو متابعة الشاشة. ابدأ بالشيء اللي في بالك.");
     if (/^(هلا|هلو|السلام|سلام|مرحبا|صباح الخير|مساء الخير|كيف الحال|كيفك|شلونك|اخبارك)/i.test(text)) return respond("welcome", `${stylePrefix()}ياهلا${friendlyName}. قل لي اللي في بالك، وأنا إما أسمعك أو أساعدك نرتبه.`);
     if (/(شكرا|مشكور|يعطيك العافية|تسلم)/i.test(text)) return respond("general", "العفو، هذا واجبي. خذ راحتك.");
     if (/(كيف تتعلم|كيف تحفظ|وش تحفظ|الخصوصية|بياناتي)/i.test(text)) return respond("privacy", "ذاكرتي المحلية تحفظ فقط الاسم أو التفضيل أو العبارة التي توافق عليها، وتبقى على جهازك. تقدر تراجعها أو تمسحها في أي وقت، ولا أشارك محادثتك تلقائيًا.");
@@ -157,6 +157,9 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
     if (/(?:افتح|خذني|ودني|روح).*?(صحتي|الكاميرا|الجلوس|الماء|تمرين|وضعية)/i.test(text)) { respond("tool", `${stylePrefix()}بفتح لك مركز صحتي. التشغيل يبقى بيدك.`); window.setTimeout(() => { location.href = "/health"; }, 450); return; }
     if (/(?:افتح|خذني|ودني|روح).*?(تركيز|بومودورو)/i.test(text)) { respond("tool", `${stylePrefix()}نروح لجلسة التركيز.`); location.hash = "focus"; return; }
     if (/(?:افتح|خذني|ودني|روح).*?(مراقبة الشاشة|شارك الشاشة|متابعة الشاشة|الاستماع|اسمع اسمي)/i.test(text)) { respond("tool", `${stylePrefix()}أفتح لك الأداة، وما يبدأ الميكروفون أو مشاركة الشاشة إلا بعد موافقتك.`); location.hash = "assistant"; return; }
+    if (/(?:لخص|تلخيص|فرغ|تفريغ).{0,30}(?:اجتماع|محاضرة|مكالمة|تسجيل|الصوت)/i.test(text) || /(?:اجتماع|محاضرة).{0,20}(?:طويل|كامل)/i.test(text)) { respond("summary", `${stylePrefix()}نفتح لك «لخّص اجتماعك». تقدر تقسّم التسجيل إلى أجزاء، وتراجع التفريغ والملخص قبل التصدير.`); window.setTimeout(() => { location.href = "/meetings"; }, 450); return; }
+    if (/(?:كويز|quiz|ميد|mid|اختبار|تسليم|ديدلاين|deadline).{0,50}(?:موعد|بتاريخ|يوم|الأسبوع|بكرة|غدًا|غدا)?/i.test(text)) { setPendingTask(text); return respond("academic", `${stylePrefix()}التقطت أنها معلومة أكاديمية. أحفظها كتذكير مؤقتًا بعد تأكيدك، ويمكنك تعديل التاريخ والتنبيه قبل الحفظ.`); }
+    if (/(?:اشتراك|بلس|plus|تجربة|إحالة|احالة|دعوة|مكافأة|مكافاه)/i.test(text)) return respond("subscription", "من صفحة NAVIXA Plus تراجع حالة التجربة والباقات. نظام الإحالات يمنح المكافأة بعد اشتراك موثّق، مع منع الإحالة الذاتية والتكرار.");
     if (/(?:افتح|ورني|أبي).*?(مباريات|دوري|نادي|فريق)/i.test(text)) return respond("tool", `${stylePrefix()}بطاقة المباريات موجودة في الصفحة. اختر ناديك أو دوريك، وفعل التنبيه إذا رغبت.`);
     if (/(?:أضف|اضف|سجل|حط|حوّل).{0,25}(?:كمهمة|مهمة|كتذكير|تذكير|في المهام|بقائمة المهام)/i.test(text)) { onAddTask(text); return respond("task", `${stylePrefix()}تمت الإضافة. إذا عندك وقت أو تاريخ، اكتبه لي.`); }
     if (/(?:ذكرني|تذكير)/i.test(text)) return respond("task", `${stylePrefix()}أذكرك به. ما الشيء المطلوب، ومتى يناسبك؟`);
@@ -216,6 +219,9 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
       emotion:["أبي أتكلم فقط","أعطني خطوة صغيرة","خلنا نرتبها بهدوء"],
       task:["خليها حديث فقط","أبغى أحفظها","وش الخيارات؟"],
       tool:["افتح التركيز","أبي مباريات اليوم","كيف تعمل الخصوصية؟"],
+      summary:["افتح تلخيص الاجتماعات","كيف أقسم تسجيلًا طويلًا؟","صدّر الملخص"],
+      academic:["احفظ الموعد كتذكير","عدّل التنبيه","لا تحفظها الآن"],
+      subscription:["كيف تبدأ التجربة؟","كيف تعمل الإحالة؟","افتح صفحة Plus"],
       general:["اختصر لي","أعطني مثال","خلنا نكمل"],
     };
     return choices[lastIntent];
