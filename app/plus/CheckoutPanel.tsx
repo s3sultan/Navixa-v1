@@ -1,10 +1,12 @@
 "use client";
 
-import {useRef,useState} from "react";
+import Link from "next/link";
+import {useEffect,useRef,useState} from "react";
 import {useSearchParams} from "next/navigation";
 
 type Plan="monthly"|"quarterly";
 type CheckoutPayload={intentId:string;publicKey:string;amount:number;currency:string;description:string;callbackUrl:string;metadata:Record<string,string>;methods:string[];supportedNetworks:string[];applePay:{country:string;label:string;validateMerchantUrl:string}|null};
+type CheckoutAvailability={available:boolean;message:string};
 
 type MoyasarOptions={element:string;amount:number;currency:string;description:string;publishable_api_key:string;callback_url:string;supported_networks:string[];methods:string[];metadata:Record<string,string>;apple_pay?:{country:string;label:string;validate_merchant_url:string}};
 
@@ -30,7 +32,9 @@ export default function CheckoutPanel(){
   const [discountCode,setDiscountCode]=useState("");
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
+  const [availability,setAvailability]=useState<CheckoutAvailability|null>(null);
   const formRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{let active=true;fetch("/api/billing/checkout",{cache:"no-store"}).then(async response=>({ok:response.ok,data:await response.json().catch(()=>null)})).then(({ok,data})=>{if(active&&ok&&data)setAvailability(data as CheckoutAvailability)}).catch(()=>{if(active)setAvailability({available:false,message:"الاشتراك المدفوع يفتح قريبًا. ابدأ تجربة Plus الآن."})});return()=>{active=false};},[]);
 
   const start=async()=>{
     setBusy(true);setNotice("");
@@ -55,8 +59,8 @@ export default function CheckoutPanel(){
     </div>
     {foundersIntentId?<p className="checkout-notice">تم تخصيص سعر مؤسس لحسابك. يظهر المبلغ النهائي داخل نموذج الدفع، ولا يمكن دمجه مع كود خصم آخر.</p>:<div className="checkout-code"><label htmlFor="discount-code">كود خصم (اختياري)</label><input id="discount-code" value={discountCode} onChange={event=>setDiscountCode(event.target.value.toUpperCase())} maxLength={32} placeholder="مثال: FOUNDERS100" autoCapitalize="characters"/></div>}
     <div className="checkout-methods" aria-label="طرق الدفع"><span>البطاقات ومدى</span><span>Apple Pay عند توفره</span></div>
-    <button className="checkout-start" disabled={busy} onClick={()=>void start()}>{busy?"جارٍ تجهيز الدفع…":"المتابعة إلى الدفع الآمن"}</button>
-    {notice&&<p className="checkout-notice" role="status">{notice}</p>}
+    {availability?.available?<button className="checkout-start" disabled={busy} onClick={()=>void start()}>{busy?"جارٍ تجهيز الدفع…":"المتابعة إلى الدفع الآمن"}</button>:<Link className="checkout-start checkout-closed" href="/#account">ابدأ أو أكمل تجربة Plus</Link>}
+    {(availability&&!availability.available)&&<p className="checkout-notice" role="status">{availability.message}</p>}{notice&&<p className="checkout-notice" role="status">{notice}</p>}
     <div ref={formRef} className="navixa-moyasar-form" aria-live="polite"/>
     <p className="checkout-footnote">تُعالج بيانات الدفع داخل نموذج مُيسر الآمن. لا تحفظ NAVIXA رقم البطاقة أو بيانات Apple Pay.</p>
   </section>;

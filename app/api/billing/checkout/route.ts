@@ -30,11 +30,18 @@ async function schema(database:D1Database){
 }
 async function settings(database:D1Database){await schema(database);const rows=await database.prepare("SELECT setting_key,setting_value FROM navixa_billing_settings").all<{setting_key:string;setting_value:string}>();const next={...defaults};for(const row of rows.results)if(row.setting_key in next)next[row.setting_key as keyof Settings]=row.setting_value;return next;}
 
+export async function GET(){
+  const database=await db();if(!database)return NextResponse.json({available:false,message:"الاشتراك المدفوع يفتح قريبًا. يمكنك بدء تجربة Plus الآن."},{headers:{"Cache-Control":"no-store"}});
+  const current=await settings(database),secrets=await env();
+  const available=current.mode==="live"&&current.public_checkout==="true"&&current.live_payments_enabled==="true"&&Boolean(secrets.MOYASAR_LIVE_PUBLISHABLE_KEY);
+  return NextResponse.json({available,message:available?"الدفع الآمن متاح الآن":"الاشتراك المدفوع يفتح قريبًا. ابدأ تجربة Plus الآن، وسنخبرك عند تفعيل الدفع."},{headers:{"Cache-Control":"no-store"}});
+}
+
 export async function POST(request:Request){
   if(request.headers.get("origin")!==new URL(request.url).origin)return NextResponse.json({error:"طلب غير مسموح"},{status:403,headers:{"Cache-Control":"no-store"}});
   if(!allowedRate(request))return NextResponse.json({error:"عدد محاولات كبير، حاول لاحقًا"},{status:429,headers:{"Retry-After":"600","Cache-Control":"no-store"}});
   const database=await db();if(!database)return NextResponse.json({error:"الدفع غير متاح حاليًا"},{status:503,headers:{"Cache-Control":"no-store"}});
-  const current=await settings(database);if(current.public_checkout!=="true"||current.live_payments_enabled!=="true"||current.mode!=="live")return NextResponse.json({error:"الدفع غير متاح حاليًا"},{status:404,headers:{"Cache-Control":"no-store"}});
+  const current=await settings(database);if(current.public_checkout!=="true"||current.live_payments_enabled!=="true"||current.mode!=="live")return NextResponse.json({error:"الاشتراك المدفوع يفتح قريبًا. ابدأ تجربة Plus الآن، وسنخبرك عند تفعيل الدفع."},{status:409,headers:{"Cache-Control":"no-store"}});
   const authSettings=await getUserAuthSettings(database).catch(()=>null),session=await resolveUserSession(request,database);if(!authSettings?.userAuthEnabled||!session)return NextResponse.json({error:"سجّل الدخول بحساب NAVIXA قبل المتابعة إلى الدفع"},{status:401,headers:{"Cache-Control":"no-store"}});
   const secrets=await env(),publicKey=secrets.MOYASAR_LIVE_PUBLISHABLE_KEY||"";if(!publicKey)return NextResponse.json({error:"إعداد الدفع غير مكتمل"},{status:503,headers:{"Cache-Control":"no-store"}});
   const body=await request.json().catch(()=>({})) as {plan?:unknown;referralCode?:unknown;discountCode?:unknown;foundersIntentId?:unknown};

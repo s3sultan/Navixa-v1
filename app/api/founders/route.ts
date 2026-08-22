@@ -23,11 +23,7 @@ export async function GET(){
     available:active,
     startAt:status.startAt,
     endAt:status.endAt,
-    totalSeats:status.total,
-    paidSeats:status.used,
-    reservedSeats:status.reserved,
-    remainingSeats:status.remaining,
-    message:active?"توجد فرص مؤسسين محدودة متاحة الآن":"حملة المؤسسين غير متاحة حاليًا",
+    message:active?"عرض مؤسسي NAVIXA متاح الآن":"عرض مؤسسي NAVIXA غير متاح حاليًا",
   },{headers:{"Cache-Control":"no-store"}});
 }
 
