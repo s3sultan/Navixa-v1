@@ -20,7 +20,9 @@ const id = () => globalThis.crypto?.randomUUID?.() || `memory-${Date.now()}-${Ma
 const normalise = (value: string) => value.replace(/[؟?!،,.]/g, " ").replace(/\s+/g, " ").trim();
 const memoryTitle: Record<MemoryKind, string> = { name: "الاسم", preference: "تفضيل", style: "أسلوب الحديث", phrase: "معلومة مفيدة" };
 const makeMessage = (from: Message["from"], text: string): Message => ({ id: id(), from, text, at: new Date().toISOString() });
-const initialMessage = () => makeMessage("navixa", "هلا، أنا NAVIXA. نتكلم براحتك؛ أفهم السياق وأحفظ فقط ما توافق عليه على جهازك.");
+const initialMessage = () => makeMessage("navixa", "هلا، أنا NAVIXA. قل لي اللي في بالك بطريقتك؛ أساعدك نفهمه أو نرتبه، وما أحفظ شيئًا إلا بإذنك وعلى جهازك.");
+const pickReply = (seed: string, choices: string[]) => choices[[...seed].reduce((total, letter) => total + letter.charCodeAt(0), 0) % choices.length] || choices[0] || "";
+const shortEcho = (value: string) => normalise(value).slice(0, 72).replace(/[،.!؟]+$/g, "");
 
 export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTask: (title: string) => void; openRequest: number }) {
   const [open, setOpen] = useState(false);
@@ -104,7 +106,7 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
     return true;
   };
   const forget = (itemId: string) => setMemory(current => current.filter(item => item.id !== itemId));
-  const stylePrefix = () => assistantStyle === "direct" ? "" : assistantStyle === "calm" ? "بهدوء، " : "أبشر، ";
+  const stylePrefix = () => assistantStyle === "direct" ? "" : assistantStyle === "calm" ? "بهدوء، " : "";
   const respond = (intent: AssistantIntent, text: string) => { setLastIntent(intent); reply(text); };
   const friendlyName = name ? ` يا ${name}` : "";
   const rememberFromMessage = (text: string) => {
@@ -145,21 +147,21 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
       if (/^(?:اي|ايوه|نعم|تمام|سجلها|أضفها|اضفها)$/i.test(text)) { onAddTask(pendingTask); setPendingTask(null); return respond("task", `${stylePrefix()}تم حفظها كمهمة. إذا تبي، أعطني وقتها وأرتبه لك.`); }
       if (/^(?:لا|مو الآن|مو الان|الغها|إلغاء)$/i.test(text)) { setPendingTask(null); return respond("general", "تمام، نخليها حديثًا بيننا فقط."); }
     }
-    if (/^(?:من انت|مين انت|من تكون|عرفني بنفسك|وش انت)\??$/i.test(text)) return respond("identity", `أنا NAVIXA${friendlyName}. مساعد يومي يساعدك تفهم فكرتك، تتابع الأهم، وتستخدم أدواتك بخصوصية.\n\nتكلم بطريقتك؛ ما أحوّل كلامك لمهمة أو تذكير إلا إذا طلبت.`);
-    if (/(?:وش تقدر تسوي|وش تسوي|قدراتك|ساعدني في ايش)/i.test(text)) return respond("capabilities", "أقدر أرتّب فكرة، أساعدك في مهمة أو تذكير، ألخّص اجتماعًا أو محاضرة، ألتقط موعد كويز أو ميد، وأفتح لك أدوات التركيز والصحة والمباريات والاستماع أو متابعة الشاشة. ابدأ بالشيء اللي في بالك.");
-    if (/^(هلا|هلو|السلام|سلام|مرحبا|صباح الخير|مساء الخير|كيف الحال|كيفك|شلونك|اخبارك)/i.test(text)) return respond("welcome", `${stylePrefix()}ياهلا${friendlyName}. قل لي اللي في بالك، وأنا إما أسمعك أو أساعدك نرتبه.`);
-    if (/(شكرا|مشكور|يعطيك العافية|تسلم)/i.test(text)) return respond("general", "العفو، هذا واجبي. خذ راحتك.");
+    if (/^(?:من انت|مين انت|من تكون|عرفني بنفسك|وش انت)\??$/i.test(text)) return respond("identity", `أنا NAVIXA${friendlyName}. أساعدك تفهم الفكرة، ترتب الأولويات، وتستخدم أدواتك بدون تعقيد.\n\nخذ راحتك في الكلام؛ ما أحوّل أي شيء لمهمة أو تذكير إلا إذا طلبت مني ذلك.`);
+    if (/(?:وش تقدر تسوي|وش تسوي|قدراتك|ساعدني في ايش)/i.test(text)) return respond("capabilities", "أساعدك في الشيء الذي أمامك الآن: نرتب فكرة، نحوّل أمرًا واضحًا إلى مهمة بعد موافقتك، نلخّص اجتماعًا أو محاضرة، أو نفتح أدوات التركيز والصحة والاستماع ومتابعة الشاشة. قل لي موقفك الحالي، وليس اسم الميزة فقط، وأنا أقترح أقصر طريق.");
+    if (/^(هلا|هلو|السلام|سلام|مرحبا|صباح الخير|مساء الخير|كيف الحال|كيفك|شلونك|اخبارك)/i.test(text)) return respond("welcome", `${stylePrefix()}${pickReply(text,[`ياهلا${friendlyName}. وش أكثر شيء تبغى ترتبه اليوم؟`,`حياك${friendlyName}. نبدأ بفكرة، مهمة، أو شيء شاغل بالك؟`,`هلا بك${friendlyName}. قل لي الموضوع كما هو، وأنا أمسكه معك خطوة خطوة.`])}`);
+    if (/(شكرا|مشكور|يعطيك العافية|تسلم)/i.test(text)) return respond("general", pickReply(text,["العفو، يسعدني. إذا احتجت نكمل من نفس النقطة أنا موجود.","الله يعافيك. خذ راحتك، ونكمل عندما تكون مستعدًا.","العفو. تبغاني أتركها كما هي، أو نأخذ الخطوة التالية؟"]));
     if (/(كيف تتعلم|كيف تحفظ|وش تحفظ|الخصوصية|بياناتي)/i.test(text)) return respond("privacy", "ذاكرتي المحلية تحفظ فقط الاسم أو التفضيل أو العبارة التي توافق عليها، وتبقى على جهازك. تقدر تراجعها أو تمسحها في أي وقت، ولا أشارك محادثتك تلقائيًا.");
     if (/(وش تعرف عني|ماذا تعرف عني|وش حفظت|ذاكرتك)/i.test(text)) { if (!memory.length) return respond("privacy", "ما حفظت عنك شيئًا حتى الآن. إذا رغبت، قل لي أسلوب الرد الذي تحبه أو اطلب مني حفظ معلومة محددة."); const summary = memory.map(item => `${memoryTitle[item.kind]}: ${item.value}`).join(" · "); return respond("privacy", `المحفوظ محليًا: ${summary}. وتقدر تعدله أو تمسحه من زر الذاكرة.`); }
     if (/(انس|امسح|احذف) (?:كل )?(?:الذاكرة|معلوماتي|تفضيلاتي)/i.test(text)) { setMemory([]); return respond("privacy", "تم مسح الذاكرة المحلية من هذا الجهاز."); }
-    if (/(تعبان|متضايق|زعلان|مضغوط|طفشت)/i.test(text)) return respond("emotion", `${stylePrefix()}أفهمك. ما نحتاج نحول كل شيء لخطة الآن؛ تقدر تفضفض، أو نأخذ خطوة واحدة تخفف الحمل.`);
-    if (/(عندي فكرة|فكرة|وش رايك|ما رأيك|رايك)/i.test(text)) return respond("idea", `${stylePrefix()}قل لي الفكرة كما هي، حتى لو كانت غير مرتبة. أعطيك رأيًا صريحًا أولًا، ثم نرتبها إذا رغبت.`);
+    if (/(تعبان|متضايق|زعلان|مضغوط|طفشت)/i.test(text)) return respond("emotion", `${stylePrefix()}واضح إن اليوم ثقيل عليك. ما نحتاج نحل كل شيء الآن؛ تقدر تكتب اللي مضايقك كما هو، أو نقسمه إلى خطوة صغيرة واحدة تخفف الضغط.`);
+    if (/(عندي فكرة|فكرة|وش رايك|ما رأيك|رايك)/i.test(text)) return respond("idea", `${stylePrefix()}أعطني الفكرة كما هي، حتى لو كانت ناقصة. سأبدأ برأيي الصريح: ما الذي فيها قوي، وما الذي قد يربك المستخدم، ثم نقترح نسخة أبسط إذا احتجنا.`);
     if (/(?:افتح|خذني|ودني|روح).*?(صحتي|الكاميرا|الجلوس|الماء|تمرين|وضعية)/i.test(text)) { respond("tool", `${stylePrefix()}بفتح لك مركز صحتي. التشغيل يبقى بيدك.`); window.setTimeout(() => { location.href = "/health"; }, 450); return; }
     if (/(?:افتح|خذني|ودني|روح).*?(تركيز|بومودورو)/i.test(text)) { respond("tool", `${stylePrefix()}نروح لجلسة التركيز.`); location.hash = "focus"; return; }
     if (/(?:افتح|خذني|ودني|روح).*?(مراقبة الشاشة|شارك الشاشة|متابعة الشاشة|الاستماع|اسمع اسمي)/i.test(text)) { respond("tool", `${stylePrefix()}أفتح لك الأداة، وما يبدأ الميكروفون أو مشاركة الشاشة إلا بعد موافقتك.`); location.hash = "assistant"; return; }
     if (/(?:لخص|تلخيص|فرغ|تفريغ).{0,30}(?:اجتماع|محاضرة|مكالمة|تسجيل|الصوت)/i.test(text) || /(?:اجتماع|محاضرة).{0,20}(?:طويل|كامل)/i.test(text)) { respond("summary", `${stylePrefix()}نفتح لك «لخّص اجتماعك». تقدر تقسّم التسجيل إلى أجزاء، وتراجع التفريغ والملخص قبل التصدير.`); window.setTimeout(() => { location.href = "/meetings"; }, 450); return; }
     if (/(?:كويز|quiz|ميد|mid|اختبار|تسليم|ديدلاين|deadline).{0,50}(?:موعد|بتاريخ|يوم|الأسبوع|بكرة|غدًا|غدا)?/i.test(text)) { setPendingTask(text); return respond("academic", `${stylePrefix()}التقطت أنها معلومة أكاديمية. أحفظها كتذكير مؤقتًا بعد تأكيدك، ويمكنك تعديل التاريخ والتنبيه قبل الحفظ.`); }
-    if (/(?:اشتراك|بلس|plus|تجربة|إحالة|احالة|دعوة|مكافأة|مكافاه)/i.test(text)) return respond("subscription", "من صفحة NAVIXA Plus تراجع حالة التجربة والباقات. نظام الإحالات يمنح المكافأة بعد اشتراك موثّق، مع منع الإحالة الذاتية والتكرار.");
+    if (/(?:اشتراك|بلس|plus|تجربة|إحالة|احالة|دعوة|مكافأة|مكافاه)/i.test(text)) return respond("subscription", "تقدر تكمل تجربة Plus براحتك، أو تشترك مباشرة في أي يوم منها عندما تكون جاهزًا. قبل الدفع يظهر لك السعر والتفاصيل بوضوح. أما الإحالة فمكافأتها تُثبت فقط بعد اشتراك موثّق، حتى يبقى النظام عادلًا للجميع.");
     if (/(?:افتح|ورني|أبي).*?(مباريات|دوري|نادي|فريق)/i.test(text)) return respond("tool", `${stylePrefix()}بطاقة المباريات موجودة في الصفحة. اختر ناديك أو دوريك، وفعل التنبيه إذا رغبت.`);
     if (/(?:أضف|اضف|سجل|حط|حوّل).{0,25}(?:كمهمة|مهمة|كتذكير|تذكير|في المهام|بقائمة المهام)/i.test(text)) { onAddTask(text); return respond("task", `${stylePrefix()}تمت الإضافة. إذا عندك وقت أو تاريخ، اكتبه لي.`); }
     if (/(?:ذكرني|تذكير)/i.test(text)) return respond("task", `${stylePrefix()}أذكرك به. ما الشيء المطلوب، ومتى يناسبك؟`);
@@ -167,8 +169,9 @@ export default function FloatingAssistant({ onAddTask, openRequest }: { onAddTas
     const globalPattern = globalPatterns.find(pattern => { const trigger = normalise(pattern.trigger); return trigger.length >= 3 && text.includes(trigger); });
     if (globalPattern) return respond("general", globalPattern.response);
     if (learned) return respond("privacy", `${stylePrefix()}وصلتني، وحفظت تفضيلك محليًا ليكون أسلوبي أقرب لك. تقدر تغيره أو تمسحه متى شئت.`);
-    const context = lastIntent === "idea" ? "إذا كانت فكرتك تحتاج قرارًا، أعطني الهدف والشيء الذي يقلقك فيها." : lastIntent === "emotion" ? "خذ راحتك؛ اكتب اللي مضايقك كما هو." : "اكتب لي تفاصيل أكثر أو مثالًا واحدًا، وأرد عليك مباشرة.";
-    return respond("general", `${stylePrefix()}فهمت عليك${preferenceHint} ${context}`);
+    const context = lastIntent === "idea" ? "إذا كانت تحتاج قرارًا، قل لي هدفها والشيء الذي يقلقك فيها." : lastIntent === "emotion" ? "خذ راحتك؛ اكتب اللي مضايقك كما هو، بلا ترتيب." : "أعطني مثالًا واحدًا أو النتيجة التي تبغاها، وأرد عليك بشكل عملي.";
+    const echo = shortEcho(raw);
+    return respond("general", `${stylePrefix()}فهمت${echo ? ` أنك تقصد: «${echo}»` : "عليك"}.${preferenceHint} ${context}`);
   };
 
   const toggleAssistant = () => {
