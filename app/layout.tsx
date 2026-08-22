@@ -28,13 +28,13 @@ export const metadata: Metadata = {
     siteName: "NAVIXA SA",
     title: "NAVIXA SA — يفهم يومك",
     description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "NAVIXA SA — مساعدك الذكي، حاضر في التفاصيل التي تهمك" }],
+    images: [{ url: "/navixa-share.png", width: 1200, height: 630, alt: "NAVIXA SA — مساعدك الذكي، حاضر في التفاصيل التي تهمك" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "NAVIXA SA — يفهم يومك",
     description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.",
-    images: ["/opengraph-image"],
+    images: ["/navixa-share.png"],
   },
 };
 
@@ -49,7 +49,7 @@ name: "NAVIXA SA",
   applicationCategory: "ProductivityApplication",
   operatingSystem: "Web",
   inLanguage: "ar",
-  image: `${siteUrl}/opengraph-image`,
+  image: `${siteUrl}/navixa-share.png`,
   offers: { "@type": "Offer", price: "0", priceCurrency: "SAR" },
 };
 
