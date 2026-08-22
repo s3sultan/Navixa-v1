@@ -15,6 +15,7 @@ import AdminReferralSettings from "./settings/AdminReferralSettings";
 import AdminDiscountCodes from "./settings/AdminDiscountCodes";
 import AdminMeetingSettings from "./settings/AdminMeetingSettings";
 import AdminDomainExpiryAlert from "./settings/AdminDomainExpiryAlert";
+import AdminServiceTransitionSettings from "./settings/AdminServiceTransitionSettings";
 import { useAdminAuth } from "./useAdminAuth";
 
 const features = [
@@ -154,7 +155,7 @@ export default function AdminPage() {
         <section className="admin-section" id="settings">
           <div className="section-label"><small>إعدادات المنصة</small><h2>الإعدادات المنظمة</h2><p>افتح القسم الذي تريد تعديله فقط لتبقى الصفحة هادئة وسهلة.</p></div>
           <div className="settings-stack">
-            <details className="settings-group" open><summary>الحماية والدومين <span>الدخول · البريد · انتهاء النطاق</span></summary><div className="settings-group-content"><AdminDomainExpiryAlert /><AdminUserAuthSettings /></div></details>
+            <details className="settings-group" open><summary>الحماية والدومين <span>الدخول · البريد · انتهاء النطاق</span></summary><div className="settings-group-content"><AdminDomainExpiryAlert /><AdminServiceTransitionSettings /><AdminUserAuthSettings /></div></details>
             <details className="settings-group"><summary>التنبيهات والمباريات <span>القنوات · القواعد · العرض</span></summary><div className="settings-group-content"><AdminAlertSettings /><AdminMatchSettings /></div></details>
             <details className="settings-group"><summary>المساعد والاجتماعات <span>الردود · التعلم · التلخيص</span></summary><div className="settings-group-content"><AdminAssistantSettings /><AdminAssistantLearningSettings /><AdminMeetingSettings /></div></details>
             <details className="settings-group"><summary>الصحة والمحتوى <span>العافية · العدادات · التمارين</span></summary><div className="settings-group-content"><AdminHealthSettings /><AdminCounterSettings /></div></details>
