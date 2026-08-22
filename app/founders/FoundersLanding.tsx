@@ -13,6 +13,7 @@ const clock=(target:string,now:number)=>{const diff=Math.max(0,Date.parse(target
 
 export default function FoundersLanding(){
   const [campaign,setCampaign]=useState<Campaign>(empty),[loaded,setLoaded]=useState(false),[now,setNow]=useState(()=>Date.now());
+  useEffect(()=>{document.body.classList.add("founders-route");return()=>document.body.classList.remove("founders-route")},[]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer)},[]);
   useEffect(()=>{let active=true;const load=async()=>{try{const response=await fetch("/api/founders",{cache:"no-store"});if(response.ok&&active){setCampaign(await response.json() as Campaign);setLoaded(true)}}catch{if(active)setLoaded(true)}};void load();const timer=window.setInterval(()=>void load(),15000);return()=>{active=false;window.clearInterval(timer)}},[]);
   const progress=Math.min(100,Math.max(0,(campaign.paidSeats/campaign.totalSeats)*100)),start=clock(campaign.startAt,now),end=clock(campaign.endAt,now),beforeStart=now<Date.parse(campaign.startAt),countdown=beforeStart?start:end;
