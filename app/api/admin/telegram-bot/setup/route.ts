@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server.js";
 import { ADMIN_SESSION_COOKIE, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../../worker/adminAuth.ts";
+import { officialTelegramBotUsername } from "../../../../../worker/telegramBot.ts";
 
 type Env = Record<string, string | undefined>;
 type TelegramResponse = { ok?: boolean; result?: { username?: string }; description?: string };
@@ -22,9 +23,9 @@ export async function POST(request: Request) {
   if (!await allowed(request)) return noStore({ error: "غير مصرح" }, 401);
   const env = await runtimeEnv();
   const token = env.NAVIXA_TELEGRAM_BOT_TOKEN;
-  const username = env.NAVIXA_TELEGRAM_BOT_USERNAME?.replace(/^@/, "").trim();
+  const username = officialTelegramBotUsername(env.NAVIXA_TELEGRAM_BOT_USERNAME);
   const webhookSecret = env.NAVIXA_TELEGRAM_WEBHOOK_SECRET;
-  if (!token || !username || !webhookSecret) return noStore({ error: "أضف أسرار بوت NAVIXA الرسمية أولًا" }, 409);
+  if (!token || !webhookSecret) return noStore({ error: "أضف أسرار بوت NAVIXA الرسمية أولًا" }, 409);
 
   try {
     const meResponse = await fetch(`https://api.telegram.org/bot${token}/getMe`, { cache: "no-store" });

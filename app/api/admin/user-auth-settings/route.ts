@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server.js";
 import { ADMIN_SESSION_COOKIE, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../worker/adminAuth.ts";
 import { getUserAuthSettings, type D1Database } from "../../../../worker/userAuth.ts";
+import { officialTelegramBotUsername } from "../../../../worker/telegramBot.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
@@ -36,7 +37,7 @@ async function snapshot(database: Database, secrets: Env) {
   ]);
   const telegram = {
     botTokenConfigured: Boolean(secrets.NAVIXA_TELEGRAM_BOT_TOKEN),
-    usernameConfigured: Boolean(secrets.NAVIXA_TELEGRAM_BOT_USERNAME),
+    usernameConfigured: Boolean(officialTelegramBotUsername(secrets.NAVIXA_TELEGRAM_BOT_USERNAME)),
     webhookSecretConfigured: Boolean(secrets.NAVIXA_TELEGRAM_WEBHOOK_SECRET),
     encryptionKeyConfigured: Boolean(secrets.NAVIXA_TELEGRAM_ENCRYPTION_KEY),
   };

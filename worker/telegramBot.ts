@@ -8,6 +8,12 @@ type RuntimeTelegramEnv = {
   NAVIXA_TELEGRAM_BOT_USERNAME?: string;
 };
 
+export const NAVIXA_OFFICIAL_TELEGRAM_BOT_USERNAME = "navixa_alerts_bot";
+
+export function officialTelegramBotUsername(value?: string) {
+  return value?.replace(/^@/, "").trim() || NAVIXA_OFFICIAL_TELEGRAM_BOT_USERNAME;
+}
+
 function base64Url(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -21,11 +27,13 @@ function fromBase64Url(value: string) {
 }
 
 export async function telegramRuntimeEnv(): Promise<RuntimeTelegramEnv> {
+  let runtime: RuntimeTelegramEnv;
   try {
-    return ((await import("cloudflare:workers") as { env?: RuntimeTelegramEnv }).env || {});
+    runtime = (await import("cloudflare:workers") as { env?: RuntimeTelegramEnv }).env || {};
   } catch {
-    return (globalThis as { __NAVIXA_TELEGRAM_ENV__?: RuntimeTelegramEnv }).__NAVIXA_TELEGRAM_ENV__ || {};
+    runtime = (globalThis as { __NAVIXA_TELEGRAM_ENV__?: RuntimeTelegramEnv }).__NAVIXA_TELEGRAM_ENV__ || {};
   }
+  return { ...runtime, NAVIXA_TELEGRAM_BOT_USERNAME: officialTelegramBotUsername(runtime.NAVIXA_TELEGRAM_BOT_USERNAME) };
 }
 
 export async function hashTelegramValue(value: string, secret: string) {
