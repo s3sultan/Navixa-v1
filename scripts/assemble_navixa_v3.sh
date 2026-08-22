@@ -7,10 +7,11 @@ OUT="$VID/final/navixa-overview-v3.mp4"
 TMP="$ROOT/.tmp-navixa-v3"
 mkdir -p "$TMP" "$(dirname "$OUT")"
 
-# Brand intro: an original NAVIXA scene, not an overlay on existing footage.
-ffmpeg -y -f lavfi -i "color=c=0x102f43:s=1280x720:r=30:d=7" -loop 1 -i "$ROOT/public/navixa-mark.png" -i "$AUD/navixa-v3-intro.wav" \
-  -filter_complex "[0:v]format=yuv420p,drawbox=x=0:y=0:w=1280:h=720:color=0x102f43@1:t=fill,drawbox=x=0:y=0:w=1280:h=8:color=0x8f82c9@1:t=fill,drawbox=x=0:y=712:w=1280:h=8:color=0x6fb79b@1:t=fill,drawbox=x=76:y=86:w=1128:h=548:color=0xffffff@0.05:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='NAVIXA SA':fontcolor=0xf7f4ef@0.45:fontsize=24:x=78:y=112,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='نافكسا':fontcolor=white:fontsize=82:x=(w-text_w)/2:y=470,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='مساعدك الذكي، حاضر في التفاصيل التي تهمك':fontcolor=0xd9d3ee:fontsize=29:x=(w-text_w)/2:y=578[bg];[1:v]format=rgba,scale=150:-1:force_original_aspect_ratio=decrease,colorchannelmixer=aa=0.98[logo];[bg][logo]overlay=(W-w)/2:190:shortest=1[v]" \
-  -map "[v]" -map 2:a -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -t 7 -movflags +faststart "$TMP/00-intro.mp4" >/dev/null 2>&1
+# Brand intro uses the same real scene and lower-third language as the ending.
+# NAVIXA and the smaller SA suffix are separated; no standalone card is placed over the footage.
+ffmpeg -y -stream_loop -1 -i "$VID/navixa-overview-06-cta-clean.mp4" -i "$AUD/navixa-v3-intro.wav" \
+  -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,fps=30,drawbox=x=0:y=586:w=1280:h=134:color=0x102f43@0.74:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='NAVIXA':fontcolor=white:fontsize=52:x=(w-text_w)/2-18:y=610,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='SA':fontcolor=0xd9d3ee:fontsize=22:x=(w-text_w)/2+115:y=602,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='مساعدك الذكي، حاضر في التفاصيل التي تهمك':fontcolor=0xf7f4ef:fontsize=26:x=(w-text_w)/2:y=665[v]" \
+  -map "[v]" -map 1:a -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -t 7 -movflags +faststart "$TMP/00-intro.mp4" >/dev/null 2>&1
 
 make_scene(){
   local video="$1" audio="$2" output="$3" text="${4:-}"
