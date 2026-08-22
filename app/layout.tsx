@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   category: "productivity",
   alternates: { canonical: "/" },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
-  icons: { icon: "/navixa-sa-icon.svg", apple: "/navixa-sa-icon.svg", shortcut: "/navixa-sa-icon.svg" },
+  icons: { icon: "/navixa-sa-icon.svg", apple: "/apple-touch-icon.png", shortcut: "/navixa-sa-icon.svg" },
   openGraph: {
     type: "website",
     locale: "ar_SA",
