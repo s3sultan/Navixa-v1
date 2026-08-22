@@ -14,6 +14,9 @@ async function schema(database:D1Database){
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_subscribers (id TEXT PRIMARY KEY,user_id TEXT NOT NULL DEFAULT '',contact TEXT NOT NULL UNIQUE,display_name TEXT NOT NULL DEFAULT '',plan TEXT NOT NULL DEFAULT 'trial',status TEXT NOT NULL DEFAULT 'waitlist',trial_started_at TEXT NOT NULL DEFAULT '',trial_ends_at TEXT NOT NULL DEFAULT '',subscription_ends_at TEXT NOT NULL DEFAULT '',source TEXT NOT NULL DEFAULT 'plus_page',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_billing_events (id TEXT PRIMARY KEY,provider_event_id TEXT NOT NULL UNIQUE,subscriber_id TEXT NOT NULL DEFAULT '',event_type TEXT NOT NULL,mode TEXT NOT NULL DEFAULT 'test',payload_json TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL,processed_at TEXT NOT NULL DEFAULT '')").run();
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_billing_settings (setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
+  await database.prepare("CREATE TABLE IF NOT EXISTS navixa_discount_codes (id TEXT PRIMARY KEY,code TEXT NOT NULL UNIQUE,discount_type TEXT NOT NULL DEFAULT 'percent',discount_value INTEGER NOT NULL DEFAULT 0,plans TEXT NOT NULL DEFAULT 'all',max_redemptions INTEGER NOT NULL DEFAULT 0,redeemed_count INTEGER NOT NULL DEFAULT 0,reserved_count INTEGER NOT NULL DEFAULT 0,valid_from TEXT NOT NULL DEFAULT '',valid_until TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
+  await database.prepare("ALTER TABLE navixa_discount_codes ADD COLUMN reserved_count INTEGER NOT NULL DEFAULT 0").run().catch(()=>{});
+  await database.prepare("ALTER TABLE navixa_billing_intents ADD COLUMN discount_code TEXT NOT NULL DEFAULT ''").run().catch(()=>{});
   const now=new Date().toISOString();for(const [key,value] of Object.entries(defaults))await database.prepare("INSERT OR IGNORE INTO navixa_billing_settings (setting_key,setting_value,updated_at) VALUES (?,?,?)").bind(key,value,now).run();
 }
 async function settings(database:D1Database){await schema(database);const rows=await database.prepare("SELECT setting_key,setting_value FROM navixa_billing_settings").all<{setting_key:string;setting_value:string}>();const next={...defaults};for(const row of rows.results)if(row.setting_key in next)next[row.setting_key as keyof Settings]=row.setting_value;return next;}
@@ -35,7 +38,7 @@ export async function POST(request:Request){
   const data=(body.data&&typeof body.data==="object"?body.data:{}) as Record<string,unknown>;
   const metadata=(data.metadata&&typeof data.metadata==="object"?data.metadata:{}) as Record<string,unknown>;
   const intentId=clean(metadata.navixa_intent,100);
-  const intents=await database.prepare("SELECT id,user_id,contact,plan,status FROM navixa_billing_intents WHERE id=? AND mode='live' AND expires_at>? LIMIT 1").bind(intentId,new Date().toISOString()).all<{id:string;user_id:string;contact:string;plan:string;status:string}>();
+  const intents=await database.prepare("SELECT id,user_id,contact,plan,status,discount_code FROM navixa_billing_intents WHERE id=? AND mode='live' AND status='pending' AND expires_at>? LIMIT 1").bind(intentId,new Date().toISOString()).all<{id:string;user_id:string;contact:string;plan:string;status:string;discount_code:string}>();
   const intent=intents.results[0],contact=intent?.contact||"",plan=intent?.plan||"",userId=intent?.user_id||"";
   if(!eventId||!intentId||!userId||!validEmail(contact)||!['payment_paid','subscription_renewed'].includes(eventType)||!['monthly','quarterly'].includes(plan))return NextResponse.json({error:"حدث الدفع لا يحمل نية NAVIXA صالحة"},{status:400});
   const existing=await database.prepare("SELECT id FROM navixa_billing_events WHERE provider_event_id=? LIMIT 1").bind(eventId).all<{id:string}>();if(existing.results.length)return NextResponse.json({ok:true,duplicate:true});
@@ -43,6 +46,7 @@ export async function POST(request:Request){
   if(requestedLive){
     await database.prepare("INSERT INTO navixa_subscribers (id,user_id,contact,display_name,plan,status,subscription_ends_at,source,created_at,updated_at) VALUES (?,?,?,'',?,'active',?,'moyasar_webhook',?,?) ON CONFLICT(contact) DO UPDATE SET user_id=excluded.user_id,plan=excluded.plan,status='active',subscription_ends_at=excluded.subscription_ends_at,source='moyasar_webhook',updated_at=excluded.updated_at").bind(subscriberId,userId,contact,plan,end,now,now).run();
     await database.prepare("UPDATE navixa_billing_intents SET status='paid',provider_payment_id=?,updated_at=? WHERE id=?").bind(eventId,now,intentId).run();
+    if(intent.discount_code)await database.prepare("UPDATE navixa_discount_codes SET redeemed_count=redeemed_count+1,reserved_count=CASE WHEN reserved_count>0 THEN reserved_count-1 ELSE 0 END,updated_at=? WHERE code=?").bind(now,intent.discount_code).run();
   }
   await database.prepare("INSERT INTO navixa_billing_events (id,provider_event_id,subscriber_id,event_type,mode,payload_json,created_at,processed_at) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),eventId,requestedLive?subscriberId:"",eventType,mode,JSON.stringify({intentId,plan,provider:"moyasar"}),now,now).run();
   return NextResponse.json({ok:true,mode,activated:requestedLive});

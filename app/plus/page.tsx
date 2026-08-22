@@ -45,11 +45,11 @@ export default function NavixaPlusPage() {
     <section className="plus-plans" id="plans" aria-labelledby="plans-title">
       <header><small>{ar.plus.plansEyebrow}</small><h2 id="plans-title">{ar.plus.plansTitle}</h2><p>{ar.plus.plansDescription}</p></header>
       <div className="plan-grid">
-        <article className="plan-card trial"><span className="plan-tag">ابدأ الآن</span><h3>تجربة Plus</h3><div className="plan-price"><b>حتى 19/9</b><span>2026<br/>بلا بطاقة</span></div><p>تجربة مجانية خلال حملة الإطلاق الثاني، وتنتهي تلقائيًا في 19 سبتمبر 2026 الساعة 11:59 مساءً بتوقيت أم القرى.</p><Link href="/#account">ابدأ تجربتك</Link></article>
-        <article className="plan-card featured"><span className="plan-tag">الأقرب للإطلاق</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>للشخص الذي يريد ذكاءً أعمق وتخصيصًا مستمرًا.</p><a href="#interest">سجّل اهتمامك</a></article>
+        <article className="plan-card trial"><span className="plan-tag">ابدأ مجانًا</span><h3>جرّب Plus بهدوء</h3><div className="plan-price"><b>بدون</b><span>بطاقة<br/>ولا التزام</span></div><p>ابدأ التجربة الآن. يمكنك إيقافها في أي وقت، ولن يُخصم أي مبلغ تلقائيًا. تنتهي التجربة في 19 سبتمبر 2026 الساعة 11:59 مساءً بتوقيت أم القرى.</p><Link href="/#account">ابدأ تجربتك المجانية</Link></article>
+        <article className="plan-card featured"><span className="plan-tag">عرض المؤسسين · أول 100 عميل</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>لأول 100 اشتراك فقط: خصم مؤسسين محدود، يظهر لك قبل تأكيد الدفع.</p><a href="#interest">أرغب بعرض المؤسسين</a></article>
         <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="#interest">سجّل اهتمامك</a></article>
       </div>
-      <aside className="founders-note"><span>✦</span><p><b>سعر المؤسسين قادم.</b> أوائل المستخدمين سيحصلون على عرض خاص لفترة محدودة عند فتح الاشتراك.</p></aside>
+      <aside className="founders-note"><span>✦</span><p><b>عرض المؤسسين لأول 100 عميل.</b> كود خصم محدود بعدد 100 استخدام، ولا يمكن استخدامه بعد اكتمال العدد.</p></aside>
     </section>
 
     <InterestForm/>
