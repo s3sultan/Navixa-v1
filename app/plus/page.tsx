@@ -45,7 +45,7 @@ export default function NavixaPlusPage() {
     <section className="plus-plans" id="plans" aria-labelledby="plans-title">
       <header><small>{ar.plus.plansEyebrow}</small><h2 id="plans-title">{ar.plus.plansTitle}</h2><p>{ar.plus.plansDescription}</p></header>
       <div className="plan-grid">
-        <article className="plan-card trial"><span className="plan-tag">ابدأ هنا</span><h3>تجربة Plus</h3><div className="plan-price"><b>14</b><span>يومًا<br/>بلا بطاقة</span></div><p>تعرف على المساعد الأذكى وميزات Plus قبل أي قرار.</p><a href="#interest">أرغب في التجربة</a></article>
+        <article className="plan-card trial"><span className="plan-tag">ابدأ الآن</span><h3>تجربة Plus</h3><div className="plan-price"><b>حتى 19/9</b><span>2026<br/>بلا بطاقة</span></div><p>تجربة مجانية خلال حملة الإطلاق الثاني، وتنتهي تلقائيًا في 19 سبتمبر 2026 الساعة 11:59 مساءً بتوقيت أم القرى.</p><Link href="/#account">ابدأ تجربتك</Link></article>
         <article className="plan-card featured"><span className="plan-tag">الأقرب للإطلاق</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>للشخص الذي يريد ذكاءً أعمق وتخصيصًا مستمرًا.</p><a href="#interest">سجّل اهتمامك</a></article>
         <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="#interest">سجّل اهتمامك</a></article>
       </div>
@@ -56,6 +56,6 @@ export default function NavixaPlusPage() {
 
     <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>لا نبيع بياناتك لنموذج الاشتراك.</h2><p>الدفع سيكون عبر بوابة خارجية آمنة عند الإطلاق. تفضيلاتك وخصوصيتك المحلية تبقى كما هي.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
 
-    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt=""/><span><b>NAVIXA</b><small>يفهم يومك</small></span></Link><span>نسخة تعريفية · لا يوجد تحصيل مالي الآن</span></footer>
+    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt=""/><span><b>NAVIXA</b><small>يفهم يومك</small></span></Link><span>الإطلاق الثاني · التجربة حتى 19 سبتمبر 2026</span></footer>
   </main>;
 }

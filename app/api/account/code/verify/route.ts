@@ -37,7 +37,11 @@ export async function POST(request: Request) {
   if (settings.earlyAccessEnabled) {
     const subscriber = await database.prepare("SELECT id,status FROM navixa_subscribers WHERE user_id=? OR contact=? LIMIT 1").bind(userId, email).all<{ id: string; status: string }>();
     if (!subscriber.results[0]) {
-      const trialEnd = new Date(Date.now() + settings.trialDays * 86_400_000).toISOString();
+      // نهاية الحملة: 19 سبتمبر 2026، 23:59:59 بتوقيت أم القرى (UTC+3).
+      const campaignEnd = Date.parse("2026-09-19T20:59:59.999Z");
+      const requestedEnd = Date.now() + settings.trialDays * 86_400_000;
+      if (Date.now() >= campaignEnd) return NextResponse.json({ error: "انتهت فترة التجربة المجانية حاليًا. يمكنك الاشتراك في Plus عند توفر الباقة." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+      const trialEnd = new Date(Math.min(requestedEnd, campaignEnd)).toISOString();
       await database.prepare("INSERT INTO navixa_subscribers(id,user_id,contact,display_name,plan,status,trial_started_at,trial_ends_at,source,created_at,updated_at) VALUES (?,?,?,'','trial','trial',?,?, 'early_access_account',?,?)").bind(crypto.randomUUID(), userId, email, now, trialEnd, now, now).run();
     } else if (subscriber.results[0].status !== "active") {
       await database.prepare("UPDATE navixa_subscribers SET user_id=?,updated_at=? WHERE id=?").bind(userId, now, subscriber.results[0].id).run();
