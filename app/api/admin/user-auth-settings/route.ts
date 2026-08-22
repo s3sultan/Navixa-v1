@@ -34,7 +34,13 @@ async function snapshot(database: Database, secrets: Env) {
     database.prepare("SELECT COUNT(*) AS count FROM navixa_users").all<{ count: number }>().catch(() => ({ results: [{ count: 0 }] })),
     database.prepare("SELECT COUNT(*) AS count FROM navixa_user_sessions WHERE revoked_at='' AND expires_at>? ").bind(new Date().toISOString()).all<{ count: number }>().catch(() => ({ results: [{ count: 0 }] })),
   ]);
-  return { settings, readiness: { emailProviderConfigured: Boolean(secrets.RESEND_API_KEY && secrets.NAVIXA_AUTH_FROM && secrets.NAVIXA_AUTH_CODE_PEPPER), telegramBotConfigured: Boolean(secrets.NAVIXA_TELEGRAM_BOT_TOKEN && secrets.NAVIXA_TELEGRAM_WEBHOOK_SECRET && secrets.NAVIXA_TELEGRAM_ENCRYPTION_KEY && secrets.NAVIXA_TELEGRAM_BOT_USERNAME), users: Number(users.results[0]?.count || 0), activeSessions: Number(sessions.results[0]?.count || 0) } };
+  const telegram = {
+    botTokenConfigured: Boolean(secrets.NAVIXA_TELEGRAM_BOT_TOKEN),
+    usernameConfigured: Boolean(secrets.NAVIXA_TELEGRAM_BOT_USERNAME),
+    webhookSecretConfigured: Boolean(secrets.NAVIXA_TELEGRAM_WEBHOOK_SECRET),
+    encryptionKeyConfigured: Boolean(secrets.NAVIXA_TELEGRAM_ENCRYPTION_KEY),
+  };
+  return { settings, readiness: { emailProviderConfigured: Boolean(secrets.RESEND_API_KEY && secrets.NAVIXA_AUTH_FROM && secrets.NAVIXA_AUTH_CODE_PEPPER), telegramBotConfigured: Object.values(telegram).every(Boolean), telegram, users: Number(users.results[0]?.count || 0), activeSessions: Number(sessions.results[0]?.count || 0) } };
 }
 
 export async function GET(request: Request) {
