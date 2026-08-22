@@ -13,7 +13,13 @@ const flag = (value: unknown) => value === true || value === "true";
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
 async function env(): Promise<Env> { try { return (await import("cloudflare:workers") as { env?: Env }).env || {}; } catch { return globalThis as Env; } }
-async function allowed(request: Request) { const secret = await resolveAdminJwtSecret(); return Boolean(secret && isTrustedSameOriginRequest(request) && await verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret)); }
+async function allowed(request: Request) {
+  const secret = await resolveAdminJwtSecret();
+  const session = secret ? await verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret) : null;
+  if (!session) return false;
+  // قراءة الإعدادات لا تغيّر حالة الخادم؛ أما كل تعديل فيبقى مقيدًا بطلب من المصدر نفسه لمنع CSRF.
+  return request.method === "GET" || isTrustedSameOriginRequest(request);
+}
 
 async function schema(database: Database) {
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_user_auth_settings (setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
