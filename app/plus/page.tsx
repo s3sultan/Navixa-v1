@@ -6,6 +6,7 @@ import { languageIdentity } from "../content/languages";
 import "./plus.css";
 import InterestForm from "./InterestForm";
 import ReferralCapture from "./ReferralCapture";
+import CheckoutPanel from "./CheckoutPanel";
 
 export const metadata: Metadata = {
   title: "NAVIXA Plus — يفهم يومك بعمق أكبر",
@@ -46,12 +47,13 @@ export default function NavixaPlusPage() {
       <header><small>{ar.plus.plansEyebrow}</small><h2 id="plans-title">{ar.plus.plansTitle}</h2><p>{ar.plus.plansDescription}</p></header>
       <div className="plan-grid">
         <article className="plan-card trial"><span className="plan-tag">ابدأ مجانًا</span><h3>جرّب Plus بهدوء</h3><div className="plan-price"><b>بدون</b><span>بطاقة<br/>ولا التزام</span></div><p>ابدأ التجربة الآن. يمكنك إيقافها في أي وقت، ولن يُخصم أي مبلغ تلقائيًا. تنتهي التجربة في 19 سبتمبر 2026 الساعة 11:59 مساءً بتوقيت أم القرى.</p><Link href="/#account">ابدأ تجربتك المجانية</Link></article>
-        <article className="plan-card featured"><span className="plan-tag">عرض المؤسسين · أول 100 عميل</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>لأول 100 اشتراك فقط: خصم مؤسسين محدود، يظهر لك قبل تأكيد الدفع.</p><a href="#interest">أرغب بعرض المؤسسين</a></article>
-        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="#interest">سجّل اهتمامك</a></article>
+        <article className="plan-card featured"><span className="plan-tag">عرض المؤسسين · أول 100 عميل</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>لأول 100 اشتراك فقط: خصم مؤسسين محدود، يظهر لك قبل تأكيد الدفع.</p><a href="#checkout">اشترك مباشرة</a></article>
+        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="#checkout">اختر باقتك</a></article>
       </div>
       <aside className="founders-note"><span>✦</span><p><b>عرض المؤسسين لأول 100 عميل.</b> كود خصم محدود بعدد 100 استخدام، ولا يمكن استخدامه بعد اكتمال العدد.</p></aside>
     </section>
 
+    <CheckoutPanel/>
     <InterestForm/>
 
     <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>لا نبيع بياناتك لنموذج الاشتراك.</h2><p>الدفع سيكون عبر بوابة خارجية آمنة عند الإطلاق. تفضيلاتك وخصوصيتك المحلية تبقى كما هي.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
