@@ -62,3 +62,41 @@
   .welcome-footer{padding:10px 2px 0}
 }
 @media(max-width:380px){.welcome-priority-features{grid-template-columns:1fr}.welcome-priority-features article{min-height:auto}}
+
+/* Arabic typography correction: preserve connected letter shaping and natural word spacing */
+.welcome,
+.welcome h1,
+.welcome h2,
+.welcome h3,
+.welcome p,
+.welcome b,
+.welcome small,
+.welcome button,
+.welcome label {
+  letter-spacing: normal!important;
+  word-spacing: normal!important;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+}
+.welcome h1,
+.welcome h2,
+.welcome h3,
+.welcome p,
+.welcome b,
+.welcome small,
+.welcome label {
+  font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+}
+.welcome h1 { line-height: 1.22!important; }
+@media(max-width:700px){
+  .welcome h1 { line-height: 1.24!important; }
+  .welcome-intro,
+  .welcome-priority-features small,
+  .welcome-benefit-panel small,
+  .welcome-assurance,
+  .welcome-footer,
+  .welcome-persistent-toggle { letter-spacing: normal!important; word-spacing: normal!important; }
+}
+
+/* فيديو NAVIXA الشامل: تحميل الفيديو يبدأ فقط بعد فتح المشغل. */
+.welcome-overview-video{width:100%;display:grid;grid-template-columns:42px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;border:1px solid rgba(20,133,118,.2);border-radius:18px;background:rgba(255,255,255,.72);padding:12px 15px;color:#174f4c;text-align:right;cursor:pointer;font-family:inherit}.welcome-overview-video>span{grid-row:1/3;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#168f84,#7d6cda);color:#fff;font-size:14px;padding-right:2px}.welcome-overview-video b{font-size:14px;line-height:1.35}.welcome-overview-video small{color:#637c78;font-size:11px;margin-top:2px}.welcome-overview-video:focus-visible,.welcome-overview-video:hover{outline:none;border-color:#168f84;background:#fff}.navixa-overview-video-backdrop{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:24px;background:rgba(16,41,39,.7);backdrop-filter:blur(10px)}.navixa-overview-video-modal{width:min(900px,100%);border:1px solid rgba(255,255,255,.28);border-radius:24px;background:#fbfffe;padding:14px;box-shadow:0 26px 80px rgba(0,0,0,.33);direction:rtl}.navixa-overview-video-head{display:flex;align-items:center;justify-content:space-between;padding:3px 5px 12px}.navixa-overview-video-head div{display:grid;gap:2px}.navixa-overview-video-head small{color:#168f84;font-weight:800;font-size:11px;letter-spacing:.08em}.navixa-overview-video-head b{color:#173f3d;font-size:17px}.navixa-overview-video-head button{width:36px;height:36px;border:0;border-radius:50%;background:#edf6f4;color:#174f4c;font-size:25px;line-height:1;cursor:pointer}.navixa-overview-video{display:block;width:100%;max-height:min(72vh,620px);border-radius:16px;background:#0d2422;object-fit:contain}.navixa-overview-video-modal>p{margin:11px 7px 3px;color:#526e6a;font-size:13px;line-height:1.8}@media(max-width:560px){.navixa-overview-video-backdrop{padding:14px}.navixa-overview-video-modal{padding:10px;border-radius:20px}.navixa-overview-video-head b{font-size:15px}.navixa-overview-video-modal>p{font-size:12px}.welcome-overview-video{border-radius:16px}}

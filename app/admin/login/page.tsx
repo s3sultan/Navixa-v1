@@ -9,8 +9,9 @@ const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.goo
 type GoogleIdentity = {
   accounts: {
     id: {
-      initialize: (options: { client_id: string; callback: (result: { credential: string }) => void }) => void;
+      initialize: (options: { client_id: string; callback: (result: { credential: string }) => void; itp_support?: boolean; auto_select?: boolean; cancel_on_tap_outside?: boolean }) => void;
       renderButton: (element: HTMLElement, options: Record<string, string | number>) => void;
+      prompt?: () => void;
     };
   };
 };
@@ -76,6 +77,10 @@ export default function AdminLogin() {
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: ({ credential }) => void finishGoogleLogin(credential),
+          // يعرض مسارًا متوافقًا مع قيود منع التتبع في Safari وiOS.
+          itp_support: true,
+          auto_select: false,
+          cancel_on_tap_outside: true,
         });
         google.accounts.id.renderButton(mount, {
           type: "standard",
@@ -152,6 +157,18 @@ export default function AdminLogin() {
     };
   }, [finishGoogleLogin, reloadKey]);
 
+  const openGoogleLoginOnMobile = () => {
+    const google = (window as Window & { google?: GoogleIdentity }).google;
+    if (!google?.accounts?.id) {
+      setError("جارٍ تجهيز تسجيل Google. انتظر لحظة ثم أعد المحاولة.");
+      setReloadKey(key => key + 1);
+      return;
+    }
+    setError("");
+    // استدعاء مباشر من لمسة المستخدم مهم لمتصفحات iPhone التي تقيد النوافذ المنبثقة.
+    google.accounts.id.prompt?.();
+  };
+
   const statusText = state === "loading"
     ? "جارٍ تجهيز تسجيل الدخول الآمن…"
     : state === "authorizing"
@@ -171,7 +188,8 @@ export default function AdminLogin() {
           <p>اختر حساب Google المصرّح له للوصول إلى لوحة الإدارة.</p>
         </div>
         <div className="google-login-box shown" aria-busy={state === "loading" || state === "authorizing"}>
-          <div ref={googleButton} aria-label="زر الدخول بحساب Google" />
+          <div className="google-button-frame" ref={googleButton} aria-label="زر الدخول بحساب Google" />
+          <button type="button" className="google-mobile-trigger" onClick={openGoogleLoginOnMobile} disabled={state === "loading" || state === "authorizing"}>فتح تسجيل Google</button>
           {statusText && <span className="google-status">{statusText}</span>}
         </div>
         {state === "error" && <button className="google-retry" onClick={() => setReloadKey(key => key + 1)}>إعادة تجهيز الدخول</button>}

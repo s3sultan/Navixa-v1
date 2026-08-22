@@ -2,12 +2,17 @@
 
 type AppearanceMode="light"|"dark"|"system";
 type AppearancePalette="oasis"|"lilac"|"midnight"|"sand";
+type TextScale="default"|"large"|"xlarge";
 
 type Props={
   mode:AppearanceMode;
   palette:AppearancePalette;
+  textScale:TextScale;
+  highContrast:boolean;
   onModeChange:(mode:AppearanceMode)=>void;
   onPaletteChange:(palette:AppearancePalette)=>void;
+  onTextScaleChange:(scale:TextScale)=>void;
+  onHighContrastChange:(enabled:boolean)=>void;
 };
 
 const modes:{id:AppearanceMode;icon:string;title:string;description:string}[]=[
@@ -23,11 +28,18 @@ const palettes:{id:AppearancePalette;title:string;description:string;swatches:st
   {id:"sand",title:"رمال دافئة",description:"أخضر صحراوي وذهبي",swatches:["#2c8877","#c59046","#fff9ee"]},
 ];
 
-export default function AppearanceSettings({mode,palette,onModeChange,onPaletteChange}:Props){
-  return <section className="appearance-settings" aria-label="إعدادات مظهر NAVIXA">
-    <div className="appearance-heading"><div><small>المظهر</small><h3>شكّل NAVIXA بطريقتك</h3><p>تُحفظ هذه الخيارات على جهازك فقط.</p></div><span aria-hidden="true">✦</span></div>
+const scales:{id:TextScale;title:string;description:string}[]=[
+  {id:"default",title:"عادي",description:"الحجم الافتراضي"},
+  {id:"large",title:"كبير",description:"أسهل للقراءة"},
+  {id:"xlarge",title:"كبير جدًا",description:"وضوح أعلى"},
+];
+
+export default function AppearanceSettings({mode,palette,textScale,highContrast,onModeChange,onPaletteChange,onTextScaleChange,onHighContrastChange}:Props){
+  return <section className="appearance-settings" aria-label="إعدادات مظهر ووصول NAVIXA">
+    <div className="appearance-heading"><div><small>المظهر والوصول</small><h3>شكّل NAVIXA بطريقتك</h3><p>تُحفظ هذه الخيارات على جهازك فقط.</p></div><span aria-hidden="true">✦</span></div>
     <div className="appearance-section"><b>وضع الواجهة</b><div className="appearance-mode-grid">{modes.map(item=><button type="button" key={item.id} className={mode===item.id?"selected":""} onClick={()=>onModeChange(item.id)} aria-pressed={mode===item.id}><span>{item.icon}</span><strong>{item.title}</strong><small>{item.description}</small></button>)}</div></div>
     <div className="appearance-section"><b>لوحة الألوان</b><div className="appearance-palette-grid">{palettes.map(item=><button type="button" key={item.id} className={palette===item.id?"selected":""} onClick={()=>onPaletteChange(item.id)} aria-pressed={palette===item.id}><i>{item.swatches.map(color=><em key={color} style={{background:color}}/>)}</i><strong>{item.title}</strong><small>{item.description}</small></button>)}</div></div>
-    <p className="appearance-note">يمكنك التبديل في أي وقت؛ لا يتم إرسال تفضيلات المظهر إلى الخادم.</p>
+    <div className="appearance-section accessibility-section"><b>وضوح القراءة</b><div className="appearance-scale-grid">{scales.map(item=><button type="button" key={item.id} className={textScale===item.id?"selected":""} onClick={()=>onTextScaleChange(item.id)} aria-pressed={textScale===item.id}><strong>{item.title}</strong><small>{item.description}</small></button>)}</div><label className="appearance-contrast-toggle"><span><b>تباين أوضح</b><small>يرفع وضوح النصوص والحدود</small></span><input type="checkbox" checked={highContrast} onChange={event=>onHighContrastChange(event.target.checked)}/><i aria-hidden="true"/></label></div>
+    <p className="appearance-note">تعمل أدوات الوضوح على هذا الجهاز فقط، ويمكن تغييرها في أي وقت.</p>
   </section>;
 }
