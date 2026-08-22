@@ -1,0 +1,30 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type Campaign={
+  available:boolean;startAt:string;endAt:string;totalSeats:number;paidSeats:number;reservedSeats:number;remainingSeats:number;message:string;
+};
+
+const empty:Campaign={available:false,startAt:"2026-09-19T21:00:00.000Z",endAt:"2026-09-22T20:59:59.999Z",totalSeats:100,paidSeats:0,reservedSeats:0,remainingSeats:100,message:"نافذة المؤسسين لم تبدأ بعد"};
+const format=(value:string)=>new Intl.DateTimeFormat("ar-SA",{dateStyle:"long",timeStyle:"short",timeZone:"Asia/Riyadh"}).format(new Date(value));
+
+export default function FoundersLanding(){
+  const [campaign,setCampaign]=useState<Campaign>(empty),[loaded,setLoaded]=useState(false);
+  useEffect(()=>{let active=true;const load=async()=>{try{const response=await fetch("/api/founders",{cache:"no-store"});if(response.ok&&active){setCampaign(await response.json() as Campaign);setLoaded(true)}}catch{if(active)setLoaded(true)}};void load();const timer=window.setInterval(()=>void load(),15000);return()=>{active=false;window.clearInterval(timer)}},[]);
+  const progress=Math.min(100,Math.max(0,(campaign.paidSeats/campaign.totalSeats)*100));
+  return <main className="founders-page" dir="rtl">
+    <nav className="founders-nav"><Link href="/" className="founders-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt=""/><span>NAVIXA <small>SA</small></span></Link><Link href="/plus">تعرف على Plus ←</Link></nav>
+    <section className="founders-hero">
+      <div className="founders-copy"><p className="founders-eyebrow">نافذة مؤسسي NAVIXA</p><h1>سعر مؤسس شخصي<br/><em>يظهر لك قبل الدفع.</em></h1><p className="founders-lead">بعد تجربة Plus، تفتح نافذة محدودة لأول 100 اشتراك مدفوع. يخصص النظام سعرًا واحدًا لحسابك، ويظهر لك بوضوح قبل أن تقرر الدفع.</p><div className="founders-actions"><Link href="/#account">ابدأ بالتجربة مجانًا</Link><a href="#terms">اقرأ شروط العرض</a></div><p className="founders-date">الحملة: {format(campaign.startAt)} — {format(campaign.endAt)}</p></div>
+      <aside className="seats-live" aria-live="polite"><span className="seats-label">{campaign.available?"المقاعد المتبقية الآن":"مقاعد حملة المؤسسين"}</span><strong>{loaded?campaign.remainingSeats:"—"}</strong><span className="seats-total">من أصل {campaign.totalSeats} مقعد</span><div className="seats-track"><i style={{width:`${progress}%`}}/></div><p>{campaign.available?"يُحدّث العداد كل 15 ثانية. لا ينقص المقعد إلا بعد دفع موثق.":"تبدأ الحملة بعد انتهاء التجربة العامة."}</p></aside>
+    </section>
+    <section className="founders-principles"><article><b>1–12 ر.س</b><span>نطاق سعر المؤسس لأول شهر</span></article><article><b>15 دقيقة</b><span>مهلة حجز السعر للحساب</span></article><article><b>19 ر.س</b><span>سعر التجديد الشهري المعلن لاحقًا</span></article></section>
+    <section className="founders-prices" aria-labelledby="founders-price-title"><div><small>أسعار الحملة</small><h2 id="founders-price-title">فئات سعر المؤسس</h2><p>يخصص النظام فئة واحدة لحسابك من المقاعد المتاحة. يظهر السعر النهائي قبل الدفع، ولا يعني ظهور الفئة أنها متاحة دائمًا.</p></div><div className="price-list" aria-label="فئات سعر أول شهر"><span className="special">1 ر.س<small>وفاء</small></span><span>3 ر.س</span><span>6 ر.س</span><span>9 ر.س</span><span>10 ر.س</span><span>12 ر.س</span></div></section>
+    <section className="founders-explainer"><div><small>كيف يعمل العرض؟</small><h2>لا تختار السعر، لكنك ترى السعر كاملًا قبل الدفع.</h2></div><ol><li><b>سجّل ببريدك الموثق.</b><span>لكل حساب فرصة واحدة فقط.</span></li><li><b>يُخصص لك سعر مؤسس.</b><span>يُحجز لمدة 15 دقيقة ولا يعاد سحبه.</span></li><li><b>أكّد قرارك بحرية.</b><span>لا تُستهلك المقاعد إلا بعد دفع موثق.</span></li></ol></section>
+    <section className="founders-trust"><div><span>✦</span><p><b>أول مؤسس وآخر مؤسس</b> يحصلان على أول شهر بـ1 ر.س كعربون محبة ووفاء.</p></div><div><span>✓</span><p><b>لا بطاقة أثناء التجربة.</b> ولا يخصم أي مبلغ قبل اختيارك الاشتراك وإتمام الدفع.</p></div><div><span>✓</span><p><b>القرار لك.</b> تستطيع إدارة اشتراكك وفق السياسة المنشورة في حسابك.</p></div></section>
+    <section className="founders-terms" id="terms"><small>شروط مختصرة قبل الدفع</small><h2>شفافية العرض جزء من التجربة.</h2><details><summary>عرض الشروط الأساسية</summary><p>حملة مؤسسي NAVIXA محدودة بـ100 اشتراك مدفوع موثق أو حتى نهاية الحملة، أيهما أولًا. سعر المؤسس يطبق على أول شهر فقط ويظهر للحساب قبل الدفع. السعر المعلن للتجديد لاحقًا هو 19 ر.س شهريًا. يخصص العرض مرة واحدة لكل حساب وبريد موثق، ولا يكتمل احتساب المقعد إلا بعد الدفع الناجح. تطبق سياسة الإلغاء والاسترجاع المنشورة وقت الشراء.</p></details><p className="terms-note">تُعرض التفاصيل الكاملة، والسعر النهائي، وسياسة الإلغاء قبل تأكيد أي دفع.</p></section>
+    <footer>© NAVIXA SA · <Link href="/privacy">الخصوصية</Link> · <Link href="/plus">Plus</Link></footer>
+  </main>;
+}

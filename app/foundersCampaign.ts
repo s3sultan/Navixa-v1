@@ -12,7 +12,7 @@ export const FOUNDERS_POOLS=[
   {price:600,seats:15},
   {price:900,seats:25},
   {price:1000,seats:10},
-  {price:1200,seats:40},
+  {price:1200,seats:41},
 ] as const;
 
 const nowIso=()=>new Date().toISOString();
