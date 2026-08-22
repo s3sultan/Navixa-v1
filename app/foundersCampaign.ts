@@ -4,8 +4,10 @@ export type D1Database={prepare:(sql:string)=>D1Statement};
 type Pool={price_amount:number;seats_total:number;reserved_count:number;redeemed_count:number};
 type Award={id:string;price_amount:number;award_role:"first"|"random"|"last";status:"reserved"|"paid"|"expired";expires_at:string};
 export const FOUNDERS_KEY="navixa_founders_sep_2026";
-export const FOUNDERS_START="2026-09-19T21:00:00.000Z"; // 20 Sep 2026 00:00 Umm Al Qura
+export const FOUNDERS_START="2026-08-21T21:00:00.000Z"; // 22 Aug 2026 00:00 Umm Al Qura
 export const FOUNDERS_END="2026-09-22T20:59:59.999Z"; // 22 Sep 2026 23:59:59 Umm Al Qura
+export const FIRST_FOUNDER_REVEAL_DELAY_MS=7*24*60*60*1000;
+export const FIRST_FOUNDER_BADGE_DURATION_MS=365*24*60*60*1000;
 export const FOUNDERS_POOLS=[
   {price:100,seats:2},
   {price:300,seats:7},
@@ -23,9 +25,11 @@ export async function ensureFoundersCampaign(database:D1Database){
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_founders_campaigns (campaign_key TEXT PRIMARY KEY,start_at TEXT NOT NULL,end_at TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL)").run();
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_founders_pools (campaign_key TEXT NOT NULL,price_amount INTEGER NOT NULL,seats_total INTEGER NOT NULL,reserved_count INTEGER NOT NULL DEFAULT 0,redeemed_count INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(campaign_key,price_amount))").run();
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_founders_awards (id TEXT PRIMARY KEY,campaign_key TEXT NOT NULL,contact TEXT NOT NULL UNIQUE,user_id TEXT NOT NULL,price_amount INTEGER NOT NULL,award_role TEXT NOT NULL DEFAULT 'random',status TEXT NOT NULL DEFAULT 'reserved',intent_id TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,reserved_at TEXT NOT NULL,expires_at TEXT NOT NULL,paid_at TEXT NOT NULL DEFAULT '')").run();
+  await database.prepare("CREATE TABLE IF NOT EXISTS navixa_founders_honors (id TEXT PRIMARY KEY,campaign_key TEXT NOT NULL,award_id TEXT NOT NULL UNIQUE,contact TEXT NOT NULL,user_id TEXT NOT NULL,honor_type TEXT NOT NULL,unlock_at TEXT NOT NULL,badge_until TEXT NOT NULL,revealed_at TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)").run();
   await database.prepare("ALTER TABLE navixa_founders_awards ADD COLUMN award_role TEXT NOT NULL DEFAULT 'random'").run().catch(()=>{});
   const now=nowIso();
   await database.prepare("INSERT OR IGNORE INTO navixa_founders_campaigns (campaign_key,start_at,end_at,active,created_at) VALUES (?,?,?,?,?)").bind(FOUNDERS_KEY,FOUNDERS_START,FOUNDERS_END,1,now).run();
+  await database.prepare("UPDATE navixa_founders_campaigns SET start_at=?,end_at=?,active=1 WHERE campaign_key=?").bind(FOUNDERS_START,FOUNDERS_END,FOUNDERS_KEY).run();
   for(const pool of FOUNDERS_POOLS)await database.prepare("INSERT OR IGNORE INTO navixa_founders_pools (campaign_key,price_amount,seats_total,reserved_count,redeemed_count) VALUES (?,?,?,?,?)").bind(FOUNDERS_KEY,pool.price,pool.seats,0,0).run();
 }
 
@@ -64,9 +68,11 @@ export async function assignFoundersAward(database:D1Database,contact:string,use
 
 export async function completeFoundersAward(database:D1Database,intentId:string){
   await ensureFoundersCampaign(database);const now=nowIso();
-  const rows=await database.prepare("SELECT id,price_amount,status FROM navixa_founders_awards WHERE intent_id=? AND campaign_key=? LIMIT 1").bind(intentId,FOUNDERS_KEY).all<{id:string;price_amount:number;status:string}>();const award=rows.results[0];
+  const rows=await database.prepare("SELECT id,price_amount,status,award_role,contact,user_id FROM navixa_founders_awards WHERE intent_id=? AND campaign_key=? LIMIT 1").bind(intentId,FOUNDERS_KEY).all<{id:string;price_amount:number;status:string;award_role:"first"|"random"|"last";contact:string;user_id:string}>();const award=rows.results[0];
   if(!award||award.status!=="reserved")return false;
   const result=await database.prepare("UPDATE navixa_founders_awards SET status='paid',paid_at=? WHERE id=? AND status='reserved'").bind(now,award.id).run();
   if(changes(result)===0)return false;
-  await database.prepare("UPDATE navixa_founders_pools SET redeemed_count=redeemed_count+1,reserved_count=CASE WHEN reserved_count>0 THEN reserved_count-1 ELSE 0 END WHERE campaign_key=? AND price_amount=?").bind(FOUNDERS_KEY,award.price_amount).run();return true;
+  await database.prepare("UPDATE navixa_founders_pools SET redeemed_count=redeemed_count+1,reserved_count=CASE WHEN reserved_count>0 THEN reserved_count-1 ELSE 0 END WHERE campaign_key=? AND price_amount=?").bind(FOUNDERS_KEY,award.price_amount).run();
+  if(award.award_role==="first"){const paidAt=Date.parse(now),unlockAt=new Date(paidAt+FIRST_FOUNDER_REVEAL_DELAY_MS).toISOString(),badgeUntil=new Date(paidAt+FIRST_FOUNDER_BADGE_DURATION_MS).toISOString();await database.prepare("INSERT OR IGNORE INTO navixa_founders_honors (id,campaign_key,award_id,contact,user_id,honor_type,unlock_at,badge_until,revealed_at,created_at) VALUES (?,?,?,?,?,'first_gold_founder',?,?, '',?)").bind(crypto.randomUUID(),FOUNDERS_KEY,award.id,award.contact,award.user_id,unlockAt,badgeUntil,now).run();}
+  return true;
 }
