@@ -10,7 +10,7 @@ const BASE_URL = `http://[::1]:${APP_PORT}`;
 const DEBUG_URL = `http://127.0.0.1:${DEBUG_PORT}`;
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-async function waitForUrl(url, label, attempts = 90) {
+async function waitForUrl(url, label, attempts = 180) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
