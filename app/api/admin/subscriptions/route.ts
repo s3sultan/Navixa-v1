@@ -30,13 +30,13 @@ export async function GET(request:Request){
 
 export async function POST(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
-  const body=await request.json().catch(()=>({})) as {action?:unknown;id?:unknown;contact?:unknown;displayName?:unknown;plan?:unknown;status?:unknown};
+  const body=await request.json().catch(()=>({})) as {action?:unknown;id?:unknown;contact?:unknown;displayName?:unknown;plan?:unknown;status?:unknown;trialDays?:unknown};
   const action=clean(body.action,24),id=clean(body.id,80),now=new Date().toISOString();const database=await db();if(!database)return NextResponse.json({error:"التخزين غير مهيأ"},{status:503,headers:{"Cache-Control":"no-store"}});await schema(database);
   if(action==="create_trial"){
     const contact=email(body.contact),displayName=clean(body.displayName,80);if(!validEmail(contact))return NextResponse.json({error:"أدخل بريدًا صحيحًا"},{status:400});
-    const trialEnd=afterDays(14),subscriberId=crypto.randomUUID();
+    const requestedDays=Math.max(1,Math.min(90,Number.parseInt(clean(body.trialDays,3),10)||14)),trialEnd=afterDays(requestedDays),subscriberId=crypto.randomUUID();
     await database.prepare("INSERT INTO navixa_subscribers (id,contact,display_name,plan,status,trial_started_at,trial_ends_at,subscription_ends_at,source,created_at,updated_at) VALUES (?,?,?,'trial','trial',?,?,?,'admin_trial',?,?) ON CONFLICT(contact) DO UPDATE SET display_name=excluded.display_name,plan='trial',status='trial',trial_started_at=excluded.trial_started_at,trial_ends_at=excluded.trial_ends_at,subscription_ends_at='',source='admin_trial',updated_at=excluded.updated_at").bind(subscriberId,contact,displayName,now,trialEnd,"",now,now).run();
-    return NextResponse.json({ok:true,message:"تم منح تجربة Plus لمدة 14 يومًا"},{headers:{"Cache-Control":"no-store"}});
+    return NextResponse.json({ok:true,message:`تم منح تجربة Plus لمدة ${requestedDays} يومًا`},{headers:{"Cache-Control":"no-store"}});
   }
   if(!id)return NextResponse.json({error:"معرف المشترك مطلوب"},{status:400});
   if(action==="extend_trial"){const trialEnd=afterDays(14);await database.prepare("UPDATE navixa_subscribers SET plan='trial',status='trial',trial_ends_at=?,subscription_ends_at='',updated_at=? WHERE id=?").bind(trialEnd,now,id).run();return NextResponse.json({ok:true,message:"تم تمديد التجربة 14 يومًا"},{headers:{"Cache-Control":"no-store"}});}

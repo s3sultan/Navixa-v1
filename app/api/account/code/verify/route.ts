@@ -18,10 +18,10 @@ export async function POST(request: Request) {
   const settings = await getUserAuthSettings(database).catch(() => null), secrets = await env();
   if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !secrets.NAVIXA_AUTH_CODE_PEPPER) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   const body = await request.json().catch(() => ({})) as { email?: unknown; code?: unknown };
-  const email = normalizeUserEmail(body.email), loginCode = code(body.code), ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "anonymous";
-  if (!consume(`verify:${ip}`)) return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": "600", "Cache-Control": "no-store" } });
+  const email = normalizeUserEmail(body.email), loginCode = code(body.code), ipForAttempts = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "anonymous";
+  if (!consume(`verify:${ipForAttempts}`)) return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": "600", "Cache-Control": "no-store" } });
   if (!isValidUserEmail(email) || loginCode.length !== 6) return NextResponse.json({ error: "تحقق من البريد والرمز" }, { status: 400, headers: { "Cache-Control": "no-store" } });
-  const emailHash = await hashOpaqueValue(email), expected = await hashOpaqueValue(`${email}:${loginCode}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`), now = new Date().toISOString();
+  const emailHash = await hashOpaqueValue(email), expected = await hashOpaqueValue(`${email}:${loginCode}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`), now = new Date().toISOString(), ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown", ipHash = await hashOpaqueValue(`trial-ip-v1:${ip}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`);
   const codes = await database.prepare("SELECT id,code_hash,attempts FROM navixa_user_login_codes WHERE email_hash=? AND purpose='login' AND consumed_at='' AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(emailHash, now).all<{ id: string; code_hash: string; attempts: number }>();
   const activeCode = codes.results[0];
   if (!activeCode || activeCode.attempts >= 5 || activeCode.code_hash !== expected) {
@@ -35,14 +35,20 @@ export async function POST(request: Request) {
   if (!existing.results[0]) await database.prepare("INSERT INTO navixa_users(id,email,email_hash,webauthn_user_id,status,created_at,updated_at,last_login_at) VALUES (?,?,?,?, 'active',?,?,?)").bind(userId, email, emailHash, createOpaqueToken(), now, now, now).run();
   else await database.prepare("UPDATE navixa_users SET status='active',updated_at=?,last_login_at=? WHERE id=?").bind(now, now, userId).run();
   if (settings.earlyAccessEnabled) {
+    await database.prepare("CREATE TABLE IF NOT EXISTS navixa_trial_issuance (id TEXT PRIMARY KEY,email_hash TEXT NOT NULL UNIQUE,ip_hash TEXT NOT NULL,issued_at TEXT NOT NULL)").run().catch(()=>{});
     const subscriber = await database.prepare("SELECT id,status FROM navixa_subscribers WHERE user_id=? OR contact=? LIMIT 1").bind(userId, email).all<{ id: string; status: string }>();
     if (!subscriber.results[0]) {
+      const previousWindow = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      let ipUsageCount = 0;
+      try { const ipUsage = await database.prepare("SELECT COUNT(*) AS count FROM navixa_trial_issuance WHERE ip_hash=? AND issued_at>=?").bind(ipHash, previousWindow).all<{count:number}>(); ipUsageCount = ipUsage.results[0]?.count || 0; } catch { ipUsageCount = 0; }
+      if (ipUsageCount >= 2) return NextResponse.json({ error: "تم استخدام الحد المسموح للتجربة من هذه الشبكة خلال الفترة الحالية." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": "86400" } });
       // نهاية الحملة: 19 سبتمبر 2026، 23:59:59 بتوقيت أم القرى (UTC+3).
       const campaignEnd = Date.parse("2026-09-19T20:59:59.999Z");
       const requestedEnd = Date.now() + settings.trialDays * 86_400_000;
       if (Date.now() >= campaignEnd) return NextResponse.json({ error: "انتهت فترة التجربة المجانية حاليًا. يمكنك الاشتراك في Plus عند توفر الباقة." }, { status: 403, headers: { "Cache-Control": "no-store" } });
       const trialEnd = new Date(Math.min(requestedEnd, campaignEnd)).toISOString();
       await database.prepare("INSERT INTO navixa_subscribers(id,user_id,contact,display_name,plan,status,trial_started_at,trial_ends_at,source,created_at,updated_at) VALUES (?,?,?,'','trial','trial',?,?, 'early_access_account',?,?)").bind(crypto.randomUUID(), userId, email, now, trialEnd, now, now).run();
+      await database.prepare("INSERT INTO navixa_trial_issuance(id,email_hash,ip_hash,issued_at) VALUES (?,?,?,?) ON CONFLICT(email_hash) DO NOTHING").bind(crypto.randomUUID(), emailHash, ipHash, now).run().catch(()=>{});
     } else if (subscriber.results[0].status !== "active") {
       await database.prepare("UPDATE navixa_subscribers SET user_id=?,updated_at=? WHERE id=?").bind(userId, now, subscriber.results[0].id).run();
     }
