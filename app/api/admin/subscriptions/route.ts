@@ -17,7 +17,7 @@ function afterDays(days:number){return new Date(Date.now()+days*86400000).toISOS
 export async function GET(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
   const database=await db();if(!database)return NextResponse.json({summary:{waitlist:0,trial:0,active:0,endingSoon:0},subscribers:[]},{headers:{"Cache-Control":"no-store"}});
-  await schema(database);const now=new Date().toISOString(),soon=afterDays(3);
+  await schema(database);const now=new Date().toISOString(),soon=afterDays(4);
   const [rows,waitlist,trial,active,endingSoon]=await Promise.all([
     database.prepare("SELECT id,contact,display_name,plan,status,trial_started_at,trial_ends_at,subscription_ends_at,source,created_at,updated_at FROM navixa_subscribers ORDER BY updated_at DESC LIMIT 80").all<Subscriber>(),
     database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status='waitlist'").all<{count:number}>(),

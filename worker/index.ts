@@ -4,6 +4,7 @@ import handler from "vinext/server/app-router-entry";
 import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath, isProtectedAdminPath, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "./adminAuth";
 import { deliverDueMatchPushes } from "./matchPush";
 import { checkDomainExpiry } from "./domainExpiryAlert";
+import { deliverDueSubscriptionRenewals } from "./subscriptionRenewals";
 
 interface Env {
   ASSETS: Fetcher;
@@ -13,6 +14,8 @@ interface Env {
   RESEND_API_KEY?: string;
   NAVIXA_ADMIN_EMAIL?: string;
   RESEND_FROM_EMAIL?: string;
+  NAVIXA_AUTH_FROM?: string;
+  NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -237,6 +240,7 @@ const worker = {
     ctx.waitUntil(deliverDueMatchPushes(env).then(result => console.log(JSON.stringify({ event: "match_push_scheduled", delivered: result.delivered, skipped: result.skipped }))));
     ctx.waitUntil(aggregatePerformanceWindows(env).catch(error => console.log(JSON.stringify({ event: "performance_aggregation_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(checkDomainExpiry(env).catch(error => console.log(JSON.stringify({ event: "domain_expiry_check_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(deliverDueSubscriptionRenewals(env).then(result => console.log(JSON.stringify({ event: "subscription_renewal_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "subscription_renewal_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);

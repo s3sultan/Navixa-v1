@@ -3,9 +3,18 @@ import { getUserAuthSettings, resolveUserSession, trustedUserMutation, type D1Da
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
-const alertTypes = new Set(["adhan","iqama","water","break","focus","name","wird","sadaqah","task"]);
+const alertTypes = new Set(["adhan","iqama","water","break","focus","name","wird","sadaqah","task","renewal"]);
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
 function reply(body: Record<string, unknown>, status = 200) { return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } }); }
+
+export async function GET(request: Request) {
+  const database = await db();
+  if (!database) return reply({ enabled: false }, 503);
+  const session = await resolveUserSession(request, database);
+  if (!session) return reply({ enabled: false }, 401);
+  const preference = await database.prepare("SELECT enabled FROM navixa_user_telegram_preferences WHERE user_id=? AND notification_type='renewal' LIMIT 1").bind(session.userId).all<{ enabled: number }>();
+  return reply({ enabled: preference.results[0]?.enabled === 1 });
+}
 
 export async function POST(request: Request) {
   if (!trustedUserMutation(request)) return reply({ error: "مصدر الطلب غير موثوق" }, 403);
