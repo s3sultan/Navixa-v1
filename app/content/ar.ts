@@ -11,7 +11,7 @@ export const ar = {
   },
   home: {
     welcome: {
-      greetingPrefix: "هذا NAVIXA",
+      greetingPrefix: "هذا NAVIXA SA",
       titleLineOne: "مساحتك الذكية",
       titleLineTwo: "ليوم أكثر هدوءًا.",
       intro: "مساحة هادئة تساعدك على إنجاز الأهم، وبإذنك فقط.",

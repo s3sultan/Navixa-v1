@@ -25,7 +25,7 @@ const included = [
 export default function NavixaPlusPage() {
   return <main className="plus-page" dir={languageIdentity.ar.direction}><ReferralCapture/>
     <nav className="plus-nav">
-      <Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt=""/><span><b>NAVIXA</b><small>يفهم يومك</small></span></Link>
+      <Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt=""/><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link>
       <Link href="/" className="plus-back">العودة للرئيسية ←</Link>
     </nav>
 
@@ -58,6 +58,6 @@ export default function NavixaPlusPage() {
 
     <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>لا نبيع بياناتك لنموذج الاشتراك.</h2><p>الدفع سيكون عبر بوابة خارجية آمنة عند الإطلاق. تفضيلاتك وخصوصيتك المحلية تبقى كما هي.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
 
-    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt=""/><span><b>NAVIXA</b><small>يفهم يومك</small></span></Link><span>الإطلاق الثاني · التجربة حتى 19 سبتمبر 2026</span></footer>
+    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt=""/><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><span>الإطلاق الثاني · التجربة حتى 19 سبتمبر 2026</span></footer>
   </main>;
 }
