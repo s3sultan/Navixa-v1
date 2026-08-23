@@ -17,7 +17,7 @@ export default function NavixaSplash() {
     <div className="navixa-splash-orbit" aria-hidden="true" />
     <div className="navixa-splash-brand">
       <img src="/navixa-mark.webp" alt="" />
-      <div className="navixa-splash-wordmark"><b>NAVIXA</b><small>SA</small></div>
+      <div className="navixa-splash-wordmark"><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b></div>
       <p>مساعدك الذكي، حاضر في التفاصيل التي تهمك</p>
     </div>
   </div>;

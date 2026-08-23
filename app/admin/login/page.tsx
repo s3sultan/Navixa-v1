@@ -180,7 +180,7 @@ export default function AdminLogin() {
       <section className="login-card">
         <Link href="/" className="login-brand">
           <span className="login-logo-mark"><img src="/navixa-mark.png" alt="" /></span>
-          <div><b>NAVIXA</b><small>ADMIN CENTER</small></div>
+          <div><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>ADMIN CENTER</small></div>
         </Link>
         <div className="login-title">
           <small>دخول الإدارة الآمن</small>

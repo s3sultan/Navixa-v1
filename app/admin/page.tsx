@@ -75,7 +75,7 @@ export default function AdminPage() {
       <aside className="admin-side">
         <div className="logo">
           <span className="admin-logo-mark"><img src="/navixa-mark.png" alt="" /></span>
-          <div><b>NAVIXA <small className="brand-sa">SA</small></b><small>مركز الإدارة</small></div>
+          <div><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>مركز الإدارة</small></div>
         </div>
         <div className="admin-badge">صلاحيات المدير الكاملة</div>
 
