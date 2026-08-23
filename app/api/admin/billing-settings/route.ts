@@ -7,9 +7,9 @@ type BillingSetting={setting_key:string;setting_value:string};
 type BillingEvent={id:string;provider_event_id:string;event_type:string;mode:string;created_at:string;processed_at:string};
 type Env=Record<string,string|undefined>;
 
-const settingKeys=["provider","mode","public_checkout","test_webhook_enabled","live_payments_enabled","card_mada_enabled","visa_enabled","mastercard_enabled","apple_pay_enabled","stc_pay_enabled","samsung_pay_enabled","tamara_enabled","tamara_sandbox_enabled"] as const;
+const settingKeys=["provider","mode","public_checkout","test_webhook_enabled","live_payments_enabled","card_mada_enabled","visa_enabled","mastercard_enabled","apple_pay_enabled","stc_pay_enabled","samsung_pay_enabled","tamara_enabled","tamara_sandbox_enabled","telr_enabled","telr_sandbox_enabled"] as const;
 type SettingKey=(typeof settingKeys)[number];
-const defaults:Record<SettingKey,string>={provider:"moyasar",mode:"test",public_checkout:"false",test_webhook_enabled:"false",live_payments_enabled:"false",card_mada_enabled:"true",visa_enabled:"true",mastercard_enabled:"true",apple_pay_enabled:"false",stc_pay_enabled:"false",samsung_pay_enabled:"false",tamara_enabled:"false",tamara_sandbox_enabled:"true"};
+const defaults:Record<SettingKey,string>={provider:"moyasar",mode:"test",public_checkout:"false",test_webhook_enabled:"false",live_payments_enabled:"false",card_mada_enabled:"true",visa_enabled:"true",mastercard_enabled:"true",apple_pay_enabled:"false",stc_pay_enabled:"false",samsung_pay_enabled:"false",tamara_enabled:"false",tamara_sandbox_enabled:"true",telr_enabled:"false",telr_sandbox_enabled:"true"};
 const clean=(value:unknown,limit:number)=>typeof value==="string"?value.replace(/\s+/g," ").trim().slice(0,limit):"";
 const flag=(value:unknown)=>value===true||value==="true";
 
@@ -23,7 +23,7 @@ async function schema(database:D1Database){
   for(const key of settingKeys)await database.prepare("INSERT OR IGNORE INTO navixa_billing_settings (setting_key,setting_value,updated_at) VALUES (?,?,?)").bind(key,defaults[key],now).run();
 }
 async function readSettings(database:D1Database){await schema(database);const rows=await database.prepare("SELECT setting_key,setting_value FROM navixa_billing_settings").all<BillingSetting>();const settings={...defaults};for(const row of rows.results)if(settingKeys.includes(row.setting_key as SettingKey))settings[row.setting_key as SettingKey]=row.setting_value;return settings;}
-function safeStatus(secrets:Env){return {testPublishableKeyConfigured:Boolean(secrets.MOYASAR_TEST_PUBLISHABLE_KEY),testKeyConfigured:Boolean(secrets.MOYASAR_TEST_SECRET_KEY),testWebhookSecretConfigured:Boolean(secrets.MOYASAR_TEST_WEBHOOK_SECRET),livePublishableKeyConfigured:Boolean(secrets.MOYASAR_LIVE_PUBLISHABLE_KEY),liveKeyConfigured:Boolean(secrets.MOYASAR_LIVE_SECRET_KEY),liveWebhookSecretConfigured:Boolean(secrets.MOYASAR_LIVE_WEBHOOK_SECRET),tamaraApiUrlConfigured:Boolean(secrets.TAMARA_API_URL),tamaraTestKeyConfigured:Boolean(secrets.TAMARA_TEST_API_TOKEN),tamaraLiveKeyConfigured:Boolean(secrets.TAMARA_LIVE_API_TOKEN),tamaraWebhookSecretConfigured:Boolean(secrets.TAMARA_WEBHOOK_SECRET)};}
+function safeStatus(secrets:Env){return {testPublishableKeyConfigured:Boolean(secrets.MOYASAR_TEST_PUBLISHABLE_KEY),testKeyConfigured:Boolean(secrets.MOYASAR_TEST_SECRET_KEY),testWebhookSecretConfigured:Boolean(secrets.MOYASAR_TEST_WEBHOOK_SECRET),livePublishableKeyConfigured:Boolean(secrets.MOYASAR_LIVE_PUBLISHABLE_KEY),liveKeyConfigured:Boolean(secrets.MOYASAR_LIVE_SECRET_KEY),liveWebhookSecretConfigured:Boolean(secrets.MOYASAR_LIVE_WEBHOOK_SECRET),tamaraApiUrlConfigured:Boolean(secrets.TAMARA_API_URL),tamaraTestKeyConfigured:Boolean(secrets.TAMARA_TEST_API_TOKEN),tamaraLiveKeyConfigured:Boolean(secrets.TAMARA_LIVE_API_TOKEN),tamaraWebhookSecretConfigured:Boolean(secrets.TAMARA_WEBHOOK_SECRET),telrStoreIdConfigured:Boolean(secrets.TELR_STORE_ID),telrTestKeyConfigured:Boolean(secrets.TELR_TEST_AUTH_KEY),telrLiveKeyConfigured:Boolean(secrets.TELR_LIVE_AUTH_KEY),telrWebhookSecretConfigured:Boolean(secrets.TELR_WEBHOOK_SECRET),telrAdminEnabled:secrets.NAVIXA_TELR_ENABLED==="true"};}
 
 export async function GET(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
@@ -34,7 +34,7 @@ export async function GET(request:Request){
 
 export async function POST(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
-  const body=await request.json().catch(()=>({})) as {provider?:unknown;mode?:unknown;publicCheckout?:unknown;testWebhookEnabled?:unknown;livePaymentsEnabled?:unknown;cardMadaEnabled?:unknown;visaEnabled?:unknown;mastercardEnabled?:unknown;applePayEnabled?:unknown;stcPayEnabled?:unknown;samsungPayEnabled?:unknown;tamaraEnabled?:unknown;tamaraSandboxEnabled?:unknown};
+  const body=await request.json().catch(()=>({})) as {provider?:unknown;mode?:unknown;publicCheckout?:unknown;testWebhookEnabled?:unknown;livePaymentsEnabled?:unknown;cardMadaEnabled?:unknown;visaEnabled?:unknown;mastercardEnabled?:unknown;applePayEnabled?:unknown;stcPayEnabled?:unknown;samsungPayEnabled?:unknown;tamaraEnabled?:unknown;tamaraSandboxEnabled?:unknown;telrEnabled?:unknown;telrSandboxEnabled?:unknown};
   const database=await db();if(!database)return NextResponse.json({error:"التخزين غير مهيأ"},{status:503,headers:{"Cache-Control":"no-store"}});
   const current=await readSettings(database),secrets=await env();
   const next={
@@ -51,6 +51,8 @@ export async function POST(request:Request){
     samsung_pay_enabled:String(flag(body.samsungPayEnabled)),
     tamara_enabled:String(flag(body.tamaraEnabled)),
     tamara_sandbox_enabled:String(flag(body.tamaraSandboxEnabled)),
+    telr_enabled:String(flag(body.telrEnabled)),
+    telr_sandbox_enabled:String(flag(body.telrSandboxEnabled)),
   };
   if(next.provider!=="moyasar"||!["test","live"].includes(next.mode))return NextResponse.json({error:"إعداد بوابة الدفع غير صالح"},{status:400});
   if(next.public_checkout==="true"&&next.live_payments_enabled!=="true")return NextResponse.json({error:"لا يمكن إظهار الدفع للزوار قبل تفعيل الوضع الحي من الإدارة"},{status:400});

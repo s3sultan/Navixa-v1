@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildMoyasarCheckout, normalizeMoyasarWebhook, tamaraAdapter } from "../app/billing/providers/index.ts";
+import { buildMoyasarCheckout, buildTelrHostedPaymentRequest, normalizeMoyasarWebhook, tamaraAdapter, telrAdapter } from "../app/billing/providers/index.ts";
 
 test("Moyasar checkout deduplicates provider methods and preserves Apple Pay metadata", () => {
   const checkout = buildMoyasarCheckout({
@@ -35,4 +35,27 @@ test("Tamara remains disabled unless an administrator enables it and sandbox sec
   const ready = tamaraAdapter.readiness({ NAVIXA_TAMARA_ENABLED: "true", TAMARA_API_URL: "https://api.tamara.test", TAMARA_TEST_API_TOKEN: "test_token", TAMARA_WEBHOOK_SECRET: "webhook_secret" });
   assert.equal(ready.enabled, true);
   assert.equal(ready.mode, "sandbox");
+});
+
+test("Telr remains disabled until an administrator enables it and all sandbox credentials exist", () => {
+  const missing = telrAdapter.readiness({ NAVIXA_TELR_ENABLED: "true" });
+  assert.equal(missing.enabled, false);
+  assert.deepEqual(missing.missingSecrets, ["TELR_STORE_ID", "TELR_TEST_AUTH_KEY", "TELR_WEBHOOK_SECRET"]);
+  const ready = telrAdapter.readiness({ NAVIXA_TELR_ENABLED: "true", TELR_STORE_ID: "1234", TELR_TEST_AUTH_KEY: "test_key", TELR_WEBHOOK_SECRET: "webhook_secret" });
+  assert.equal(ready.enabled, true);
+  assert.equal(ready.mode, "sandbox");
+});
+
+test("Telr hosted checkout uses major SAR units and refuses to construct a request while disabled", () => {
+  const intent = { id: "intent_123", amount: 1900, currency: "SAR" as const, description: "NAVIXA Plus", callbackUrl: "https://navixasa.com/plus/complete?intent=intent_123", metadata: { navixa_intent: "intent_123" } };
+  const disabled = buildTelrHostedPaymentRequest({ intent, environment: {}, authorisedUrl: intent.callbackUrl, declinedUrl: intent.callbackUrl, cancelledUrl: intent.callbackUrl, webhookUrl: "https://navixasa.com/api/billing/webhooks/telr", panels: ["card"] });
+  assert.equal(disabled.ok, false);
+  const configured = buildTelrHostedPaymentRequest({ intent, environment: { NAVIXA_TELR_ENABLED: "true", TELR_STORE_ID: "1234", TELR_TEST_AUTH_KEY: "test_key", TELR_WEBHOOK_SECRET: "webhook_secret" }, authorisedUrl: intent.callbackUrl, declinedUrl: intent.callbackUrl, cancelledUrl: intent.callbackUrl, webhookUrl: "https://navixasa.com/api/billing/webhooks/telr", panels: ["card", "applepay"] });
+  assert.equal(configured.ok, true);
+  if (configured.ok) {
+    assert.equal(configured.request.order.amount, "19.00");
+    assert.equal(configured.request.order.test, "1");
+    assert.equal(configured.request.order.cartid, "intent_123");
+    assert.equal(configured.request.panels, "card,applepay");
+  }
 });

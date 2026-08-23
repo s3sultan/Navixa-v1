@@ -1,14 +1,17 @@
 import { moyasarAdapter } from "./moyasar.ts";
 import { tamaraAdapter } from "./tamara.ts";
+import { telrAdapter } from "./telr.ts";
 import type { PaymentProviderAdapter, PaymentProviderId, ProviderEnvironment, ProviderReadiness } from "./types.ts";
 
 export * from "./types.ts";
 export { buildMoyasarCheckout, moyasarAdapter, normalizeMoyasarWebhook, verifyMoyasarPayment } from "./moyasar.ts";
 export { tamaraActivationRule, tamaraAdapter } from "./tamara.ts";
+export { buildTelrHostedPaymentRequest, createTelrHostedCheckout, telrActivationRule, telrAdapter, verifyTelrPayment } from "./telr.ts";
 
 const adapters: Partial<Record<PaymentProviderId, PaymentProviderAdapter>> = {
   moyasar: moyasarAdapter,
   tamara: tamaraAdapter,
+  telr: telrAdapter,
 };
 
 export function providerAdapter(id: PaymentProviderId) {
