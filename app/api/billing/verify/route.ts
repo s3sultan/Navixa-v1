@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server.js";
 import {applyPendingCredits,rewardReferralAfterVerifiedPayment} from "../../../referrals.ts";
 import {completeFoundersAward} from "../../../foundersCampaign.ts";
+import { verifyMoyasarPayment } from "../../../billing/providers/index.ts";
 
 type D1Statement={bind:(...values:unknown[])=>D1Statement;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
 type D1Database={prepare:(sql:string)=>D1Statement};
@@ -32,15 +33,16 @@ export async function POST(request:Request){
   const body=await request.json().catch(()=>({})) as {intentId?:unknown;paymentId?:unknown};const intentId=clean(body.intentId,80),id=paymentId(body.paymentId);if(!intentId||!id)return NextResponse.json({error:"مرجع الدفع غير صالح"},{status:400,headers:{"Cache-Control":"no-store"}});
   const selected=await database.prepare("SELECT id,contact,plan,amount,currency,status,expires_at,discount_code,founders_intent_id FROM navixa_billing_intents WHERE id=? LIMIT 1").bind(intentId).all<Intent>();const intent=selected.results[0];if(!intent||intent.status!=="pending"||new Date(intent.expires_at).getTime()<Date.now())return NextResponse.json({error:"نية الشراء غير متاحة أو انتهت"},{status:400,headers:{"Cache-Control":"no-store"}});
   const secrets=await env(),secret=secrets.MOYASAR_LIVE_SECRET_KEY||"";if(!secret)return NextResponse.json({error:"إعداد الدفع غير مكتمل"},{status:503,headers:{"Cache-Control":"no-store"}});
-  const authorization=`Basic ${btoa(`${secret}:`)}`;const response=await fetch(`https://api.moyasar.com/v1/payments/${encodeURIComponent(id)}`,{headers:{Authorization:authorization,Accept:"application/json"}});if(!response.ok)return NextResponse.json({error:"تعذر التحقق من الدفع"},{status:502,headers:{"Cache-Control":"no-store"}});
-  const payment=await response.json() as {status?:unknown;amount?:unknown;currency?:unknown;metadata?:unknown};const metadata=(payment.metadata&&typeof payment.metadata==="object"?payment.metadata:{}) as Record<string,unknown>;
-  if(payment.status!=="paid"||payment.amount!==intent.amount||payment.currency!==intent.currency||metadata.navixa_intent!==intent.id)return NextResponse.json({error:"لم تتم مطابقة بيانات الدفع"},{status:400,headers:{"Cache-Control":"no-store"}});
+  const payment=await verifyMoyasarPayment({secret,paymentId:id,expectedIntentId:intent.id,expectedAmount:intent.amount,expectedCurrency:intent.currency});
+  if(!payment)return NextResponse.json({error:"تعذر التحقق من الدفع"},{status:502,headers:{"Cache-Control":"no-store"}});
+  if(payment.status!=="paid")return NextResponse.json({error:"لم تتم مطابقة بيانات الدفع"},{status:400,headers:{"Cache-Control":"no-store"}});
+  const verifiedPaymentId=payment.paymentId;
   const now=new Date().toISOString(),days=intent.plan==="quarterly"?120:30,end=new Date(Date.now()+days*86400000).toISOString(),subscriberId=crypto.randomUUID();
-  await database.prepare("UPDATE navixa_billing_intents SET status='paid',provider_payment_id=?,updated_at=? WHERE id=?").bind(id,now,intent.id).run();
+  await database.prepare("UPDATE navixa_billing_intents SET status='paid',provider_payment_id=?,updated_at=? WHERE id=?").bind(verifiedPaymentId,now,intent.id).run();
   if(intent.discount_code)await database.prepare("UPDATE navixa_discount_codes SET redeemed_count=redeemed_count+1,reserved_count=CASE WHEN reserved_count>0 THEN reserved_count-1 ELSE 0 END,updated_at=? WHERE code=?").bind(now,intent.discount_code).run();
   await database.prepare("INSERT INTO navixa_subscribers (id,contact,display_name,plan,status,subscription_ends_at,source,created_at,updated_at) VALUES (?,?,'',?,'active',?,'moyasar_verify',?,?) ON CONFLICT(contact) DO UPDATE SET plan=excluded.plan,status='active',subscription_ends_at=excluded.subscription_ends_at,source='moyasar_verify',updated_at=excluded.updated_at").bind(subscriberId,intent.contact,intent.plan,end,now,now).run();
   const foundersAwarded=intent.founders_intent_id?await completeFoundersAward(database,intent.founders_intent_id).catch(()=>false):false;
-  const creditsApplied=await applyPendingCredits(database,intent.contact);const referral=await rewardReferralAfterVerifiedPayment(database,intent.id,id,intent.plan).catch(()=>({rewarded:false,reason:"review"}));
-  await database.prepare("INSERT OR IGNORE INTO navixa_billing_events (id,provider_event_id,subscriber_id,event_type,mode,payload_json,created_at,processed_at) VALUES (?,?,?,?, 'live',?,?,?)").bind(crypto.randomUUID(),`verify:${id}`,subscriberId,"payment_verified",JSON.stringify({intentId:intent.id,plan:intent.plan,creditsApplied,referral,foundersAwarded}),now,now).run();
+  const creditsApplied=await applyPendingCredits(database,intent.contact);const referral=await rewardReferralAfterVerifiedPayment(database,intent.id,verifiedPaymentId,intent.plan).catch(()=>({rewarded:false,reason:"review"}));
+  await database.prepare("INSERT OR IGNORE INTO navixa_billing_events (id,provider_event_id,subscriber_id,event_type,mode,payload_json,created_at,processed_at) VALUES (?,?,?,?, 'live',?,?,?)").bind(crypto.randomUUID(),`verify:${verifiedPaymentId}`,subscriberId,"payment_verified",JSON.stringify({intentId:intent.id,plan:intent.plan,creditsApplied,referral,foundersAwarded}),now,now).run();
   return NextResponse.json({ok:true,plan:intent.plan,endsAt:end,creditsApplied,referral,foundersAwarded},{headers:{"Cache-Control":"no-store"}});
 }
