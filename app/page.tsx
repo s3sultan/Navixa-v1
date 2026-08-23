@@ -24,6 +24,7 @@ import AppearanceSettings from "./AppearanceSettings";
 import {isScreenEnabled,sendTelegramAlert} from "./alertPrefs";
 import { betaUsageLabel, betaUsageRemaining, consumeBetaUsage } from "./betaUsage";
 import { captureAcademicDate, type AcademicCapture } from "./academicCapture";
+import { readAcademicReminders, type AcademicReminder } from "./academicReminders";
 
 type Task={title:string;done:boolean;meta?:string};
 type SmartTool="listener"|"screen"|"tasks"|"summary"|"links";
@@ -198,6 +199,7 @@ export default function Home(){
   const hideTutorial=(key:TutorialKey)=>{setTutorialHidden(current=>({...current,[key]:true}));setTutorialOpen(null);notify("لن يظهر هذا الشرح تلقائيًا مرة أخرى")};
   const restoreTutorial=(key:TutorialKey)=>setTutorialHidden(current=>({...current,[key]:false}));
   useEffect(()=>()=>{listeningRequestedRef.current=false;recognitionRef.current?.abort();recognitionRef.current=null},[]);
+  useEffect(()=>{const merge=(items:AcademicReminder[])=>setTasks(current=>{const additions=items.filter(item=>!current.some(task=>task.meta===`تذكير أكاديمي · ${item.id}`)).map(item=>({title:item.title,done:false,meta:`تذكير أكاديمي · ${item.id}`}));return additions.length?[...current,...additions]:current});merge(readAcademicReminders());const onReminder=(event:Event)=>merge([(event as CustomEvent<AcademicReminder>).detail]);window.addEventListener("navixa:academic-reminder",onReminder);return()=>window.removeEventListener("navixa:academic-reminder",onReminder)},[]);
   useEffect(()=>{const settings=JSON.parse(localStorage.getItem("navixa-counter-settings")||'{"enabled":true,"start":0}');setShowCounter(settings.enabled!==false);const next=Number(localStorage.getItem("navixa-visit-count")||settings.start||0)+1;localStorage.setItem("navixa-visit-count",String(next));setVisitCount(next);setEhsanCount(Number(localStorage.getItem("navixa-ehsan-clicks")||0))},[]);
   useEffect(()=>{const stored=localStorage.getItem("navixa-stats-visitor-key");const visitorKey=stored||((crypto as any).randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);if(!stored)localStorage.setItem("navixa-stats-visitor-key",visitorKey);fetch("/api/stats",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({event:"visit",visitorKey})}).then(response=>response.json()).then(data=>{if(data?.configured&&data?.stats){setVisitCount(Number(data.stats.visits)||0);setEhsanCount(Number(data.stats.ehsan)||0);setStatsConfigured(true)}else setStatsConfigured(false)}).catch(()=>setStatsConfigured(false));},[]);
   const endFocusMode=()=>{const remaining=Math.max(0,(focusDeadlineRef.current??Date.now())-Date.now());focusDeadlineRef.current=null;setSeconds(Math.ceil(remaining/1000));setFocusProgress(Math.max(0,Math.min(1,(focusDuration*1000-remaining)/(focusDuration*1000))));setRunning(false);setFocusMode(false);if(typeof document!=="undefined"&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};

@@ -1,10 +1,12 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { deleteMeetingSession, listMeetingSessions, saveMeetingSession, type MeetingPart, type MeetingSession, type TranscriptSegment } from "./meetingStore";
 import { buildLocalSummary, mergeMeetingParts, pendingMeetingParts } from "./meetingSummary";
 import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, mergeGlossaries, parseGlossaryInput, type GlossaryTerm } from "./meetingGlossary";
+import { academicSuggestions, type AcademicSuggestion } from "./academicSuggestions";
+import { saveAcademicReminder } from "../academicReminders";
 import "./meetings.css";
 
 type StudioState = "ready" | "recording" | "processing" | "review";
@@ -115,6 +117,14 @@ export default function MeetingStudio() {
   const [manualCorrect, setManualCorrect] = useState("");
   const [sharingLearning, setSharingLearning] = useState(false);
   const [policy,setPolicy]=useState<MeetingPolicy>(DEFAULT_POLICY);
+  const [acceptedAcademicIds, setAcceptedAcademicIds] = useState<string[]>([]);
+  const suggestions = useMemo(() => academicSuggestions(`${draft?.summary || ""}\n${draft?.transcript || ""}`), [draft?.summary, draft?.transcript]);
+  const acceptAcademicSuggestion = (suggestion: AcademicSuggestion) => {
+    saveAcademicReminder({ title: suggestion.title, date: suggestion.date });
+    setDraft((current) => current ? { ...current, tasks: [...current.tasks, `تذكير أكاديمي: ${suggestion.title} — ${suggestion.date}`] } : current);
+    setAcceptedAcademicIds((current) => [...current, suggestion.id]);
+    setNotice("أُضيف الموعد إلى مهام NAVIXA وتذكير محلي قبل يوم من الموعد.");
+  };
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const startedAtRef = useRef(0);
@@ -436,7 +446,7 @@ export default function MeetingStudio() {
       <div className="meeting-print-brand"><img src="/navixa-export-logo.png" alt="NAVIXA SA" /><div><b>NAVIXA SA — لخّص اجتماعك</b><span className="meeting-brand-seal">ختم NAVIXA SA · ملخص محلي قابل للمراجعة</span><a href={NAVIXA_URL}>{NAVIXA_URL}</a></div></div>
       <div className="meeting-output-head"><div><small>نتيجة محلية قابلة للتحرير</small><h2>الملخص والنص الزمني</h2></div><div className="meeting-export-actions">{policy.globalLearningEnabled&&<button type="button" className="meeting-secondary meeting-approve-learning" onClick={() => void approveLearning()} disabled={sharingLearning||!draft.transcript.trim()}>{sharingLearning?"جارٍ الإرسال…":draft.learningShared?"✓ أُرسلت للمراجعة":"✓ اعتماد النتيجة"}</button>}<button type="button" className="meeting-secondary" onClick={exportText}>↓ نص</button>{policy.exportPdfEnabled&&<button type="button" className="meeting-secondary" onClick={exportPdf}>↓ PDF</button>}{policy.exportWordEnabled&&<button type="button" className="meeting-secondary" onClick={() => void exportWord()}>↓ Word</button>}</div></div>
       <div className="meeting-output-grid">
-        <section className="meeting-summary-pane"><label>الخلاصة<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="سيظهر هنا ملخص محلي بعد التفريغ…" /></label><div className="meeting-lists"><div><h3>قرارات</h3>{draft.decisions.length ? draft.decisions.map((item, index) => <p key={`${item}-${index}`}>✓ {item}</p>) : <p className="empty">ستظهر القرارات المحتملة هنا بعد التفريغ.</p>}</div><div><h3>مهام</h3>{draft.tasks.length ? draft.tasks.map((item, index) => <p key={`${item}-${index}`}>→ {item}</p>) : <p className="empty">ستظهر المهام المحتملة هنا بعد التفريغ.</p>}</div></div></section>
+        <section className="meeting-summary-pane"><label>الخلاصة<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="سيظهر هنا ملخص محلي بعد التفريغ…" /></label>{suggestions.length>0&&<section className="academic-suggestion-review"><div><small>اقتراحات من النص المحلي</small><h3>راجع الموعد قبل إضافته</h3><p>لا ينشئ NAVIXA تنبيهًا تلقائيًا؛ تحقق من التاريخ ثم أضفه كتذكير قابل للتعديل.</p></div>{suggestions.map((suggestion)=><article key={suggestion.id}><div><b>{suggestion.title}</b><span>{suggestion.date}</span></div><button type="button" disabled={acceptedAcademicIds.includes(suggestion.id)} onClick={()=>acceptAcademicSuggestion(suggestion)}>{acceptedAcademicIds.includes(suggestion.id)?"أُضيف للتذكيرات":"أضف كتذكير"}</button></article>)}</section>}<div className="meeting-lists"><div><h3>قرارات</h3>{draft.decisions.length ? draft.decisions.map((item, index) => <p key={`${item}-${index}`}>✓ {item}</p>) : <p className="empty">ستظهر القرارات المحتملة هنا بعد التفريغ.</p>}</div><div><h3>مهام</h3>{draft.tasks.length ? draft.tasks.map((item, index) => <p key={`${item}-${index}`}>→ {item}</p>) : <p className="empty">ستظهر المهام المحتملة هنا بعد التفريغ.</p>}</div></div></section>
         <section className="meeting-transcript-pane"><label>النص الزمني<textarea value={draft.transcript} onChange={(event) => updateTranscript(event.target.value)} placeholder="سيظهر النص هنا بعد التفريغ…" /></label><div className="meeting-correction-form"><b>صحّح مصطلحًا</b><input value={manualWrong} onChange={(event) => setManualWrong(event.target.value)} placeholder="الكتابة الخاطئة" maxLength={80}/><input value={manualCorrect} onChange={(event) => setManualCorrect(event.target.value)} placeholder="الكتابة الصحيحة" maxLength={80}/><button type="button" onClick={() => addGlossaryCorrection(manualWrong,manualCorrect)} disabled={!manualWrong.trim()||!manualCorrect.trim()}>أضف للقاموس</button><small>يُصحح محليًا الآن. لا يُرسل للمراجعة إلا إذا فعّلت الموافقة قبل التسجيل.</small></div><div className="meeting-timeline">{draft.segments.length ? draft.segments.slice(0, 8).map((segment, index) => <button type="button" key={`${segment.start}-${index}`} onClick={() => setNotice(`المقطع عند ${formatMinute(segment.start)} محفوظ داخل النص المحلي.`)}><time>{formatMinute(segment.start)}</time><span>{segment.text}</span></button>) : <p>لا توجد طوابع زمنية بعد.</p>}</div></section>
       </div>
     </section>}

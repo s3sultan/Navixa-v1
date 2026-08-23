@@ -2,6 +2,7 @@
 
 import {useEffect,useRef} from "react";
 import {getPersonalReminderPrefs,PersonalReminderKind} from "./reminderPrefs";
+import {readAcademicReminders} from "./academicReminders";
 
 const MINUTE=60_000;
 const ACTIVITY_KEY="navixa-last-activity-at";
@@ -49,10 +50,12 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
       if(!activeToday)return;
 
       const focus=focusRef.current;
+      const academic=readAcademicReminders().find(item=>item.alertDate<=today()&&item.date>=today());
       const candidates:Candidate[]=[
         {kind:"eye",title:"راحة لعينيك",body:"خذ 20 ثانية وانظر إلى نقطة بعيدة. عيناك تستحقان الاستراحة.",due:prefs.eye&&((focus.focusRunning&&focus.focusElapsedSeconds>=20*60)||activityAge>=35*MINUTE)},
         {kind:"water",title:"تذكير ماء لطيف",body:"مر وقت منذ آخر كوب ماء مسجّل. خذ رشفة إذا احتجت.",due:prefs.water&&(!lastWater||now-lastWater>=waterInterval)},
         {kind:"break",title:"استراحة حركة قصيرة",body:"مضت فترة من دون تفاعل. حرّك كتفيك وخذ دقيقة خفيفة لنفسك.",due:prefs.break&&!focus.focusRunning&&activityAge>=55*MINUTE},
+        {kind:"academic",title:"تذكير أكاديمي",body:academic?`غدًا أو اليوم: ${academic.title} (${academic.date}). راجع الموعد قبل البدء.`:"",due:Boolean(prefs.academic&&academic)},
       ];
       const next=candidates.find(candidate=>candidate.due&&now-Number(localStorage.getItem(sentKey(candidate.kind))||0)>=quietFor);
       if(!next)return;
