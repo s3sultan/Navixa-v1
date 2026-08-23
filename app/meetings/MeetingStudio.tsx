@@ -5,6 +5,8 @@ import Link from "next/link";
 import { deleteMeetingSession, listMeetingSessions, saveMeetingSession, type MeetingPart, type MeetingSession, type TranscriptSegment } from "./meetingStore";
 import { buildLocalSummary, mergeMeetingParts, pendingMeetingParts } from "./meetingSummary";
 import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, mergeGlossaries, parseGlossaryInput, type GlossaryTerm } from "./meetingGlossary";
+import { academicSuggestions, type AcademicSuggestion } from "./academicSuggestions";
+import { saveAcademicReminder } from "../academicReminders";
 import "./meetings.css";
 
 type StudioState = "ready" | "recording" | "processing" | "review";
@@ -16,24 +18,6 @@ const NAVIXA_URL = "https://navixasa.com";
 type MeetingPolicy={enabled:boolean;baseModelEnabled:boolean;autoLanguageEnabled:boolean;globalLearningEnabled:boolean;maxFileMb:number;exportPdfEnabled:boolean;exportWordEnabled:boolean;tutorialEnabled:boolean;usageNoticeEnabled:boolean};
 const DEFAULT_POLICY:MeetingPolicy={enabled:true,baseModelEnabled:true,autoLanguageEnabled:true,globalLearningEnabled:true,maxFileMb:250,exportPdfEnabled:true,exportWordEnabled:true,tutorialEnabled:true,usageNoticeEnabled:true};
 const CHUNK_OPTIONS = [15, 30, 45] as const;
-
-type AcademicSuggestion = { id: string; title: string; date: string; evidence: string };
-
-function academicSuggestions(text: string): AcademicSuggestion[] {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  const pattern = /([^.!؟\n]{0,90}(?:كويز|quiz|ميد|mid(?:term)?|اختبار|presentation|عرض)[^.!؟\n]{0,120}?)(?:بتاريخ|موعده|يوم|on)?\s*(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/gi;
-  const found: AcademicSuggestion[] = [];
-  for (const match of normalized.matchAll(pattern)) {
-    const day = Number(match[2]), month = Number(match[3]);
-    const suppliedYear = Number(match[4] || 0);
-    const year = suppliedYear >= 2024 && suppliedYear <= 2100 ? suppliedYear : new Date().getFullYear();
-    if (!day || day > 31 || !month || month > 12) continue;
-    const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const evidence = match[1].trim();
-    found.push({ id: `${date}-${evidence}`.slice(0, 180), title: evidence.slice(0, 110), date, evidence });
-  }
-  return found.filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index).slice(0, 5);
-}
 
 function newId() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `meeting-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -136,9 +120,10 @@ export default function MeetingStudio() {
   const [acceptedAcademicIds, setAcceptedAcademicIds] = useState<string[]>([]);
   const suggestions = useMemo(() => academicSuggestions(`${draft?.summary || ""}\n${draft?.transcript || ""}`), [draft?.summary, draft?.transcript]);
   const acceptAcademicSuggestion = (suggestion: AcademicSuggestion) => {
+    saveAcademicReminder({ title: suggestion.title, date: suggestion.date });
     setDraft((current) => current ? { ...current, tasks: [...current.tasks, `تذكير أكاديمي: ${suggestion.title} — ${suggestion.date}`] } : current);
     setAcceptedAcademicIds((current) => [...current, suggestion.id]);
-    setNotice("أُضيف الاقتراح إلى مهام الجلسة كتذكير قابل للتعديل.");
+    setNotice("أُضيف الموعد إلى مهام NAVIXA وتذكير محلي قبل يوم من الموعد.");
   };
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);

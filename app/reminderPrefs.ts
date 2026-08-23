@@ -1,4 +1,4 @@
-export type PersonalReminderKind="water"|"break"|"eye";
+export type PersonalReminderKind="water"|"break"|"eye"|"academic";
 
 export type PersonalReminderPrefs={
   enabled:boolean;
@@ -7,6 +7,7 @@ export type PersonalReminderPrefs={
   water:boolean;
   break:boolean;
   eye:boolean;
+  academic:boolean;
 };
 
 export const DEFAULT_PERSONAL_REMINDER_PREFS:PersonalReminderPrefs={
@@ -16,6 +17,7 @@ export const DEFAULT_PERSONAL_REMINDER_PREFS:PersonalReminderPrefs={
   water:true,
   break:true,
   eye:true,
+  academic:true,
 };
 
 const STORAGE_KEY="navixa-personal-reminder-prefs";
