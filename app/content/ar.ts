@@ -109,9 +109,9 @@ export const ar = {
     dataAndSync: "البيانات والمزامنة",
   },
   community: {
-    eyebrow: "NAVIXA COMMUNITY",
-    title: "تابع NAVIXA",
-    description: "سنعلن الحسابات الرسمية ووسائل الدعم هنا عند اكتمال الهوية الرسمية.",
+    eyebrow: "NAVIXA SA COMMUNITY",
+    title: "تابع NAVIXA SA",
+    description: "تواصل معنا عبر البريد الرسمي، وتابع حسابات NAVIXA SA الموثقة الظاهرة هنا.",
   },
   general: {
     noCharge: "لا يوجد تحصيل مالي في النسخة التجريبية",
