@@ -24,12 +24,14 @@ export async function POST(request: Request) {
   const match = text.match(/^\/start(?:\s+([A-Za-z0-9_-]{32,64}))?$/);
   const chatId = String(message?.chat?.id || "");
   const telegramUserId = String(message?.from?.id || "");
-  if (validTelegramChatId(chatId) && !match?.[1] && /^\/(start|help|settings|stop)(?:@\w+)?$/i.test(text)) {
+  if (validTelegramChatId(chatId) && !match?.[1] && /^\/(start|help|settings|stop|activate|link)(?:@\w+)?$/i.test(text)) {
     const command = text.replace(/^\//, "").split("@")[0].toLowerCase();
     const answers: Record<string, string> = {
       start: "أهلًا بك في NAVIXA SA. لربط تنبيهاتك الخاصة، افتح حسابك في NAVIXA ثم اختر ربط Telegram. لا تصل إليك إلا التنبيهات التي توافق عليها.",
-      help: "المساعدة: اربط Telegram من حسابك في NAVIXA عبر رابط آمن لمرة واحدة. لإيقاف التنبيهات أو تعديلها، افتح إعدادات Telegram داخل حسابك.",
-      settings: "إعدادات التنبيهات تُدار من حسابك في NAVIXA لضمان خصوصيتك. يمكنك تشغيل أو إيقاف كل نوع تنبيه بعد ربط الحساب.",
+      help: "المساعدة: اكتب /activate لشرح التفعيل. الربط الحقيقي يتم من حسابك في NAVIXA عبر رابط آمن لمرة واحدة، ثم تختار التنبيهات التي توافق عليها.",
+      activate: "طريقة التفعيل: 1) سجّل دخولك إلى NAVIXA بالبريد. 2) افتح الحساب ثم إعدادات Telegram. 3) اضغط ربط Telegram. 4) افتح الرابط الآمن واضغط Start. 5) ارجع واختر التنبيهات التي تريدها. لا تحتاج Token أو Chat ID.",
+      link: "لربط الحساب اكتب /activate أولًا، ثم نفّذ الخطوات من داخل إعدادات Telegram في حساب NAVIXA. /start العادي يشرح البوت فقط ولا يربط الحساب.",
+      settings: "إعدادات التنبيهات تُدار من حسابك في NAVIXA لضمان خصوصيتك. اكتب /activate لخطوات الربط، ثم شغّل أو أوقف كل نوع تنبيه بعد الربط.",
       stop: "لن تصلك تنبيهات جديدة عند إيقافها من إعدادات Telegram داخل حساب NAVIXA. يمكنك الرجوع إليها في أي وقت.",
     };
     await sendOfficialTelegramMessage({ chatId, token: runtime.NAVIXA_TELEGRAM_BOT_TOKEN, text: answers[command] || answers.help });

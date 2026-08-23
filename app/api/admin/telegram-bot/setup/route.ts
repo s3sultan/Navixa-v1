@@ -41,7 +41,21 @@ export async function POST(request: Request) {
     });
     const webhook = await webhookResponse.json().catch(() => ({})) as TelegramResponse;
     if (!webhookResponse.ok || !webhook.ok) return noStore({ error: "تعذر إعداد Webhook للبوت" }, 502);
-    return noStore({ ok: true, message: "تم التحقق من البوت وربط Webhook بنجاح", webhookUrl, username: me.result?.username || username });
+    const commandsResponse = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commands: [
+        { command: "start", description: "بدء وربط تنبيهات NAVIXA" },
+        { command: "activate", description: "شرح تفعيل وربط التنبيهات" },
+        { command: "link", description: "طريقة ربط حساب NAVIXA" },
+        { command: "settings", description: "إعدادات التنبيهات" },
+        { command: "stop", description: "إيقاف تنبيهات هذا الحساب" },
+        { command: "help", description: "المساعدة" },
+      ] }),
+    });
+    const commands = await commandsResponse.json().catch(() => ({})) as TelegramResponse;
+    if (!commandsResponse.ok || !commands.ok) return noStore({ error: "تم إعداد Webhook لكن تعذر تحديث قائمة أوامر البوت" }, 502);
+    return noStore({ ok: true, message: "تم التحقق من البوت وربط Webhook وتحديث قائمة الأوامر", webhookUrl, username: me.result?.username || username });
   } catch {
     return noStore({ error: "تعذر الاتصال بـTelegram الآن، حاول مرة أخرى" }, 502);
   }
