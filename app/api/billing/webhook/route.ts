@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server.js";
 import {completeFoundersAward} from "../../../foundersCampaign.ts";
+import { normalizeMoyasarWebhook } from "../../../billing/providers/index.ts";
 
 type D1Statement={bind:(...values:unknown[])=>D1Statement;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
 type D1Database={prepare:(sql:string)=>D1Statement};
@@ -34,20 +35,18 @@ export async function POST(request:Request){
   const expectedSecret=requestedLive?secrets.MOYASAR_LIVE_WEBHOOK_SECRET:secrets.MOYASAR_TEST_WEBHOOK_SECRET;
   const enabled=requestedLive?current.live_payments_enabled==="true":current.test_webhook_enabled==="true";
   if(!expectedSecret||!enabled)return NextResponse.json({error:"بوابة الدفع مقفلة من الإدارة"},{status:503,headers:{"Cache-Control":"no-store"}});
-  if(webhookSecret(request,body)!==expectedSecret)return NextResponse.json({error:"توقيع Webhook غير صالح"},{status:401,headers:{"Cache-Control":"no-store"}});
+  const normalized=normalizeMoyasarWebhook({body:{...body,secret_token:webhookSecret(request,body)},expectedSecret});
+  if(!normalized)return NextResponse.json({error:"توقيع Webhook غير صالح"},{status:401,headers:{"Cache-Control":"no-store"}});
   if(requestedLive&&(current.mode!=="live"||current.public_checkout!=="true"))return NextResponse.json({error:"الدفع الحي غير مفعل للزوار"},{status:409,headers:{"Cache-Control":"no-store"}});
-  const eventId=clean(body.id||body.eventId,120),eventType=clean(body.type||body.eventType,40);
-  const data=(body.data&&typeof body.data==="object"?body.data:{}) as Record<string,unknown>;
-  const metadata=(data.metadata&&typeof data.metadata==="object"?data.metadata:{}) as Record<string,unknown>;
-  const intentId=clean(metadata.navixa_intent,100);
+  const {eventId,eventType,intentId,paymentId:providerPaymentId}=normalized;
   const intents=await database.prepare("SELECT id,user_id,contact,plan,status,discount_code,founders_intent_id FROM navixa_billing_intents WHERE id=? AND mode='live' AND status='pending' AND expires_at>? LIMIT 1").bind(intentId,new Date().toISOString()).all<{id:string;user_id:string;contact:string;plan:string;status:string;discount_code:string;founders_intent_id:string}>();
   const intent=intents.results[0],contact=intent?.contact||"",plan=intent?.plan||"",userId=intent?.user_id||"";
-  if(!eventId||!intentId||!userId||!validEmail(contact)||!['payment_paid','subscription_renewed'].includes(eventType)||!['monthly','quarterly'].includes(plan))return NextResponse.json({error:"حدث الدفع لا يحمل نية NAVIXA صالحة"},{status:400});
+  if(!eventId||!intentId||!userId||!validEmail(contact)||!normalized.paid||!['monthly','quarterly'].includes(plan))return NextResponse.json({error:"حدث الدفع لا يحمل نية NAVIXA صالحة"},{status:400});
   const existing=await database.prepare("SELECT id FROM navixa_billing_events WHERE provider_event_id=? LIMIT 1").bind(eventId).all<{id:string}>();if(existing.results.length)return NextResponse.json({ok:true,duplicate:true});
   const now=new Date().toISOString(),days=plan==="quarterly"?120:30,end=new Date(Date.now()+days*86400000).toISOString(),subscriberId=crypto.randomUUID(),mode=requestedLive?"live":"test";let foundersAwarded=false;
   if(requestedLive){
     await database.prepare("INSERT INTO navixa_subscribers (id,user_id,contact,display_name,plan,status,subscription_ends_at,source,created_at,updated_at) VALUES (?,?,?,'',?,'active',?,'moyasar_webhook',?,?) ON CONFLICT(contact) DO UPDATE SET user_id=excluded.user_id,plan=excluded.plan,status='active',subscription_ends_at=excluded.subscription_ends_at,source='moyasar_webhook',updated_at=excluded.updated_at").bind(subscriberId,userId,contact,plan,end,now,now).run();
-    await database.prepare("UPDATE navixa_billing_intents SET status='paid',provider_payment_id=?,updated_at=? WHERE id=?").bind(eventId,now,intentId).run();
+    await database.prepare("UPDATE navixa_billing_intents SET status='paid',provider_payment_id=?,updated_at=? WHERE id=?").bind(providerPaymentId,now,intentId).run();
     if(intent.discount_code)await database.prepare("UPDATE navixa_discount_codes SET redeemed_count=redeemed_count+1,reserved_count=CASE WHEN reserved_count>0 THEN reserved_count-1 ELSE 0 END,updated_at=? WHERE code=?").bind(now,intent.discount_code).run();
     foundersAwarded=intent.founders_intent_id?await completeFoundersAward(database,intent.founders_intent_id).catch(()=>false):false;
   }

@@ -4,9 +4,9 @@ import { ADMIN_SESSION_COOKIE, isTrustedSameOriginRequest, readCookie, resolveAd
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type D1Database = { prepare: (query: string) => D1Statement };
 type Env = Record<string, string | undefined>;
-type Provider = "moyasar" | "hyperpay" | "paytabs" | "tap" | "other";
+type Provider = "moyasar" | "hyperpay" | "paytabs" | "tap" | "telr" | "other";
 
-const providers: Provider[] = ["moyasar", "hyperpay", "paytabs", "tap", "other"];
+const providers: Provider[] = ["moyasar", "hyperpay", "paytabs", "tap", "telr", "other"];
 const clean = (value: unknown, limit: number) => typeof value === "string" ? value.trim().toLowerCase().slice(0, limit) : "";
 const validDomain = (value: string) => !value || /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(value);
 const validEmail = (value: string) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
