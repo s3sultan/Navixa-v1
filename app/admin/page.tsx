@@ -129,7 +129,7 @@ export default function AdminPage() {
           <article><span className="status-dot gold" /><div><small>الدومين</small><b>navixasa.com</b></div></article>
         </section>
 
-        <div className="admin-grid" id="features">
+        <section className="admin-section admin-fold" id="features"><details className="admin-fold-card"><summary><span>الميزات والتحكم المباشر</span><small>فعّل ما تحتاجه فقط</small></summary><div className="admin-fold-content"><div className="admin-grid">
           <section className="panel feature-panel">
             <div className="panel-head"><div><small>تحكم مباشر</small><h2>ميزات NAVIXA</h2></div><button onClick={() => tell("تم حفظ إعدادات الميزات")}>حفظ الإعدادات</button></div>
             <p className="panel-intro">فعّل الميزات التي تريد إتاحتها، واترك الباقي متوقفًا حتى تكتمل مراجعته.</p>
@@ -139,23 +139,23 @@ export default function AdminPage() {
             <div className="panel-head"><div><small>اختصارات</small><h2>إجراءات سريعة</h2></div></div>
             <div className="admin-actions"><button onClick={() => tell("فتح نموذج إضافة مستخدم")}>＋ إضافة مستخدم</button><button onClick={() => tell("فتح إدارة الأدوار")}>♙ إدارة الأدوار</button><button onClick={() => tell("تم تجهيز ملف التصدير")}>⇩ تصدير البيانات</button><button onClick={() => tell("فتح طلبات حذف البيانات")}>⌫ طلبات الحذف</button></div>
           </section>
-        </div>
+        </div></div></details></section>
 
-        <section className="panel permissions-panel" id="permissions">
+        <section className="admin-section admin-fold" id="permissions"><details className="admin-fold-card"><summary><span>الصلاحيات والوصول</span><small>الأدوار وصلاحيات المدير</small></summary><div className="admin-fold-content"><section className="panel permissions-panel">
           <div className="panel-head"><div><small>الوصول</small><h2>صلاحيات المدير</h2></div><span className="full-access">كاملة</span></div>
           <p className="panel-intro">حساب المدير الأعلى يملك صلاحية إدارة جميع أقسام NAVIXA.</p>
           <div className="permission-list">{permissions.map(permission => <div className="permission-row" key={permission[0]}><span>✓</span><div><b>{permission[0]}</b><small>{permission[1]}</small></div><em>كاملة</em><button onClick={() => tell(`فتح إعدادات ${permission[0]}`)}>إدارة</button></div>)}</div>
-        </section>
+        </section></div></details></section>
 
-        <section className="admin-section" id="content">
+        <section className="admin-section admin-fold" id="content"><details className="admin-fold-card"><summary><span>المحتوى والخدمات المرتبطة</span><small>المحتوى والتكاملات</small></summary><div className="admin-fold-content">
           <div className="section-label"><small>إدارة المحتوى</small><h2>المحتوى وتجربة المستخدم</h2><p>اختصارات المحتوى التي تظهر داخل المنصة.</p></div>
           <div className="admin-grid lower"><section className="panel"><div className="admin-actions compact"><button onClick={() => tell("فتح مكتبة التمارين")}>تمارين الحركة</button><button onClick={() => tell("فتح رسائل التذكير")}>رسائل التذكير</button><button onClick={() => tell("فتح الشارات")}>الشارات</button><button onClick={() => tell("فتح المجتمع")}>المجتمع</button></div></section><section className="panel" id="integrations"><div className="panel-head"><div><small>الاتصال</small><h2>الخدمات المرتبطة</h2></div></div><div className="integration-list">{[["Google Calendar", "جاهز"], ["إشعارات المتصفح", "جاهز"], ["التحليل المحلي", "تحت الإعداد"]].map(([name, status], index) => <div key={name}><i className={index < 2 ? "ok" : "warn"} /><b>{name}</b><small>{status}</small><button onClick={() => tell(`إدارة ${name}`)}>إدارة</button></div>)}</div></section></div>
-        </section>
+        </div></details></section>
 
         <section className="admin-section" id="settings">
           <div className="section-label"><small>إعدادات المنصة</small><h2>الإعدادات المنظمة</h2><p>افتح القسم الذي تريد تعديله فقط لتبقى الصفحة هادئة وسهلة.</p></div>
           <div className="settings-stack">
-            <details className="settings-group" open><summary>الحماية والدومين <span>الدخول · البريد · انتهاء النطاق</span></summary><div className="settings-group-content"><AdminDomainExpiryAlert /><AdminServiceTransitionSettings /><AdminUserAuthSettings /></div></details>
+            <details className="settings-group"><summary>الحماية والدومين <span>الدخول · البريد · انتهاء النطاق</span></summary><div className="settings-group-content"><AdminDomainExpiryAlert /><AdminServiceTransitionSettings /><AdminUserAuthSettings /></div></details>
             <details className="settings-group"><summary>التنبيهات والمباريات <span>القنوات · القواعد · العرض</span></summary><div className="settings-group-content"><AdminAlertSettings /><AdminMatchSettings /></div></details>
             <details className="settings-group"><summary>المساعد والاجتماعات <span>الردود · التعلم · التلخيص</span></summary><div className="settings-group-content"><AdminAssistantSettings /><AdminAssistantLearningSettings /><AdminMeetingSettings /></div></details>
             <details className="settings-group"><summary>الصحة والمحتوى <span>العافية · العدادات · التمارين</span></summary><div className="settings-group-content"><AdminHealthSettings /><AdminCounterSettings /></div></details>
@@ -163,7 +163,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="panel activity-panel" id="activity"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section>
+        <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>آخر العمليات والقنوات</small></summary><div className="admin-fold-content"><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
       </section>
     </main>
   );
