@@ -9,7 +9,7 @@ import {
 } from "../../../../worker/adminAuth.ts";
 
 type Env = Record<string, string | undefined>;
-type Provider = "tap" | "telr" | "paytabs" | "myfatoorah";
+type Provider = "tap" | "tabby" | "tamara" | "cashew" | "telr" | "paytabs" | "myfatoorah";
 
 const limiter = createMemoryRateLimiter();
 
@@ -44,12 +44,43 @@ const details = `
 ونود كذلك معرفة أي عروض لليوم الوطني السعودي 2026 أو برامج للشركات الناشئة يمكن أن تشمل إعفاء رسوم التأسيس أو Apple Pay أو تخفيضًا مؤقتًا لرسوم العمليات.
 `;
 
-const inquiries: Record<Provider, { to: string; subject: string; line: string; successMessage: string }> = {
+const inquiries: Record<Provider, { to: string; subject: string; line: string; extra?: string; successMessage: string }> = {
   tap: {
     to: "support@tap.company",
     subject: "طلب عرض سعر مخصص لبوابة دفع NAVIXA في السعودية",
     line: "ندرس Tap لمرونة API وSDK وتوفير مدى وApple Pay وSTC Pay وطرق الدفع المحلية من تجربة Checkout موحدة.",
     successMessage: "تم إرسال طلب العرض المخصص إلى فريق Tap",
+  },
+  tabby: {
+    to: "partner@tabby.sa",
+    subject: "طلب تفعيل تاجر وعرض تسعير Tabby — NAVIXA SA",
+    line: "نرغب في اعتماد Tabby كخيار تمويل منفصل لباقات NAVIXA Plus المرنة، مع الحفاظ على مدى والبطاقات كخيارات الدفع الأساسية.",
+    extra: `
+يرجى تزويدنا بشروط قبول الخدمات والاشتراكات الرقمية، والحد الأدنى والأقصى للطلب في السعودية، ومعدل التاجر والرسم الثابت ودورة التسوية والاسترداد والإلغاء والاعتراضات.
+
+ندرس مبدئيًا باقة 5 أشهر بقيمة 119 ر.س وسنة كاملة بقيمة 269 ر.س؛ نرجو بيان مدى أهلية القيم لخيارات Pay in 4 أو أي خطة متاحة. نحتاج أيضًا خطوات فتح حساب تاجر، مفاتيح الاختبار، QA قبل مفاتيح الحي، API/SDK، Webhooks، آلية التحقق الخادمي، ومتطلبات عرض علامة Tabby في Checkout.
+`,
+    successMessage: "تم إرسال طلب تفعيل وتسعير Tabby إلى فريق Tabby",
+  },
+  tamara: {
+    to: "support@tamara.co",
+    subject: "طلب تفعيل تاجر وعرض تسعير وتكامل Tamara — NAVIXA SA",
+    line: "نرغب في اعتماد Tamara كخيار تمويل منفصل لباقات NAVIXA Plus المرنة، مع إبقاء مدى والبطاقات مسار الدفع الأساسي.",
+    extra: `
+ونرجو توضيح مدى قبول الاشتراكات والخدمات الرقمية، والحد الأدنى والأقصى لقيمة الطلب في السعودية، ورسوم التاجر والرسم الثابت والتسوية والاسترداد والإلغاء والاعتراضات.
+
+الباقات التي ندرسها مبدئيًا هي 5 أشهر بقيمة 119 ر.س وسنة كاملة بقيمة 269 ر.س؛ نرجو توضيح هل تؤهل هذه القيم لخيارات التقسيط، وما عدد الدفعات الممكنة. نحتاج كذلك خطوات فتح حساب تاجر، وSandbox، وAPI/SDK، وWebhooks الموقعة، وبيئة QA، ومتطلبات اعتماد علامة Tamara داخل Checkout، وآلية دعم التجديدات أو تجنب تمويل التجديد الشهري المنخفض القيمة.
+`,
+    successMessage: "تم إرسال طلب تفعيل وتسعير Tamara إلى فريق Tamara",
+  },
+  cashew: {
+    to: "support@cashewpayments.com",
+    subject: "استفسار شراكة وتوفر تمويل للتاجر في السعودية — NAVIXA SA",
+    line: "نرغب في التحقق أولًا مما إذا كانت Cashew تقبل تجارًا وخدمات رقمية في المملكة العربية السعودية، قبل طلب عرض تكامل كامل.",
+    extra: `
+إذا كانت الخدمة متاحة في السعودية، نرجو تزويدنا بشروط فتح حساب تاجر، العملات المدعومة، الحد الأدنى والأقصى للطلب، الرسوم والتسوية، وAPI/SDK وWebhook وبيئة الاختبار. ندرس باقات رقمية بقيمة 119 ر.س لخمس أشهر و269 ر.س لسنة كاملة.
+`,
+    successMessage: "تم إرسال استفسار توفر Cashew للسوق السعودي",
   },
   telr: {
     to: "sales@telr.com",
@@ -72,7 +103,7 @@ const inquiries: Record<Provider, { to: string; subject: string; line: string; s
 };
 
 function isProvider(value: unknown): value is Provider {
-  return value === "tap" || value === "telr" || value === "paytabs" || value === "myfatoorah";
+  return value === "tap" || value === "tabby" || value === "tamara" || value === "cashew" || value === "telr" || value === "paytabs" || value === "myfatoorah";
 }
 
 export async function POST(request: Request) {
@@ -100,12 +131,13 @@ export async function POST(request: Request) {
   const inquiry = inquiries[provider];
   const text = `السلام عليكم ورحمة الله وبركاته،
 
-فريق ${provider === "myfatoorah" ? "MyFatoorah" : provider === "paytabs" ? "PayTabs" : provider === "telr" ? "Telr" : "Tap Payments"} المحترم،
+فريق ${provider === "myfatoorah" ? "MyFatoorah" : provider === "paytabs" ? "PayTabs" : provider === "tabby" ? "Tabby" : provider === "tamara" ? "Tamara" : provider === "cashew" ? "Cashew" : provider === "telr" ? "Telr" : "Tap Payments"} المحترم،
 
 نحن فريق NAVIXA SA، منصة سعودية باشتراكات شهرية وربع سنوية تساعد المستخدم على تنظيم يومه بأدوات ذكية مع تجربة خصوصية أولًا. نستعد لإطلاق تدريجي داخل المملكة ونبحث عن بوابة دفع موثوقة تناسب نموذج اشتراكات متناميًا وتجربة دفع سهلة على الجوال والويب.
 
 ${inquiry.line}
 ${details}
+${inquiry.extra || ""}
 
 من الناحية التقنية تعتمد NAVIXA على Next.js/Vinext وCloudflare Workers وD1، ولدينا مسار تحقق خادمي وWebhook مهيأ للاختبار. يسعدنا تزويدكم بالتفاصيل المطلوبة وإجراء اختبار Sandbox ثم اختبار حي محدود بعد اعتماد الحساب.
 
