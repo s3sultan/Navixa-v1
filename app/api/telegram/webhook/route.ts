@@ -24,6 +24,17 @@ export async function POST(request: Request) {
   const match = text.match(/^\/start(?:\s+([A-Za-z0-9_-]{32,64}))?$/);
   const chatId = String(message?.chat?.id || "");
   const telegramUserId = String(message?.from?.id || "");
+  if (validTelegramChatId(chatId) && !match?.[1] && /^\/(start|help|settings|stop)(?:@\w+)?$/i.test(text)) {
+    const command = text.replace(/^\//, "").split("@")[0].toLowerCase();
+    const answers: Record<string, string> = {
+      start: "أهلًا بك في NAVIXA SA. لربط تنبيهاتك الخاصة، افتح حسابك في NAVIXA ثم اختر ربط Telegram. لا تصل إليك إلا التنبيهات التي توافق عليها.",
+      help: "المساعدة: اربط Telegram من حسابك في NAVIXA عبر رابط آمن لمرة واحدة. لإيقاف التنبيهات أو تعديلها، افتح إعدادات Telegram داخل حسابك.",
+      settings: "إعدادات التنبيهات تُدار من حسابك في NAVIXA لضمان خصوصيتك. يمكنك تشغيل أو إيقاف كل نوع تنبيه بعد ربط الحساب.",
+      stop: "لن تصلك تنبيهات جديدة عند إيقافها من إعدادات Telegram داخل حساب NAVIXA. يمكنك الرجوع إليها في أي وقت.",
+    };
+    await sendOfficialTelegramMessage({ chatId, token: runtime.NAVIXA_TELEGRAM_BOT_TOKEN, text: answers[command] || answers.help });
+    return reply({ ok: true });
+  }
   if (!match?.[1] || !validTelegramLinkToken(match[1]) || !validTelegramChatId(chatId) || !validTelegramChatId(telegramUserId)) return reply({ ok: true });
 
   const now = new Date();
