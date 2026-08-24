@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import MeetingStudio from "./MeetingStudio";
+import FeatureAccessGate from "../FeatureAccessGate";
 
 export const metadata: Metadata = {
   title: "سجّل ولخّص",
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function MeetingsPage() {
-  return <MeetingStudio />;
+  return <FeatureAccessGate feature="تسجيل وتلخيص الاجتماعات"><MeetingStudio /></FeatureAccessGate>;
 }

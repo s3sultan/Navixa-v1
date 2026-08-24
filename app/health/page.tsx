@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import HealthMonitor from "../HealthMonitor";
+import FeatureAccessGate from "../FeatureAccessGate";
 import "../navixa.css";
 import "../health-page.css";
 
@@ -16,7 +17,7 @@ export default function HealthPage(){
       <button className={`health-alert-toggle ${alerts?"enabled":"muted"}`} onClick={toggle} aria-label="تفعيل أو إلغاء تنبيهات الصحة"><span>{alerts?"🔔":"🔕"}</span><b>{alerts?"التنبيهات مفعّلة":"التنبيهات متوقفة"}</b></button>
     </header>
     <section className="health-hero" aria-labelledby="health-hero-title"><div className="health-hero-copy"><small>صحة NAVIXA · محليًا وخصوصيًا</small><h2 id="health-hero-title">اجلس بوعي، وتحرك في وقتك</h2><p>راقب وضعية جلوسك، سجّل ماءك، وخذ استراحة قصيرة عندما يحتاجها جسدك — بدون رفع صور الكاميرا إلى أي خادم.</p><div className="health-hero-pills"><span>خصوصية أولًا</span><span>مراقبة محلية</span><span>خطوات بسيطة</span></div></div><div className="health-hero-orb"><img src="/navixa-mark.webp" alt="" /><span>جسمك<br/><b>يستحق العناية</b></span></div></section>
-    <HealthMonitor/>
+    <FeatureAccessGate feature="مزايا مركز صحتي"><HealthMonitor/></FeatureAccessGate>
     <section className="health-ecosystem-teaser" aria-label="منظومة NAVIXA القادمة">
       <div className="health-ecosystem-icon" aria-hidden="true">◒</div>
       <div className="health-ecosystem-copy"><small>من منظومة NAVIXA</small><h2>NAVIXA Fitness</h2><p>مساحة رياضية هادئة تساعدك على بناء عادات حركة متوازنة.</p></div>

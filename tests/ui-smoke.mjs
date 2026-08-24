@@ -95,38 +95,24 @@ async function main() {
     await cdp.call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 
     await navigate(cdp, `${BASE_URL}/`);
-    const mobileAssistant = await evaluate(cdp, `(() => {
-      localStorage.setItem("navixa-assistant-enabled", "false");
-      document.documentElement.classList.add("assistant-off");
-      const button = document.querySelector(".assistant-bubble");
-      const wrapper = document.querySelector(".floating-assistant");
-      if (!button || !wrapper) return { found: false };
-      const rect = button.getBoundingClientRect();
-      const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-      return { found: true, left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), visible: getComputedStyle(wrapper).display !== "none", clickable: point === button || button.contains(point) };
-    })()`);
-    assert.equal(mobileAssistant.found, true, "يجب أن يوجد زر المساعد على الجوال");
-    assert.equal(mobileAssistant.visible, true, "يجب ألا يُخفى زر المساعد بسبب حالة إيقاف سابقة");
-    assert.ok(mobileAssistant.left >= 0 && mobileAssistant.left < 60, "يجب أن يكون زر المساعد في الجانب الأيسر الواضح");
-    assert.ok(mobileAssistant.top >= 70 && mobileAssistant.top < 150, "يجب أن يكون زر المساعد داخل أعلى الشاشة");
-    assert.equal(mobileAssistant.clickable, true, "يجب ألا تحجب لوحة الترحيب زر المساعد");
-
-    const assistantOpened = await evaluate(cdp, `(() => {
-      return new Promise(resolve => {
-        const deadline = performance.now() + 2_500;
-        const attempt = () => {
-          const button = document.querySelector(".assistant-bubble");
-          const state = { expanded: button?.getAttribute("aria-expanded"), panel: Boolean(document.querySelector(".assistant-panel")), assistantOff: document.documentElement.classList.contains("assistant-off") };
-          if (state.expanded === "true" || performance.now() >= deadline) return resolve(state);
-          button?.click();
-          setTimeout(attempt, 100);
-        };
-        attempt();
-      });
-    })()`);
-    assert.equal(assistantOpened.expanded, "true", "يجب أن يفتح زر المساعد المحادثة");
-    assert.equal(assistantOpened.panel, true, "يجب أن تظهر لوحة المحادثة بعد الضغط");
-    assert.equal(assistantOpened.assistantOff, false, "يجب أن تعيد اللمسة تشغيل المساعد محليًا");
+    const accessGate = await evaluate(cdp, `new Promise(resolve => {
+      const deadline = performance.now() + 2_500;
+      const inspect = () => {
+        const welcome = document.querySelector(".welcome-enter");
+        if (welcome) { welcome.click(); return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100); }
+        const gate = document.querySelector(".feature-access-gate");
+        const action = gate?.querySelector('a[href="/account"], a[href="/plus"]');
+        if (!gate || !action) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        const rect = action.getBoundingClientRect();
+        const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        resolve({ found: true, visible: getComputedStyle(gate).display !== "none", clickable: point === action || action.contains(point), assistantHidden: !document.querySelector(".assistant-bubble") });
+      };
+      inspect();
+    })`);
+    assert.equal(accessGate.found, true, "يجب أن يرى الزائر بوابة الدخول والتفعيل");
+    assert.equal(accessGate.visible, true, "يجب أن تكون بوابة الدخول واضحة على الجوال");
+    assert.equal(accessGate.clickable, true, "يجب أن يكون رابط الحساب قابلاً للمس");
+    assert.equal(accessGate.assistantHidden, true, "يجب ألا تظهر أدوات المساعد قبل الدخول والتفعيل");
 
     await navigate(cdp, `${BASE_URL}/admin/login`);
     const loginLayout = await evaluate(cdp, `(() => {
@@ -147,35 +133,29 @@ async function main() {
     assert.equal(adminGuard.reason, "session", "يجب أن يوضح الحارس سبب إعادة التوجيه");
 
     await navigate(cdp, `${BASE_URL}/meetings`);
-    const meetingLanding = await evaluate(cdp, `(() => {
-      const page = document.querySelector(".meeting-page");
-      const consent = document.querySelector(".meeting-consent input");
-      const start = [...document.querySelectorAll("button")].find(button => button.textContent?.includes("ابدأ التسجيل"));
-      const resources = performance.getEntriesByType("resource").map(entry => entry.name);
-      return {
-        found: Boolean(page && consent && start),
-        consentUnchecked: consent instanceof HTMLInputElement && !consent.checked,
-        startVisible: start ? getComputedStyle(start).display !== "none" : false,
-        transcriptionLoaded: resources.some(name => /transcription\.worker|transformers|onnx/i.test(name)),
-        languageChoices: [...document.querySelectorAll('.meeting-language input')].map(input => input instanceof HTMLInputElement ? input.value : ''),
-        docxLoaded: resources.some(name => /docx/i.test(name)),
+    const meetingGate = await evaluate(cdp, `new Promise(resolve => {
+      const deadline = performance.now() + 2_500;
+      const inspect = () => {
+        const gate = document.querySelector(".feature-access-gate");
+        const action = gate?.querySelector('a[href="/account"], a[href="/plus"]');
+        if (!gate || !action) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        const resources = performance.getEntriesByType("resource").map(entry => entry.name);
+        resolve({ found: true, studioHidden: !document.querySelector(".meeting-page"), transcriptionLoaded: resources.some(name => /transcription\.worker|transformers|onnx/i.test(name)), docxLoaded: resources.some(name => /docx/i.test(name)) });
       };
-    })()`);
-    assert.equal(meetingLanding.found, true, "يجب أن تظهر واجهة المحاضرات الأساسية");
-    assert.equal(meetingLanding.consentUnchecked, true, "يجب ألا تفترض الصفحة موافقة تسجيل مسبقة");
-    assert.equal(meetingLanding.startVisible, true, "يجب أن يكون زر التسجيل واضحًا على الجوال");
-    assert.equal(meetingLanding.transcriptionLoaded, false, "يجب ألا يحمل محرك التفريغ قبل طلب المستخدم");
-    assert.deepEqual(meetingLanding.languageChoices, ["auto", "ar", "en"], "يجب أن تظهر خيارات اللغة التلقائية والعربية والإنجليزية");
-    assert.equal(meetingLanding.docxLoaded, false, "يجب ألا تحمل مكتبة Word قبل أن يطلب المستخدم التصدير");
+      inspect();
+    })`);
+    assert.equal(meetingGate.found, true, "يجب أن تحمي صفحة الاجتماعات ببوابة الحساب");
+    assert.equal(meetingGate.studioHidden, true, "يجب ألا تظهر أدوات التسجيل قبل الدخول والتفعيل");
+    assert.equal(meetingGate.transcriptionLoaded, false, "يجب ألا يحمل محرك التفريغ للزائر غير المفعّل");
+    assert.equal(meetingGate.docxLoaded, false, "يجب ألا تحمل مكتبة Word للزائر غير المفعّل");
 
     console.log(JSON.stringify({
       status: "passed",
       checks: {
-        mobileAssistant,
-        assistantOpened,
+        accessGate,
         loginLayout,
         adminGuard,
-        meetingLanding,
+        meetingGate,
       },
     }, null, 2));
   } finally {
