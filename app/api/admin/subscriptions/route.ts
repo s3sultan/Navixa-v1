@@ -16,16 +16,19 @@ function afterDays(days:number){return new Date(Date.now()+days*86400000).toISOS
 
 export async function GET(request:Request){
   if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
-  const database=await db();if(!database)return NextResponse.json({summary:{waitlist:0,trial:0,active:0,endingSoon:0},subscribers:[]},{headers:{"Cache-Control":"no-store"}});
+  const database=await db();if(!database)return NextResponse.json({summary:{registered:0,activated:0,nonSubscriber:0,waitlist:0,trial:0,active:0,endingSoon:0},subscribers:[]},{headers:{"Cache-Control":"no-store"}});
   await schema(database);const now=new Date().toISOString(),soon=afterDays(4);
-  const [rows,waitlist,trial,active,endingSoon]=await Promise.all([
+  const [rows,registered,activated,nonSubscriber,waitlist,trial,active,endingSoon]=await Promise.all([
     database.prepare("SELECT id,contact,display_name,plan,status,trial_started_at,trial_ends_at,subscription_ends_at,source,created_at,updated_at FROM navixa_subscribers ORDER BY updated_at DESC LIMIT 80").all<Subscriber>(),
+    database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers").all<{count:number}>(),
+    database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status IN ('trial','active')").all<{count:number}>(),
+    database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status NOT IN ('trial','active')").all<{count:number}>(),
     database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status='waitlist'").all<{count:number}>(),
     database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status='trial'").all<{count:number}>(),
     database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status='active'").all<{count:number}>(),
     database.prepare("SELECT COUNT(*) AS count FROM navixa_subscribers WHERE status IN ('trial','active') AND ((trial_ends_at<>'' AND trial_ends_at>=? AND trial_ends_at<=?) OR (subscription_ends_at<>'' AND subscription_ends_at>=? AND subscription_ends_at<=?))").bind(now,soon,now,soon).all<{count:number}>(),
   ]);
-  return NextResponse.json({summary:{waitlist:waitlist.results[0]?.count||0,trial:trial.results[0]?.count||0,active:active.results[0]?.count||0,endingSoon:endingSoon.results[0]?.count||0},subscribers:rows.results},{headers:{"Cache-Control":"no-store"}});
+  return NextResponse.json({summary:{registered:registered.results[0]?.count||0,activated:activated.results[0]?.count||0,nonSubscriber:nonSubscriber.results[0]?.count||0,waitlist:waitlist.results[0]?.count||0,trial:trial.results[0]?.count||0,active:active.results[0]?.count||0,endingSoon:endingSoon.results[0]?.count||0},subscribers:rows.results},{headers:{"Cache-Control":"no-store"}});
 }
 
 export async function POST(request:Request){
