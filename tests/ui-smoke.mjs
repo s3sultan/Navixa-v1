@@ -114,6 +114,25 @@ async function main() {
     assert.equal(accessGate.clickable, true, "يجب أن يكون رابط الحساب قابلاً للمس");
     assert.equal(accessGate.assistantHidden, true, "يجب ألا تظهر أدوات المساعد قبل الدخول والتفعيل");
 
+    await navigate(cdp, `${BASE_URL}/today`);
+    const todayGate = await evaluate(cdp, `new Promise(resolve => {
+      const deadline = performance.now() + 2_500;
+      const inspect = () => {
+        const gate = document.querySelector(".feature-access-gate");
+        const action = gate?.querySelector('a[href="/account"], a[href="/plus"]');
+        if (!gate || !action) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        const rect = action.getBoundingClientRect();
+        const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        resolve({ found: true, visible: getComputedStyle(gate).display !== "none", clickable: point === action || action.contains(point), todayHidden: !document.querySelector(".today-hero"), quickAddHidden: !document.querySelector(".quick-add-sheet") });
+      };
+      inspect();
+    })`);
+    assert.equal(todayGate.found, true, "يجب أن تحمي صفحة يومي ببوابة الحساب");
+    assert.equal(todayGate.visible, true, "يجب أن تكون بوابة يومي واضحة على الجوال");
+    assert.equal(todayGate.clickable, true, "يجب أن يكون رابط الدخول من صفحة يومي قابلاً للمس");
+    assert.equal(todayGate.todayHidden, true, "يجب ألا تظهر بيانات يومي قبل الدخول والتفعيل");
+    assert.equal(todayGate.quickAddHidden, true, "يجب ألا يظهر درج الإضافة قبل الدخول والتفعيل");
+
     await navigate(cdp, `${BASE_URL}/admin/login`);
     const loginLayout = await evaluate(cdp, `(() => {
       const box = document.querySelector(".google-login-box");
@@ -153,6 +172,7 @@ async function main() {
       status: "passed",
       checks: {
         accessGate,
+        todayGate,
         loginLayout,
         adminGuard,
         meetingGate,
