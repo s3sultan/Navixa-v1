@@ -22,7 +22,11 @@ export default function AccountAccess() {
   const loadTelegram = async () => { const response = await fetch("/api/account/telegram/link", { cache: "no-store" }); const data = await response.json().catch(() => ({ enabled: false, linked: false })); const state = response.ok ? data as TelegramLink : { enabled: false, linked: false }; setTelegram(state); if (state.linked) { const preference = await fetch("/api/account/telegram/preferences", { cache: "no-store" }).then(value => value.json()).catch(() => ({ enabled: false })); setRenewalTelegram(Boolean(preference.enabled)); } else setRenewalTelegram(false); };
   useEffect(() => { const saved = window.localStorage.getItem(REMEMBERED_EMAIL_KEY)?.trim().toLowerCase() || ""; if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(saved)) { setEmail(saved); setRememberedEmail(saved); } void load(); void loadTelegram(); }, []);
   const requestCode = async () => { setBusy(true); setNotice(""); const response = await fetch("/api/account/code/request", { method: "POST", headers, body: JSON.stringify({ email }) }); const data = await response.json().catch(() => ({})); setBusy(false); if (!response.ok) { setNotice(data.error || "تعذر طلب الرمز الآن"); return; } setSent(true); setNotice(data.message || "أرسلنا رمز الدخول إذا كان البريد صالحًا."); };
-  const openWorkspace = () => { window.location.replace("/"); };
+  const openWorkspace = () => {
+    const candidate = new URLSearchParams(window.location.search).get("next") || "/";
+    const safeNext = candidate.startsWith("/api/portfolio/authorize?") ? candidate : "/";
+    window.location.replace(safeNext);
+  };
   const rememberVerifiedEmail = () => { const value = email.trim().toLowerCase(); if (!value) return; window.localStorage.setItem(REMEMBERED_EMAIL_KEY, value); setRememberedEmail(value); };
   const forgetRememberedEmail = () => { window.localStorage.removeItem(REMEMBERED_EMAIL_KEY); setRememberedEmail(""); setEmail(""); setSent(false); setCode(""); setNotice("تم نسيان البريد من هذا الجهاز."); };
   const verify = async () => { setBusy(true); setNotice(""); const response = await fetch("/api/account/code/verify", { method: "POST", headers, body: JSON.stringify({ email, code }) }); const data = await response.json().catch(() => ({})); setBusy(false); if (!response.ok) { setNotice(data.error || "تعذر التحقق من الرمز"); return; } rememberVerifiedEmail(); setNotice("تم الدخول بأمان. جارٍ فتح أدواتك…"); window.setTimeout(openWorkspace, 180); };

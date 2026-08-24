@@ -9,7 +9,7 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "node --experimental-strip-types --test tests/admin-auth.test.ts tests/api-security.test.ts tests/local-auth-flow.test.ts tests/content-architecture.test.ts tests/telegram-session-config.test.ts tests/telegram-official-bot.test.ts tests/telegram-webhook-setup.test.ts tests/sync-security.test.ts tests/academic-suggestions.test.ts tests/academic-reminders.test.ts tests/payment-providers.test.ts tests/cache-performance.test.ts tests/today-quick-add.test.ts tests/remembered-login.test.ts",
+    "test": "node --experimental-strip-types --test tests/admin-auth.test.ts tests/api-security.test.ts tests/local-auth-flow.test.ts tests/content-architecture.test.ts tests/telegram-session-config.test.ts tests/telegram-official-bot.test.ts tests/telegram-webhook-setup.test.ts tests/sync-security.test.ts tests/academic-suggestions.test.ts tests/academic-reminders.test.ts tests/payment-providers.test.ts tests/cache-performance.test.ts tests/today-quick-add.test.ts tests/remembered-login.test.ts tests/portfolio-access.test.ts",
     "test:ui": "node tests/ui-smoke.mjs",
     "test:local": "npm run lint && npm test && npm run test:ui",
     "test:verify": "npm run test:local && npm run build",
