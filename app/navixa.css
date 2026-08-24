@@ -396,7 +396,8 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
   text-decoration: none;
 }
 .topbar-actions .topbar-plus:hover { background:#eee8ff; }
-@media(max-width:650px){.topbar-actions .topbar-plus{min-height:28px;padding:0 8px;font-size:9px}.topbar-actions .topbar-plus span{display:inline!important}}
+.topbar-actions .topbar-account{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:31px;padding:0 10px;border:1px solid rgba(8,127,131,.22);border-radius:10px;background:#edf9f6;color:#087f83;font-size:10px;font-weight:800;text-decoration:none;white-space:nowrap}.topbar-actions .topbar-account b{font-size:17px;line-height:1;font-weight:700}.topbar-actions .topbar-account:hover{background:#dff3ee;border-color:rgba(8,127,131,.38)}.topbar-actions .topbar-account:focus-visible{outline:3px solid rgba(118,86,214,.42);outline-offset:2px}
+@media(max-width:650px){.topbar-actions .topbar-plus{min-height:28px;padding:0 8px;font-size:9px}.topbar-actions .topbar-plus span{display:inline!important}.topbar-actions .topbar-account{width:31px;min-height:31px;padding:0;border-radius:10px}.topbar-actions .topbar-account span{display:none}.topbar-actions .topbar-account b{font-size:18px}}
 
 /* Always-visible assistant entry point for mobile users. */
 .topbar-assistant{background:linear-gradient(135deg,#087f83,#7656d6)!important;color:#fff!important;border:1px solid rgba(255,255,255,.28)!important;box-shadow:0 6px 14px rgba(8,127,131,.18)}
