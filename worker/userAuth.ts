@@ -2,6 +2,7 @@ import { isTrustedSameOriginRequest, readCookie } from "./adminAuth.ts";
 
 export const USER_SESSION_COOKIE = "__Host-navixa_session";
 export const USER_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const USER_SESSION_REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 const encoder = new TextEncoder();
 
 type D1Statement = {
@@ -99,6 +100,16 @@ export async function createUserSession(database: D1Database, userId: string) {
   const expiresAt = new Date(now.getTime() + USER_SESSION_TTL_SECONDS * 1000).toISOString();
   await database.prepare("INSERT INTO navixa_user_sessions(id,user_id,token_hash,created_at,expires_at,last_seen_at,revoked_at) VALUES (?,?,?,?,?,?, '')").bind(crypto.randomUUID(), userId, await hashOpaqueValue(token), now.toISOString(), expiresAt, now.toISOString()).run();
   return { token, expiresAt };
+}
+
+export async function refreshUserSessionIfNeeded(request: Request, database: D1Database, session: UserSession): Promise<{ session: UserSession; cookie: string | null }> {
+  const expiresAt = Date.parse(session.expiresAt);
+  if (!Number.isFinite(expiresAt) || expiresAt - Date.now() > USER_SESSION_REFRESH_WINDOW_SECONDS * 1000) return { session, cookie: null };
+  const token = readUserSessionToken(request);
+  if (!token || token.length < 30) return { session, cookie: null };
+  const nextExpiresAt = new Date(Date.now() + USER_SESSION_TTL_SECONDS * 1000).toISOString();
+  await database.prepare("UPDATE navixa_user_sessions SET expires_at=?,last_seen_at=? WHERE token_hash=? AND revoked_at=''").bind(nextExpiresAt, new Date().toISOString(), await hashOpaqueValue(token)).run();
+  return { session: { ...session, expiresAt: nextExpiresAt }, cookie: makeUserSessionCookie(token) };
 }
 
 export async function revokeUserSession(request: Request, database: D1Database) {

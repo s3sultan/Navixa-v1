@@ -78,6 +78,9 @@ class LocalAuthDatabase {
           const [id, userId, tokenHash, , expiresAt] = values as string[];
           this.sessions.push({ id, userId, tokenHash, expiresAt, revokedAt: "" }); return {};
         }
+        if (normalized.startsWith("update navixa_user_sessions set expires_at")) {
+          const row = this.sessions.find(item => item.tokenHash === values[2] && !item.revokedAt); if (row) row.expiresAt = String(values[0]); return {};
+        }
         if (normalized.startsWith("update navixa_user_sessions set revoked_at")) {
           const row = this.sessions.find(item => item.tokenHash === values[1] && !item.revokedAt); if (row) row.revokedAt = String(values[0]); return {};
         }
@@ -107,11 +110,12 @@ test("local passwordless flow issues one-time code, grants one trial, creates a 
     assert.equal(wrong.status, 401); assert.equal(database.codes[0].attempts, 1);
     const verified = await verifyCode(post("/api/account/code/verify", { email: "learner@example.com", code: deliveredCode }, { "cf-connecting-ip": "198.51.100.7" }));
     assert.equal(verified.status, 200); assert.equal(database.users.length, 1); assert.equal(database.subscribers.length, 1); assert.equal(database.subscribers[0].status, "trial");
-    const cookie = verified.headers.get("set-cookie") || ""; assert.match(cookie, /__Host-navixa_session=/); assert.match(cookie, /HttpOnly/); assert.match(cookie, /Secure/);
+    const cookie = verified.headers.get("set-cookie") || ""; assert.match(cookie, /__Host-navixa_session=/); assert.match(cookie, /Path=\//); assert.match(cookie, /Max-Age=2592000/); assert.match(cookie, /HttpOnly/); assert.match(cookie, /Secure/); assert.match(cookie, /SameSite=Lax/);
     const reused = await verifyCode(post("/api/account/code/verify", { email: "learner@example.com", code: deliveredCode }, { "cf-connecting-ip": "198.51.100.7" }));
     assert.equal(reused.status, 401);
+    database.sessions[0].expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60_000).toISOString();
     const session = await getSession(new Request(`${origin}/api/account/session`, { headers: { cookie: cookie.split(";")[0] } }));
-    assert.equal(session.status, 200); const state = await session.json() as { signedIn: boolean; plus: { status: string; plan: string } }; assert.equal(state.signedIn, true); assert.equal(state.plus.status, "trial"); assert.equal(state.plus.plan, "trial");
+    assert.equal(session.status, 200); const state = await session.json() as { signedIn: boolean; plus: { status: string; plan: string }; user: { expiresAt: string } }; assert.equal(state.signedIn, true); assert.equal(state.plus.status, "trial"); assert.equal(state.plus.plan, "trial"); assert.ok(Date.parse(state.user.expiresAt) > Date.now() + 28 * 24 * 60 * 60_000); assert.match(session.headers.get("set-cookie") || "", /Max-Age=2592000/);
     const signedOut = await logout(new Request(`${origin}/api/account/logout`, { method: "POST", headers: { origin, cookie: cookie.split(";")[0] } }));
     assert.equal(signedOut.status, 200);
     const afterLogout = await getSession(new Request(`${origin}/api/account/session`, { headers: { cookie: cookie.split(";")[0] } }));
