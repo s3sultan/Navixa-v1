@@ -16,13 +16,32 @@ type DomainEnv = {
 type RdapEvent = { eventAction?: string; eventDate?: string };
 type RdapDomain = { events?: RdapEvent[] };
 type AlertState = { last_alert_at: string; last_days_remaining: number };
+type CachedExpiryState = { last_checked_at: string; expires_at: string };
+const RDAP_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 async function ensureSchema(db: D1Database) {
   await db.prepare("CREATE TABLE IF NOT EXISTS navixa_domain_expiry_alert_state (domain TEXT PRIMARY KEY, last_checked_at TEXT NOT NULL DEFAULT '', expires_at TEXT NOT NULL DEFAULT '', last_days_remaining INTEGER NOT NULL DEFAULT 0, last_alert_at TEXT NOT NULL DEFAULT '')").run();
 }
 
-export async function fetchDomainExpiry(now = new Date()) {
-  const response = await fetch(`https://rdap.verisign.com/com/v1/domain/${DOMAIN}`, { headers: { accept: "application/rdap+json, application/json" } });
+async function cachedDomainExpiry(database: D1Database, now: Date) {
+  try {
+    const rows = await database.prepare("SELECT last_checked_at,expires_at FROM navixa_domain_expiry_alert_state WHERE domain = ?").bind(DOMAIN).all<CachedExpiryState>();
+    const cached = rows.results[0];
+    const checkedAt = cached?.last_checked_at ? Date.parse(cached.last_checked_at) : Number.NaN;
+    const expiresAt = cached?.expires_at ? new Date(cached.expires_at) : null;
+    if (!cached || Number.isNaN(checkedAt) || !expiresAt || Number.isNaN(expiresAt.getTime()) || now.getTime() - checkedAt > RDAP_CACHE_TTL_MS) return null;
+    return { domain: DOMAIN, expiresAt: expiresAt.toISOString(), daysRemaining: Math.ceil((expiresAt.getTime() - now.getTime()) / 86_400_000) };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchDomainExpiry(now = new Date(), database?: D1Database) {
+  if (database) {
+    const cached = await cachedDomainExpiry(database, now);
+    if (cached) return cached;
+  }
+  const response = await fetch(`https://rdap.verisign.com/com/v1/domain/${DOMAIN}`, { headers: { accept: "application/rdap+json, application/json" }, cf: { cacheTtl: 21_600, cacheEverything: true } as any });
   if (!response.ok) throw new Error(`RDAP returned ${response.status}`);
   const data = await response.json() as RdapDomain;
   const event = data.events?.find(item => item.eventAction?.toLowerCase() === "expiration");
@@ -54,10 +73,10 @@ function message(daysRemaining: number, expiresAt: string) {
 }
 
 export async function checkDomainExpiry(env: DomainEnv, now = new Date()) {
-  const status = await fetchDomainExpiry(now);
   const db = env.DB;
+  if (db) await ensureSchema(db);
+  const status = await fetchDomainExpiry(now, db);
   if (!db) return { ...status, alerted: false, reason: "database_unavailable" };
-  await ensureSchema(db);
   const previous = await db.prepare("SELECT last_alert_at,last_days_remaining FROM navixa_domain_expiry_alert_state WHERE domain = ?").bind(DOMAIN).all<AlertState>();
   const prior = previous.results[0];
   const daysSinceAlert = prior?.last_alert_at ? (now.getTime() - Date.parse(prior.last_alert_at)) / 86_400_000 : Infinity;
@@ -76,9 +95,10 @@ export async function checkDomainExpiry(env: DomainEnv, now = new Date()) {
 }
 
 export async function readDomainExpiryStatus(env: DomainEnv) {
-  const status = await fetchDomainExpiry();
   const db = env.DB;
+  if (db) await ensureSchema(db);
+  const status = await fetchDomainExpiry(new Date(), db);
   let lastAlertAt = "";
-  if (db) { await ensureSchema(db); const rows = await db.prepare("SELECT last_alert_at FROM navixa_domain_expiry_alert_state WHERE domain = ?").bind(DOMAIN).all<Pick<AlertState, "last_alert_at">>(); lastAlertAt = rows.results[0]?.last_alert_at || ""; }
+  if (db) { const rows = await db.prepare("SELECT last_alert_at FROM navixa_domain_expiry_alert_state WHERE domain = ?").bind(DOMAIN).all<Pick<AlertState, "last_alert_at">>(); lastAlertAt = rows.results[0]?.last_alert_at || ""; }
   return { ...status, lastAlertAt, warning: status.daysRemaining <= ALERT_WINDOW_DAYS, externalConfigured: configured(env) };
 }

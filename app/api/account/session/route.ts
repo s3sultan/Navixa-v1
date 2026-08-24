@@ -14,9 +14,10 @@ export async function GET(request: Request) {
   const db = await database();
   if (!db) return NextResponse.json({ enabled: false, signedIn: false, message: "حسابات NAVIXA غير متاحة مؤقتًا" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   try {
-    const settings = await getUserAuthSettings(db);
+    // Settings are shared while the session is per-cookie. Read them concurrently,
+    // but keep the complete response private so no user state is cached at the edge.
+    const [settings, session] = await Promise.all([getUserAuthSettings(db), resolveUserSession(request, db)]);
     if (!settings.userAuthEnabled) return NextResponse.json({ enabled: false, signedIn: false, trialDays: settings.trialDays }, { headers: { "Cache-Control": "no-store" } });
-    const session = await resolveUserSession(request, db);
     return NextResponse.json({
       enabled: true,
       signedIn: Boolean(session),
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
       earlyAccessEnabled: settings.earlyAccessEnabled,
       user: session ? { email: session.email, status: session.status, expiresAt: session.expiresAt } : null,
       plus: session ? (await db.prepare("SELECT plan,status,trial_ends_at,subscription_ends_at FROM navixa_subscribers WHERE user_id=? OR contact=? ORDER BY updated_at DESC LIMIT 1").bind(session.userId, session.email).all<{ plan: string; status: string; trial_ends_at: string; subscription_ends_at: string }>()).results[0] || null : null,
-    }, { headers: { "Cache-Control": "no-store" } });
+    }, { headers: { "Cache-Control": "private, no-store", "Vary": "Cookie" } });
   } catch {
     return NextResponse.json({ enabled: false, signedIn: false, message: "لم تُهيأ حسابات NAVIXA بعد" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
