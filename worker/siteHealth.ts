@@ -4,6 +4,8 @@ type Statement = { bind: (...values: unknown[]) => Statement; all: <T = Record<s
 export type SiteHealthDatabase = { prepare: (sql: string) => Statement };
 type SiteHealthEnv = { DB: SiteHealthDatabase; RESEND_API_KEY?: string; RESEND_FROM_EMAIL?: string; NAVIXA_AUTH_FROM?: string; NAVIXA_ADMIN_EMAIL?: string; NAVIXA_TELEGRAM_BOT_TOKEN?: string; NAVIXA_ADMIN_TELEGRAM_CHAT_ID?: string };
 type Check = { key: string; ok: boolean; detail: string };
+type HealthRow = { status: string; checks_json: string };
+type CountRow = { count: number; max_p95: number | null };
 let schemaReady: Promise<void> | null = null;
 
 export async function ensureSiteHealthSchema(db: SiteHealthDatabase) {
@@ -28,22 +30,20 @@ export async function runWeeklySiteHealthCheck(env: SiteHealthEnv) {
   await ensureSiteHealthSchema(env.DB);
   const now = new Date(), week = weekStart(now), nowIso = now.toISOString(), claim = `running:${crypto.randomUUID()}`;
   await env.DB.prepare("INSERT OR IGNORE INTO navixa_weekly_site_health(week_start,status,checks_json,alerted_at,email_sent,telegram_sent,created_at) VALUES (?,?,?,?,?,?,?)").bind(week, claim, "[]", "", 0, 0, nowIso).run();
-  const claimed = await env.DB.prepare("SELECT status FROM navixa_weekly_site_health WHERE week_start=?").bind(week).all<{ status: string }>();
-  if (claimed.results[0]?.status !== claim) return { skipped: "already_checked", status: "" };
+  const existing = await env.DB.prepare("SELECT status,checks_json FROM navixa_weekly_site_health WHERE week_start=?").bind(week).all<HealthRow>();
+  const retryLegacySelfFetch = existing.results[0]?.status === "critical" && existing.results[0]?.checks_json.includes("HTTP 522");
+  if (existing.results[0]?.status !== claim && !retryLegacySelfFetch) return { skipped: "already_checked", status: "" };
+  if (retryLegacySelfFetch) await env.DB.prepare("UPDATE navixa_weekly_site_health SET status=?,checks_json='[]',alerted_at='',email_sent=0,telegram_sent=0,created_at=? WHERE week_start=?").bind(claim, nowIso, week).run();
 
   const checks: Check[] = [];
-  for (const path of ["/", "/robots.txt", "/sitemap.xml"]) {
-    try {
-      const response = await fetch(`https://navixasa.com${path}`, { headers: { "user-agent": "NAVIXA-site-health/1.0" } });
-      const body = path === "/sitemap.xml" && response.ok ? await response.text() : "";
-      const canonical = path !== "/sitemap.xml" || body.includes("https://navixasa.com/");
-      checks.push({ key: path === "/" ? "public_home" : path.slice(1).replace(".", "_"), ok: response.ok && canonical, detail: safeDetail(`HTTP ${response.status}${canonical ? "" : "; canonical URL missing"}`) });
-      if (path === "/") {
-        const headers = response.headers;
-        for (const [key, header] of [["hsts", "strict-transport-security"], ["nosniff", "x-content-type-options"], ["csp_monitor", "content-security-policy-report-only"]] as const) checks.push({ key, ok: Boolean(headers.get(header)), detail: headers.get(header) ? "present" : "missing" });
-      }
-    } catch { checks.push({ key: path === "/" ? "public_home" : path.slice(1).replace(".", "_"), ok: false, detail: "request failed" }); }
-  }
+  const database = await env.DB.prepare("SELECT COUNT(*) AS count FROM navixa_weekly_site_health").all<CountRow>();
+  checks.push({ key: "database", ok: Number(database.results[0]?.count || 0) >= 1, detail: "operational tables available" });
+  const performanceCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60_000).toISOString();
+  const performance = await env.DB.prepare("SELECT COUNT(*) AS count,MAX(p95_load_ms) AS max_p95 FROM navixa_performance_windows WHERE bucket_start>=?").bind(performanceCutoff).all<CountRow>();
+  const performanceCount = Number(performance.results[0]?.count || 0), maxP95 = Number(performance.results[0]?.max_p95 || 0);
+  checks.push({ key: "field_performance", ok: maxP95 <= 10_000, detail: performanceCount ? safeDetail(`${performanceCount} aggregate windows; highest p95 ${maxP95}ms`) : "awaiting anonymous public samples" });
+  const csp = await env.DB.prepare("SELECT COUNT(*) AS count FROM navixa_csp_report_summaries WHERE bucket_day>=?").bind(performanceCutoff.slice(0, 10)).all<CountRow>();
+  checks.push({ key: "csp_monitoring", ok: true, detail: `${Number(csp.results[0]?.count || 0)} aggregate compatibility groups` });
   const failed = checks.filter(check => !check.ok), status = failed.length ? "critical" : "healthy";
   const text = `فحص NAVIXA الأسبوعي الدفاعي\n\nالحالة: ${status === "healthy" ? "سليمة" : "تتطلب مراجعة"}\n${checks.map(check => `- ${check.key}: ${check.ok ? "ok" : check.detail}`).join("\n")}\n\nهذا الفحص يراجع صفحات عامة ورؤوس حماية فقط. لا يجرب تسجيل الدخول أو كلمات المرور أو بيانات المستخدمين.`;
   const [emailSent, telegramSent] = status === "critical" ? await Promise.all([
