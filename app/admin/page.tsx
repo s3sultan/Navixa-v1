@@ -16,6 +16,7 @@ import AdminDiscountCodes from "./settings/AdminDiscountCodes";
 import AdminMeetingSettings from "./settings/AdminMeetingSettings";
 import AdminDomainExpiryAlert from "./settings/AdminDomainExpiryAlert";
 import AdminServiceTransitionSettings from "./settings/AdminServiceTransitionSettings";
+import AdminUsageAnalytics from "./settings/AdminUsageAnalytics";
 import { useAdminAuth } from "./useAdminAuth";
 
 const features = [
@@ -163,7 +164,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>آخر العمليات والقنوات</small></summary><div className="admin-fold-content"><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
+        <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>آخر العمليات والقنوات</small></summary><div className="admin-fold-content"><AdminUsageAnalytics /><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
       </section>
     </main>
   );

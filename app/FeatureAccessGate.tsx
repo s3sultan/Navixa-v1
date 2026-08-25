@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { isFeatureAccessActive, type FeatureAccessSession } from "./featureAccess";
+import UsageTracker from "./UsageTracker";
 import "./feature-access.css";
 
 type AccountSession = FeatureAccessSession & {
@@ -26,7 +27,7 @@ export default function FeatureAccessGate({ children, feature = "مزايا NAVI
     return () => { active = false; };
   }, []);
 
-  if (session && isFeatureAccessActive(session)) return <>{children}</>;
+  if (session && isFeatureAccessActive(session)) return <><UsageTracker />{children}</>;
 
   const signedIn = session?.signedIn === true;
   const unavailable = session?.enabled === false;

@@ -7,6 +7,7 @@ import { checkDomainExpiry } from "./domainExpiryAlert";
 import { deliverDueSubscriptionRenewals } from "./subscriptionRenewals";
 import { deliverDueImportantReminders } from "./importantReminders";
 import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
+import { pruneUsageAnalytics } from "./usageAnalytics";
 
 interface Env {
   ASSETS: Fetcher;
@@ -128,6 +129,7 @@ const publicMutationLimits: Record<string, number> = {
   "/api/push/subscriptions": 8,
   "/api/match-events": 30,
   "/api/performance": 30,
+  "/api/usage/event": 120,
 };
 
 function publicMutationGuard(request: Request, url: URL) {
@@ -245,6 +247,7 @@ const worker = {
     ctx.waitUntil(deliverDueSubscriptionRenewals(env).then(result => console.log(JSON.stringify({ event: "subscription_renewal_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "subscription_renewal_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(deliverDueImportantReminders(env).then(result => console.log(JSON.stringify({ event: "important_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "important_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(sendApprovedMoyasarSalesInquiry(env).then(result => console.log(JSON.stringify({ event: "moyasar_sales_inquiry", ...result }))).catch(error => console.log(JSON.stringify({ event: "moyasar_sales_inquiry_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(pruneUsageAnalytics(env).catch(error => console.log(JSON.stringify({ event: "usage_analytics_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
