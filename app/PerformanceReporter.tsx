@@ -34,7 +34,8 @@ export default function PerformanceReporter() {
       const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
       if (!navigation) return;
       const ttfbMs = Math.round(navigation.responseStart - navigation.requestStart);
-      const loadMs = Math.round((navigation.loadEventEnd || performance.now()) - navigation.startTime);
+      if (navigation.loadEventEnd <= 0) return;
+      const loadMs = Math.round(navigation.loadEventEnd - navigation.startTime);
       if (ttfbMs < 0 || loadMs < 0 || loadMs > 120_000) return;
 
       const payload = JSON.stringify({ path, ttfbMs, loadMs, lcpMs, inpMs, clsMilli: Math.round(clsScore * 1000) });
@@ -53,8 +54,8 @@ export default function PerformanceReporter() {
 
     const onPageHide = () => report();
     window.addEventListener("pagehide", onPageHide, { once: true });
-    const reportTimer = window.setTimeout(report, 30_000);
-    return () => { window.clearTimeout(reportTimer); window.removeEventListener("pagehide", onPageHide); observers.forEach((observer) => observer.disconnect()); };
+    window.addEventListener("load", report, { once: true });
+    return () => { window.removeEventListener("pagehide", onPageHide); window.removeEventListener("load", report); observers.forEach((observer) => observer.disconnect()); };
   }, []);
 
   return null;

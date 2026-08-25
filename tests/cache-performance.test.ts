@@ -25,6 +25,11 @@ assert.match(matches, /cache:"no-store"/);
 const home = source("app/page.tsx");
 assert.match(home, /api\/matches\?date=.*cache:"default"/);
 
+const performanceReporter = source("app/PerformanceReporter.tsx");
+assert.match(performanceReporter, /navigation\.loadEventEnd <= 0/);
+assert.match(performanceReporter, /window\.addEventListener\("load", report/);
+assert.doesNotMatch(performanceReporter, /navigation\.loadEventEnd \|\| performance\.now/);
+
 const domainExpiry = source("worker/domainExpiryAlert.ts");
 assert.match(domainExpiry, /RDAP_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
 assert.match(domainExpiry, /cachedDomainExpiry/);
