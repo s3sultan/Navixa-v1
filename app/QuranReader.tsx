@@ -2,11 +2,11 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 
 type QuranAyah={number:number;numberInSurah:number;surah:{name:string;number:number};juz?:number;hizbQuarter?:number};
+type PageClip={verseKey:string;audioUrl:string;start:number;end:number};
 
 const RECITERS=[
-  {name:"بندر بليلة",source:"Quran.com",url:(surah:number)=>`https://download.quranicaudio.com/quran/bandar_baleela/complete/${String(surah).padStart(3,"0")}.mp3`},
-  {name:"ياسر الدوسري",source:"Quran.com",url:(surah:number)=>`https://download.quranicaudio.com/qdc/yasser_ad-dussary/mp3/${surah}.mp3`},
-  {name:"خالد الجليل",source:"MP3Quran",url:(surah:number)=>`https://server10.mp3quran.net/jleel/${String(surah).padStart(3,"0")}.mp3`},
+  {name:"بندر بليلة",source:"Quran.com",id:160},
+  {name:"ياسر الدوسري",source:"Quran.com",id:174},
 ] as const;
 
 const dailyReciter=(date:string)=>RECITERS[[...date].reduce((total,char)=>total+char.charCodeAt(0),0)%RECITERS.length];
@@ -19,6 +19,9 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
   const [page,setPage]=useState(1);
   const [quranError,setQuranError]=useState("");
   const [isPlaying,setIsPlaying]=useState(false);
+  const [clips,setClips]=useState<PageClip[]>([]);
+  const [clipIndex,setClipIndex]=useState(0);
+  const [autoStart,setAutoStart]=useState(false);
   const audioRef=useRef<HTMLAudioElement>(null);
 
   useEffect(()=>{
@@ -48,14 +51,41 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
   const sameSurah=firstAyah?.surah.name===lastAyah?.surah.name;
   const ayahLabel=firstAyah&&lastAyah?(sameSurah?`${firstAyah.numberInSurah}–${lastAyah.numberInSurah}`:`${firstAyah.numberInSurah}–${lastAyah.numberInSurah}`):"—";
   const reciter=useMemo(()=>dailyReciter(todayKey()),[]);
-  const audioUrl=firstAyah?reciter.url(firstAyah.surah.number):"";
+  const activeClip=clips[clipIndex];
 
-  const toggleRecitation=async()=>{const audio=audioRef.current;if(!audio||!audioUrl)return;if(isPlaying){audio.pause();return}try{setQuranError("");await audio.play()}catch{setQuranError("تعذر تشغيل التلاوة. تحقق من اتصالك ثم حاول مرة أخرى.")}};
+  useEffect(()=>{
+    if(!quranAyahs?.length)return;
+    let cancelled=false;
+    const bySurah=[...new Set(quranAyahs.map(ayah=>ayah.surah.number))];
+    setClips([]);setClipIndex(0);setIsPlaying(false);setAutoStart(false);
+    Promise.all(bySurah.map(async surah=>{
+      const response=await fetch(`/api/quran-page-audio?reciter=${reciter.id}&surah=${surah}`);
+      if(!response.ok)throw new Error("audio unavailable");
+      return [surah,await response.json() as {audioUrl:string;timestamps:Array<{verse_key:string;timestamp_from:number;timestamp_to:number}>}] as const;
+    })).then(entries=>{
+      if(cancelled)return;
+      const source=new Map(entries);
+      const pageClips=quranAyahs.map(ayah=>{
+        const details=source.get(ayah.surah.number)?.[1];
+        const verseKey=`${ayah.surah.number}:${ayah.numberInSurah}`;
+        const timing=details?.timestamps.find(item=>item.verse_key===verseKey);
+        return timing&&details?{verseKey,audioUrl:details.audioUrl,start:timing.timestamp_from/1000,end:timing.timestamp_to/1000}:null;
+      }).filter((clip):clip is PageClip=>clip!==null);
+      if(!pageClips.length)throw new Error("no page clips");
+      setClips(pageClips);
+    }).catch(()=>{if(!cancelled)setQuranError("تعذر تجهيز تلاوة آيات هذه الصفحة.")});
+    return()=>{cancelled=true};
+  },[quranAyahs,reciter.id]);
+
+  const toggleRecitation=async()=>{const audio=audioRef.current;if(!audio||!activeClip)return;if(isPlaying){setAutoStart(false);audio.pause();return}try{setQuranError("");setAutoStart(true);audio.currentTime=activeClip.start;await audio.play()}catch{setQuranError("تعذر تشغيل التلاوة. تحقق من اتصالك ثم حاول مرة أخرى.")}};
+  const advanceClip=()=>{const audio=audioRef.current;if(!audio)return;if(clipIndex>=clips.length-1){setAutoStart(false);setIsPlaying(false);audio.pause();return}audio.pause();setClipIndex(index=>index+1)};
+  const handleClipReady=()=>{const audio=audioRef.current;if(!audio||!activeClip||!autoStart)return;audio.currentTime=activeClip.start;audio.play().catch(()=>setQuranError("تعذر تشغيل التلاوة. تحقق من اتصالك ثم حاول مرة أخرى."))};
+  const handleTimeUpdate=()=>{const audio=audioRef.current;if(audio&&activeClip&&audio.currentTime>=activeClip.end)advanceClip()};
 
   return <article className="quran-card mushaf-frame">
     <header><span className="card-explain-icon">📗</span><div><small>ورد اليوم — صفحة {page} من 604</small><h3>{surah}</h3><div className="quran-meta"><span>السورة: {surah}</span><span>الجزء: {currentJuz||"—"}</span><span>الحزب: {currentHizb||"—"}</span><span>الآيات: {ayahLabel}</span></div></div></header>
     <img className="quran-page-image" src={`https://quran.islam-db.com/data/pages/quranpages_1024/images/page${String(page).padStart(3,"0")}.png`} alt={`صورة صفحة المصحف رقم ${page} من سورة ${surah}`} loading="eager" />
-    <div className="quran-audio-controls"><div><small>تلاوة ورد اليوم · {reciter.name}</small><b>استمع إلى سورة {surah}</b><em>قارئ اليوم يتغير تلقائيًا مع الورد</em></div><audio ref={audioRef} src={audioUrl} preload="none" onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)} onEnded={()=>setIsPlaying(false)} onError={()=>{setIsPlaying(false);setQuranError("تعذر تحميل تلاوة السورة من مصدرها الصوتي.")}} />{isPlaying?<button type="button" onClick={toggleRecitation}>إيقاف التلاوة</button>:<button type="button" onClick={toggleRecitation} disabled={!audioUrl}>▶ تشغيل تلاوة السورة</button>}</div>
+    <div className="quran-audio-controls"><div><small>تلاوة آيات الصفحة · {reciter.name}</small><b>استمع إلى آيات الورد الظاهرة فقط</b><em>{clips.length?`الآية ${clipIndex+1} من ${clips.length} في هذه الصفحة`:`يُجهّز مقطع الصفحة`}</em></div><audio ref={audioRef} src={activeClip?.audioUrl} preload="metadata" onCanPlay={handleClipReady} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)} onTimeUpdate={handleTimeUpdate} onEnded={advanceClip} onError={()=>{setAutoStart(false);setIsPlaying(false);setQuranError("تعذر تحميل تلاوة آيات الصفحة من مصدرها الصوتي.")}} />{isPlaying?<button type="button" onClick={toggleRecitation}>إيقاف التلاوة</button>:<button type="button" onClick={toggleRecitation} disabled={!activeClip}>▶ تشغيل تلاوة الصفحة</button>}</div>
     {quranError&&<p className="quran-error">{quranError}</p>}
     <a className="quran-full-link" href="https://qurancomplex.gov.sa/quran-hafs/" target="_blank" rel="noreferrer">فتح المصحف الكامل بالرسم الحفصي ↗</a>
     {!wirdDone?<button type="button" className="wird-done" onClick={onComplete} disabled={!quranAyahs}>تم — أنجزت ورد اليوم</button>:<p className="wird-complete">✓ أنجزت ورد اليوم — بارك الله فيك</p>}
