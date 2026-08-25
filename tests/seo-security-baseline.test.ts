@@ -18,5 +18,6 @@ assert.match(sitemap, /organize-your-day|meeting-summaries|smart-reminders|local
 assert.match(worker, /Strict-Transport-Security/);
 assert.match(worker, /X-Content-Type-Options/);
 assert.match(worker, /Content-Security-Policy-Report-Only/);
+assert.match(worker, /report-uri \/api\/security\/csp-report/);
 for (const page of [organizer, meetings, reminders, privacy]) assert.match(page, /alternates: \{ canonical:/);
 console.log("SEO and browser-security baseline contract: ok");

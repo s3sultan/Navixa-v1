@@ -128,7 +128,7 @@ function applyBrowserSecurityHeaders(response: Response) {
   response.headers.set("Permissions-Policy", "geolocation=(), usb=(), serial=(), accelerometer=(), gyroscope=(), magnetometer=()");
   // Monitor CSP compatibility first so browser-based microphone and screen
   // capabilities are not blocked before their external sources are verified.
-  response.headers.set("Content-Security-Policy-Report-Only", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests");
+  response.headers.set("Content-Security-Policy-Report-Only", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; report-uri /api/security/csp-report");
   return response;
 }
 
@@ -142,11 +142,14 @@ const publicMutationLimits: Record<string, number> = {
   "/api/match-events": 30,
   "/api/performance": 30,
   "/api/usage/event": 120,
+  "/api/security/csp-report": 20,
 };
 
 function publicMutationGuard(request: Request, url: URL) {
   if (!Object.hasOwn(publicMutationLimits, url.pathname) || !["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return null;
-  if (!isTrustedSameOriginRequest(request)) {
+  // CSP violation reports are sent by the browser and may omit Origin. Their
+  // dedicated receiver logs only a directive/source host and is rate-limited.
+  if (url.pathname !== "/api/security/csp-report" && !isTrustedSameOriginRequest(request)) {
     return new Response(JSON.stringify({ error: "مصدر الطلب غير موثوق" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   }
   const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -176,7 +179,7 @@ function auditResponse(request: Request, url: URL, response: Response, startedAt
   return response;
 }
 
-type PerformanceSample = { path: "/" | "/health"; ttfb_ms: number; load_ms: number };
+type PerformanceSample = { path: string; ttfb_ms: number; load_ms: number; lcp_ms: number | null; inp_ms: number | null; cls_milli: number | null };
 type PerformanceAlertState = { last_alert_at: string };
 const PERFORMANCE_BUCKET_MINUTES = 5;
 const PERFORMANCE_ALERT_P95_MS = 1_200;
@@ -198,7 +201,7 @@ async function aggregatePerformanceWindows(env: Env) {
   const bucketStart = bucket.toISOString();
   const bucketEnd = new Date(bucket.getTime() + PERFORMANCE_BUCKET_MINUTES * 60_000).toISOString();
   const raw = await env.DB.prepare(
-    "SELECT path, ttfb_ms, load_ms FROM navixa_performance_samples WHERE captured_at >= ? AND captured_at < ? ORDER BY path ASC, load_ms ASC",
+    "SELECT path, ttfb_ms, load_ms, lcp_ms, inp_ms, cls_milli FROM navixa_performance_samples WHERE captured_at >= ? AND captured_at < ? ORDER BY path ASC, load_ms ASC",
   ).bind(bucketStart, bucketEnd).all<PerformanceSample>();
 
   const byPath = new Map<string, PerformanceSample[]>();
@@ -214,9 +217,14 @@ async function aggregatePerformanceWindows(env: Env) {
     const averageTtfb = Math.round(samples.reduce((sum, sample) => sum + sample.ttfb_ms, 0) / count);
     const averageLoad = Math.round(samples.reduce((sum, sample) => sum + sample.load_ms, 0) / count);
     const p95Load = samples[Math.max(0, Math.ceil(count * 0.95) - 1)].load_ms;
+    const aggregateMetric = (key: "lcp_ms" | "inp_ms" | "cls_milli") => {
+      const values = samples.map((sample) => sample[key]).filter((value): value is number => typeof value === "number").sort((a, b) => a - b);
+      return values.length ? { average: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length), p95: values[Math.max(0, Math.ceil(values.length * 0.95) - 1)] } : { average: null, p95: null };
+    };
+    const lcp = aggregateMetric("lcp_ms"), inp = aggregateMetric("inp_ms"), cls = aggregateMetric("cls_milli");
     await env.DB.prepare(
-      "INSERT INTO navixa_performance_windows (bucket_start,path,sample_count,avg_ttfb_ms,avg_load_ms,p95_load_ms,created_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(bucket_start,path) DO UPDATE SET sample_count=excluded.sample_count,avg_ttfb_ms=excluded.avg_ttfb_ms,avg_load_ms=excluded.avg_load_ms,p95_load_ms=excluded.p95_load_ms,created_at=excluded.created_at",
-    ).bind(bucketStart, path, count, averageTtfb, averageLoad, p95Load, now.toISOString()).run();
+      "INSERT INTO navixa_performance_windows (bucket_start,path,sample_count,avg_ttfb_ms,avg_load_ms,p95_load_ms,avg_lcp_ms,p95_lcp_ms,avg_inp_ms,p95_inp_ms,avg_cls_milli,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(bucket_start,path) DO UPDATE SET sample_count=excluded.sample_count,avg_ttfb_ms=excluded.avg_ttfb_ms,avg_load_ms=excluded.avg_load_ms,p95_load_ms=excluded.p95_load_ms,avg_lcp_ms=excluded.avg_lcp_ms,p95_lcp_ms=excluded.p95_lcp_ms,avg_inp_ms=excluded.avg_inp_ms,p95_inp_ms=excluded.p95_inp_ms,avg_cls_milli=excluded.avg_cls_milli,created_at=excluded.created_at",
+    ).bind(bucketStart, path, count, averageTtfb, averageLoad, p95Load, lcp.average, lcp.p95, inp.average, inp.p95, cls.average, now.toISOString()).run();
 
     if (count < PERFORMANCE_ALERT_MIN_SAMPLES || p95Load <= PERFORMANCE_ALERT_P95_MS) continue;
     const state = await env.DB.prepare(
