@@ -18,6 +18,7 @@ import AdminDomainExpiryAlert from "./settings/AdminDomainExpiryAlert";
 import AdminServiceTransitionSettings from "./settings/AdminServiceTransitionSettings";
 import AdminUsageAnalytics from "./settings/AdminUsageAnalytics";
 import AdminUsageHeatmap from "./settings/AdminUsageHeatmap";
+import AdminSiteHealth from "./settings/AdminSiteHealth";
 import { useAdminAuth } from "./useAdminAuth";
 
 const features = [
@@ -168,6 +169,7 @@ export default function AdminPage() {
         <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>آخر العمليات والقنوات</small></summary><div className="admin-fold-content"><AdminUsageAnalytics /><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
         <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>الإيميلات · الاستخدام · التنبيهات</small></summary><div className="admin-fold-content"><AdminUsageAnalytics /><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
         <section className="admin-section admin-fold" id="heatmap"><details className="admin-fold-card"><summary><span>الخريطة الحرارية</span><small>مناطق التفاعل المجمعة · قراءة مستقلة</small></summary><div className="admin-fold-content"><AdminUsageHeatmap /></div></details></section>
+        <section className="admin-section admin-fold" id="site-health"><details className="admin-fold-card"><summary><span>صحة الموقع وتوافق CSP</span><small>فحص أسبوعي دفاعي · تقارير الحظر المجمعة</small></summary><div className="admin-fold-content"><AdminSiteHealth /></div></details></section>
       </section>
     </main>
   );

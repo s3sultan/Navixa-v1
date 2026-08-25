@@ -8,6 +8,7 @@ import { deliverDueSubscriptionRenewals } from "./subscriptionRenewals";
 import { deliverDueImportantReminders } from "./importantReminders";
 import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
 import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics";
+import { runWeeklySiteHealthCheck } from "./siteHealth";
 
 interface Env {
   ASSETS: Fetcher;
@@ -269,6 +270,7 @@ const worker = {
     ctx.waitUntil(sendApprovedMoyasarSalesInquiry(env).then(result => console.log(JSON.stringify({ event: "moyasar_sales_inquiry", ...result }))).catch(error => console.log(JSON.stringify({ event: "moyasar_sales_inquiry_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(pruneUsageAnalytics(env).catch(error => console.log(JSON.stringify({ event: "usage_analytics_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(scanUsageAnalyticsAlerts(env).then(result => console.log(JSON.stringify({ event: "usage_analytics_alert_scan", ...result }))).catch(error => console.log(JSON.stringify({ event: "usage_analytics_alert_scan_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(runWeeklySiteHealthCheck(env).then(result => console.log(JSON.stringify({ event: "weekly_site_health", ...result }))).catch(error => console.log(JSON.stringify({ event: "weekly_site_health_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
