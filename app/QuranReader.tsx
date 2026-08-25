@@ -85,10 +85,7 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
 
   return <article className="quran-card mushaf-frame">
     <header><span className="card-explain-icon">📗</span><div><small>ورد اليوم — صفحة {page} من 604</small><h3>{surah}</h3><div className="quran-meta"><span>السورة: {surah}</span><span>الجزء: {currentJuz||"—"}</span><span>الحزب: {currentHizb||"—"}</span><span>الآيات: {ayahLabel}</span></div></div></header>
-    <div className="quran-reading-panel" aria-label={`آيات صفحة الورد ${page}`}>
-      <div className="quran-reading-heading"><span>صفحة الورد</span><b>{surah}</b><small>من الآية {ayahLabel}</small></div>
-      <div className="quran-ayahs">{quranAyahs?.length?quranAyahs.map(ayah=><span key={ayah.number}>{ayah.text||"…"}<i>{ayah.numberInSurah}</i></span>):<p>يُجهّز نص آيات هذه الصفحة…</p>}</div>
-    </div>
+    <img className="quran-page-image" src={`https://quran.islam-db.com/data/pages/quranpages_1024/images/page${String(page).padStart(3,"0")}.png`} alt={`صفحة المصحف رقم ${page} من ${surah}، الآيات ${ayahLabel}`} loading="eager" />
     <div className="quran-reader-actions"><div className="quran-audio-controls"><div><small>تلاوة آيات الصفحة · {reciter.name}</small><b>استمع إلى آيات الورد الظاهرة فقط</b><em>{clips.length?`الآية ${clipIndex+1} من ${clips.length} في هذه الصفحة`:`يُجهّز مقطع الصفحة`}</em></div><audio ref={audioRef} src={activeClip?.audioUrl} preload="metadata" onCanPlay={handleClipReady} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)} onTimeUpdate={handleTimeUpdate} onEnded={advanceClip} onError={()=>{setAutoStart(false);setIsPlaying(false);setQuranError("تعذر تحميل تلاوة آيات الصفحة من مصدرها الصوتي.")}} />{isPlaying?<button type="button" onClick={toggleRecitation}>إيقاف التلاوة</button>:<button type="button" onClick={toggleRecitation} disabled={!activeClip}>▶ تشغيل تلاوة الصفحة</button>}</div>{quranError&&<p className="quran-error">{quranError}</p>}<div className="quran-reader-footer"><a className="quran-full-link" href="https://qurancomplex.gov.sa/quran-hafs/" target="_blank" rel="noreferrer">فتح المصحف الكامل ↗</a>{!wirdDone?<button type="button" className="wird-done" onClick={onComplete} disabled={!quranAyahs}>تم — أنجزت ورد اليوم</button>:<p className="wird-complete">✓ أنجزت ورد اليوم — بارك الله فيك</p>}</div></div>
   </article>;
 }
