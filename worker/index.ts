@@ -120,6 +120,18 @@ function canStorePublicDocument(response: Response) {
     && (response.headers.get("content-type") || "").includes("text/html");
 }
 
+function applyBrowserSecurityHeaders(response: Response) {
+  response.headers.set("Strict-Transport-Security", "max-age=31536000");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "geolocation=(), usb=(), serial=(), accelerometer=(), gyroscope=(), magnetometer=()");
+  // Monitor CSP compatibility first so browser-based microphone and screen
+  // capabilities are not blocked before their external sources are verified.
+  response.headers.set("Content-Security-Policy-Report-Only", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests");
+  return response;
+}
+
 const publicMutationLimits: Record<string, number> = {
   "/api/telegram-alert": 5,
   "/api/stats": 20,
@@ -295,7 +307,7 @@ const worker = {
         const hit = new Response(cached.body, cached);
         hit.headers.set("Cache-Control", `public, max-age=0, s-maxage=${PUBLIC_DOCUMENT_TTL_SECONDS}`);
         hit.headers.set("X-NAVIXA-Edge-Cache", "HIT");
-        return auditResponse(request, url, hit, startedAt, "public");
+        return auditResponse(request, url, applyBrowserSecurityHeaders(hit), startedAt, "public");
       }
     }
 
@@ -306,7 +318,7 @@ const worker = {
       response.headers.set("X-NAVIXA-Edge-Cache", "MISS");
       if (cache) ctx.waitUntil(cache.put(cacheKey, response.clone()));
     }
-    return auditResponse(request, url, response, startedAt, requiresAdminSession ? "admin" : "public");
+    return auditResponse(request, url, applyBrowserSecurityHeaders(response), startedAt, requiresAdminSession ? "admin" : "public");
   },
 };
 
