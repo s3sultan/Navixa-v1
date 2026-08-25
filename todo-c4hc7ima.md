@@ -10,3 +10,9 @@
 - [ ] Verify the audio player and fallback behavior on mobile before publishing.
 - [ ] Replace full-surah playback with an ordered recitation playlist for the ayahs shown on the active Quran page only.
 - [ ] Verify that playback stops at the final ayah of the active page and continues on the next page the following day.
+- [ ] Deploy the approved page-only recitation fix and verify the live page-audio endpoint without autoplay.
+- [x] Prepare separate NAVIXA templates for digital subscription cancellation and refund policy, customer satisfaction survey, meeting minutes, and marketing brief.
+- [x] Keep the delivered templates read-only for recipients and reserve their master-text updates for NAVIXA administration.
+- [x] Export each approved NAVIXA template as an individual downloadable PDF.
+- [x] Draft NAVIXA terms and conditions and a concise public cancellation and refund policy page for administrative approval.
+- [x] Produce an admin-only aggregate account and login report without exposing more personal data than necessary.

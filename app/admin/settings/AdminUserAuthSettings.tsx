@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import "./user-login-report.css";
 
 type Settings = { userAuthEnabled: boolean; emailOtpEnabled: boolean; passkeysEnabled: boolean; earlyAccessEnabled: boolean; telegramBotEnabled: boolean; telegramBackgroundAlertsEnabled: boolean; trialDays: number };
-type Readiness = { emailProviderConfigured: boolean; telegramBotConfigured: boolean; users: number; activeSessions: number };
+type Account = { email: string; status: string; created_at: string; last_login_at: string; last_seen_at: string | null; active_sessions: number };
+type Readiness = { emailProviderConfigured: boolean; telegramBotConfigured: boolean; users: number; activeSessions: number; recentAccounts: Account[] };
 const initial: Settings = { userAuthEnabled: false, emailOtpEnabled: false, passkeysEnabled: false, earlyAccessEnabled: false, telegramBotEnabled: false, telegramBackgroundAlertsEnabled: false, trialDays: 14 };
 const headers = { "Content-Type": "application/json" };
 
 export default function AdminUserAuthSettings() {
   const [settings, setSettings] = useState<Settings>(initial);
-  const [readiness, setReadiness] = useState<Readiness>({ emailProviderConfigured: false, users: 0, activeSessions: 0 });
+  const [readiness, setReadiness] = useState<Readiness>({ emailProviderConfigured: false, telegramBotConfigured: false, users: 0, activeSessions: 0, recentAccounts: [] });
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [webhookBusy, setWebhookBusy] = useState(false);
@@ -19,7 +21,7 @@ export default function AdminUserAuthSettings() {
     const response = await fetch("/api/admin/user-auth-settings", { cache: "no-store" });
     if (!response.ok) return;
     const data = await response.json() as { settings?: Settings; readiness?: Readiness };
-    setSettings(data.settings || initial); setReadiness(data.readiness || { emailProviderConfigured: false, telegramBotConfigured: false, users: 0, activeSessions: 0 });
+    setSettings(data.settings || initial); setReadiness(data.readiness || { emailProviderConfigured: false, telegramBotConfigured: false, users: 0, activeSessions: 0, recentAccounts: [] });
   };
   useEffect(() => { void load(); }, []);
   const save = async () => {
@@ -52,6 +54,7 @@ export default function AdminUserAuthSettings() {
     <div className="panel-head"><div><small>NAVIXA Plus · حسابات المستخدمين</small><h2>تجربة Early Access بهوية خاصة</h2><p>لا تتصل هذه الحسابات بتسجيلات الاجتماعات أو النصوص المحلية. يبقى الدفع العام مخفيًا حتى يكتمل الاختبار الحي.</p></div><button onClick={() => void load()}>تحديث</button></div>
     {notice && <p className="admin-inline-notice">{notice}</p>}
     <div className="subscription-summary user-auth-summary"><article><small>مزود بريد الدخول</small><b>{readiness.emailProviderConfigured ? "جاهز" : "غير مهيأ"}</b><span>{readiness.emailProviderConfigured ? "يمكن تفعيل رموز الدخول" : "يتطلب نطاقًا وبريد إرسال"}</span></article><article><small>حسابات المستخدمين</small><b>{readiness.users}</b><span>لا تشمل بيانات محلية</span></article><article><small>جلسات نشطة</small><b>{readiness.activeSessions}</b><span>جلسات خادمية آمنة</span></article><article><small>تجربة Plus</small><b>{settings.trialDays}</b><span>يومًا بلا بطاقة</span></article><article><small>بوت NAVIXA</small><b>{readiness.telegramBotConfigured ? "جاهز" : "غير مهيأ"}</b><span>{readiness.telegramBotConfigured ? "ربط خاص لكل مستخدم" : "يتطلب أسرار البوت الرسمية"}</span></article></div>
+    <section className="user-login-report" aria-label="تقرير حسابات المستخدمين"><div><small>عرض إداري محمي</small><h3>البريد وآخر دخول</h3><p>تظهر هذه البيانات للمدير فقط، ولا تتضمن كلمات مرور أو رموزًا أو محتوى المستخدم المحلي.</p></div>{readiness.recentAccounts.length ? <div className="user-login-table"><div className="user-login-row user-login-heading"><b>البريد</b><b>الحالة</b><b>آخر دخول</b><b>جلسات نشطة</b></div>{readiness.recentAccounts.map(account => <div className="user-login-row" key={account.email}><span dir="ltr">{account.email}</span><span>{account.status}</span><time>{account.last_login_at ? new Date(account.last_login_at).toLocaleString("ar-SA") : "—"}</time><span>{account.active_sessions || 0}</span></div>)}</div> : <p className="user-login-empty">لا توجد حسابات مسجلة بعد.</p>}</section>
     <section className="billing-control user-auth-control"><div className="billing-control-head"><div><small>فتح تدريجي ومحمي</small><h3>الدخول بلا كلمة مرور</h3><p>يفعّل البريد رمزًا لمرة واحدة، ثم يمكن للمستخدم تفعيل Passkey ببصمة الجهاز أو Face ID. لا يوجد تخزين للصوت أو النصوص في الحساب.</p></div><span className={settings.userAuthEnabled ? "billing-state live" : "billing-state locked"}>{settings.userAuthEnabled ? "قيد التفعيل" : "مقفل"}</span></div>
       <div className="billing-actions"><button disabled={emailTestBusy || !readiness.emailProviderConfigured} onClick={() => void sendEmailTest()}>{emailTestBusy ? "جارٍ إرسال الاختبار…" : "إرسال اختبار بريد إلى المدير"}</button><code>{readiness.emailProviderConfigured ? "لا يفتح حسابات المستخدمين" : "أكمل إعداد البريد أولًا"}</code></div>
       <div className="billing-flags"><label><input type="checkbox" checked={settings.userAuthEnabled} disabled={!readiness.emailProviderConfigured} onChange={event => setFlag("userAuthEnabled", event.target.checked)}/><span><b>فتح حسابات المستخدمين</b><small>{readiness.emailProviderConfigured ? "يُفعّل رمز البريد لمرة واحدة فقط." : "أضف مزود البريد وعنوان الإرسال أولًا."}</small></span></label><label><input type="checkbox" checked={settings.passkeysEnabled} disabled={!settings.userAuthEnabled} onChange={event => setFlag("passkeysEnabled", event.target.checked)}/><span><b>تفعيل Passkeys</b><small>دخول سريع اختياري بالبصمة أو قفل الجهاز بعد أول تحقق بالبريد.</small></span></label><label><input type="checkbox" checked={settings.earlyAccessEnabled} disabled={!settings.userAuthEnabled} onChange={event => setFlag("earlyAccessEnabled", event.target.checked)}/><span><b>فتح تجربة Plus Early Access</b><small>تجربة {settings.trialDays} يومًا مرتبطة بحساب موثق، من دون دفع عام.</small></span></label></div>
