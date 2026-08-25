@@ -5,6 +5,7 @@ import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath,
 import { deliverDueMatchPushes } from "./matchPush";
 import { checkDomainExpiry } from "./domainExpiryAlert";
 import { deliverDueSubscriptionRenewals } from "./subscriptionRenewals";
+import { deliverDueImportantReminders } from "./importantReminders";
 import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
 
 interface Env {
@@ -242,6 +243,7 @@ const worker = {
     ctx.waitUntil(aggregatePerformanceWindows(env).catch(error => console.log(JSON.stringify({ event: "performance_aggregation_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(checkDomainExpiry(env).catch(error => console.log(JSON.stringify({ event: "domain_expiry_check_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(deliverDueSubscriptionRenewals(env).then(result => console.log(JSON.stringify({ event: "subscription_renewal_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "subscription_renewal_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(deliverDueImportantReminders(env).then(result => console.log(JSON.stringify({ event: "important_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "important_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(sendApprovedMoyasarSalesInquiry(env).then(result => console.log(JSON.stringify({ event: "moyasar_sales_inquiry", ...result }))).catch(error => console.log(JSON.stringify({ event: "moyasar_sales_inquiry_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
