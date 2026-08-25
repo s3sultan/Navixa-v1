@@ -16,3 +16,4 @@
 - [x] Export each approved NAVIXA template as an individual downloadable PDF.
 - [x] Draft NAVIXA terms and conditions and a concise public cancellation and refund policy page for administrative approval.
 - [x] Produce an admin-only aggregate account and login report without exposing more personal data than necessary.
+- [ ] Deploy the approved policy pages and admin account report, then verify public pages and admin-only access live.
