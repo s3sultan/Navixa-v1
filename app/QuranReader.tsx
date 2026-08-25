@@ -66,7 +66,7 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
       if(cancelled)return;
       const source=new Map(entries);
       const pageClips=quranAyahs.map(ayah=>{
-        const details=source.get(ayah.surah.number)?.[1];
+        const details=source.get(ayah.surah.number);
         const verseKey=`${ayah.surah.number}:${ayah.numberInSurah}`;
         const timing=details?.timestamps.find(item=>item.verse_key===verseKey);
         return timing&&details?{verseKey,audioUrl:details.audioUrl,start:timing.timestamp_from/1000,end:timing.timestamp_to/1000}:null;

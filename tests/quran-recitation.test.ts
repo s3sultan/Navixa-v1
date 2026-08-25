@@ -9,6 +9,8 @@ assert.match(source,/surah\.number/);
 assert.match(source,/api\/quran-page-audio/);
 assert.match(source,/تشغيل تلاوة الصفحة/);
 assert.match(source,/activeClip\.end/);
+assert.match(source,/const details=source\.get\(ayah\.surah\.number\);/);
+assert.doesNotMatch(source,/source\.get\(ayah\.surah\.number\)\?\.\[1\]/);
 assert.match(source,/quran-reading-panel/);
 assert.match(source,/quran-ayahs/);
 assert.doesNotMatch(source,/SpeechSynthesisUtterance/);
