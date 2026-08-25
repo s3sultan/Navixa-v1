@@ -121,6 +121,23 @@ function canStorePublicDocument(response: Response) {
     && (response.headers.get("content-type") || "").includes("text/html");
 }
 
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://accounts.google.com https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://quran.islam-db.com",
+  "media-src 'self' blob:",
+  "connect-src 'self' https://accounts.google.com",
+  "worker-src 'self' blob:",
+  "upgrade-insecure-requests",
+  "report-uri /api/security/csp-report",
+].join("; ");
+
 function applyBrowserSecurityHeaders(response: Response) {
   response.headers.set("Strict-Transport-Security", "max-age=31536000");
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -129,7 +146,7 @@ function applyBrowserSecurityHeaders(response: Response) {
   response.headers.set("Permissions-Policy", "geolocation=(), usb=(), serial=(), accelerometer=(), gyroscope=(), magnetometer=()");
   // Monitor CSP compatibility first so browser-based microphone and screen
   // capabilities are not blocked before their external sources are verified.
-  response.headers.set("Content-Security-Policy-Report-Only", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; report-uri /api/security/csp-report");
+  response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return response;
 }
 
