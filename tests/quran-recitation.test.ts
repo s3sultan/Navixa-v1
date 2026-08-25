@@ -9,5 +9,7 @@ assert.match(source,/surah\.number/);
 assert.match(source,/api\/quran-page-audio/);
 assert.match(source,/تشغيل تلاوة الصفحة/);
 assert.match(source,/activeClip\.end/);
+assert.match(source,/quran-reading-panel/);
+assert.match(source,/quran-ayahs/);
 assert.doesNotMatch(source,/SpeechSynthesisUtterance/);
 console.log("quran recitation matching contract: ok");
