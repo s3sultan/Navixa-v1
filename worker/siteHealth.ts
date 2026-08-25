@@ -31,17 +31,17 @@ export async function runWeeklySiteHealthCheck(env: SiteHealthEnv) {
   const now = new Date(), week = weekStart(now), nowIso = now.toISOString(), claim = `running:${crypto.randomUUID()}`;
   await env.DB.prepare("INSERT OR IGNORE INTO navixa_weekly_site_health(week_start,status,checks_json,alerted_at,email_sent,telegram_sent,created_at) VALUES (?,?,?,?,?,?,?)").bind(week, claim, "[]", "", 0, 0, nowIso).run();
   const existing = await env.DB.prepare("SELECT status,checks_json FROM navixa_weekly_site_health WHERE week_start=?").bind(week).all<HealthRow>();
-  const retryLegacySelfFetch = existing.results[0]?.status === "critical" && existing.results[0]?.checks_json.includes("HTTP 522");
-  if (existing.results[0]?.status !== claim && !retryLegacySelfFetch) return { skipped: "already_checked", status: "" };
-  if (retryLegacySelfFetch) await env.DB.prepare("UPDATE navixa_weekly_site_health SET status=?,checks_json='[]',alerted_at='',email_sent=0,telegram_sent=0,created_at=? WHERE week_start=?").bind(claim, nowIso, week).run();
+  const retryLowConfidenceReport = existing.results[0]?.status === "critical" && (existing.results[0]?.checks_json.includes("HTTP 522") || existing.results[0]?.checks_json.includes("highest p95"));
+  if (existing.results[0]?.status !== claim && !retryLowConfidenceReport) return { skipped: "already_checked", status: "" };
+  if (retryLowConfidenceReport) await env.DB.prepare("UPDATE navixa_weekly_site_health SET status=?,checks_json='[]',alerted_at='',email_sent=0,telegram_sent=0,created_at=? WHERE week_start=?").bind(claim, nowIso, week).run();
 
   const checks: Check[] = [];
   const database = await env.DB.prepare("SELECT COUNT(*) AS count FROM navixa_weekly_site_health").all<CountRow>();
   checks.push({ key: "database", ok: Number(database.results[0]?.count || 0) >= 1, detail: "operational tables available" });
   const performanceCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60_000).toISOString();
-  const performance = await env.DB.prepare("SELECT COUNT(*) AS count,MAX(p95_load_ms) AS max_p95 FROM navixa_performance_windows WHERE bucket_start>=?").bind(performanceCutoff).all<CountRow>();
+  const performance = await env.DB.prepare("SELECT COUNT(*) AS count,MAX(p95_load_ms) AS max_p95 FROM navixa_performance_windows WHERE bucket_start>=? AND sample_count>=10").bind(performanceCutoff).all<CountRow>();
   const performanceCount = Number(performance.results[0]?.count || 0), maxP95 = Number(performance.results[0]?.max_p95 || 0);
-  checks.push({ key: "field_performance", ok: maxP95 <= 10_000, detail: performanceCount ? safeDetail(`${performanceCount} aggregate windows; highest p95 ${maxP95}ms`) : "awaiting anonymous public samples" });
+  checks.push({ key: "field_performance", ok: maxP95 <= 1_200, detail: performanceCount ? safeDetail(`${performanceCount} validated windows; highest p95 ${maxP95}ms`) : "awaiting 10-sample anonymous performance windows" });
   const csp = await env.DB.prepare("SELECT COUNT(*) AS count FROM navixa_csp_report_summaries WHERE bucket_day>=?").bind(performanceCutoff.slice(0, 10)).all<CountRow>();
   checks.push({ key: "csp_monitoring", ok: true, detail: `${Number(csp.results[0]?.count || 0)} aggregate compatibility groups` });
   const failed = checks.filter(check => !check.ok), status = failed.length ? "critical" : "healthy";
