@@ -13,6 +13,8 @@ assert.match(source,/const details=source\.get\(ayah\.surah\.number\);/);
 assert.doesNotMatch(source,/source\.get\(ayah\.surah\.number\)\?\.\[1\]/);
 assert.match(source,/audio\.readyState<1/);
 assert.match(source,/audio\.load\(\)/);
+assert.match(source,/nextClip\.audioUrl===activeClip\?\.audioUrl/);
+assert.match(source,/audio\.currentTime=nextClip\.start/);
 assert.match(source,/quran-page-image/);
 assert.doesNotMatch(source,/quran-reading-panel/);
 assert.doesNotMatch(source,/SpeechSynthesisUtterance/);
