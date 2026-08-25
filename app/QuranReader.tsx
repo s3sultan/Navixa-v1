@@ -77,9 +77,10 @@ export default function QuranReader({wirdDone,onComplete}:{wirdDone:boolean;onCo
     return()=>{cancelled=true};
   },[quranAyahs,reciter.id]);
 
-  const toggleRecitation=async()=>{const audio=audioRef.current;if(!audio||!activeClip)return;if(isPlaying){setAutoStart(false);audio.pause();return}try{setQuranError("");setAutoStart(true);audio.currentTime=activeClip.start;await audio.play()}catch{setQuranError("تعذر تشغيل التلاوة. تحقق من اتصالك ثم حاول مرة أخرى.")}};
+  const startActiveClip=async()=>{const audio=audioRef.current;if(!audio||!activeClip)return;try{if(audio.readyState<1){audio.load();return}audio.currentTime=activeClip.start;await audio.play()}catch{setAutoStart(false);setQuranError("تعذر تشغيل التلاوة. تحقق من اتصالك ثم حاول مرة أخرى.")}};
+  const toggleRecitation=()=>{const audio=audioRef.current;if(!audio||!activeClip)return;if(isPlaying){setAutoStart(false);audio.pause();return}setQuranError("");setAutoStart(true);void startActiveClip()};
   const advanceClip=()=>{const audio=audioRef.current;if(!audio)return;if(clipIndex>=clips.length-1){setAutoStart(false);setIsPlaying(false);audio.pause();return}audio.pause();setClipIndex(index=>index+1)};
-  const handleClipReady=()=>{const audio=audioRef.current;if(!audio||!activeClip||!autoStart)return;audio.currentTime=activeClip.start;audio.play().catch(()=>setQuranError("تعذر تشغيل التلاوة. تحقق من اتصالك ثم حاول مرة أخرى."))};
+  const handleClipReady=()=>{if(autoStart)void startActiveClip()};
   const handleTimeUpdate=()=>{const audio=audioRef.current;if(audio&&activeClip&&audio.currentTime>=activeClip.end)advanceClip()};
 
   return <article className="quran-card mushaf-frame">
