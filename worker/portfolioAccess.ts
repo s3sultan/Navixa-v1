@@ -26,6 +26,9 @@ export const PORTFOLIO_SSO_ENABLED = {
 } as const;
 
 export const PORTFOLIO_PUBLIC_JWK: JsonWebKey = { key_ops: ["verify"], ext: true, kty: "EC", x: "3t4IG1-SSwzOL6me14lxVhh4a2Oab6-xxgLURaqtHNU", y: "Fm3gm4pXJlkhso9ITBTW6B9U1SuVy5V0EKabg9KL9wk", crv: "P-256" };
+export const PORTFOLIO_JWKS = {
+  keys: [{ ...PORTFOLIO_PUBLIC_JWK, kid: "navixa-portfolio-es256-v1", use: "sig", alg: "ES256" }],
+} as const;
 export type PortfolioApp = keyof typeof PORTFOLIO_APPS;
 export type PortfolioMembership = { userId: string; plan: string; status: "trial" | "active"; endsAt: string };
 

@@ -9,6 +9,7 @@ import { deliverDueImportantReminders } from "./importantReminders";
 import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
 import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics";
 import { runWeeklySiteHealthCheck } from "./siteHealth";
+import { PORTFOLIO_JWKS } from "./portfolioAccess";
 
 interface Env {
   ASSETS: Fetcher;
@@ -311,6 +312,18 @@ const worker = {
 
     if (request.method === "GET" && url.pathname.startsWith(LOCAL_STT_MODEL_PREFIX)) {
       const response = await relayLocalSttModel(request, url, ctx);
+      return auditResponse(request, url, response, startedAt, "public");
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/portfolio/jwks.json" && !url.search) {
+      const response = new Response(JSON.stringify(PORTFOLIO_JWKS), {
+        headers: {
+          "content-type": "application/jwk-set+json; charset=utf-8",
+          "cache-control": "public, max-age=300, s-maxage=3600",
+          "access-control-allow-origin": "*",
+          "x-content-type-options": "nosniff",
+        },
+      });
       return auditResponse(request, url, response, startedAt, "public");
     }
 
