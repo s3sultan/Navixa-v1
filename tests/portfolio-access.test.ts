@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { createPortfolioGrant, PORTFOLIO_APP_HOMES, PORTFOLIO_SSO_ENABLED, verifyPortfolioGrant } from "../worker/portfolioAccess.ts";
+import { createPortfolioGrant, PORTFOLIO_SSO_ENABLED, verifyPortfolioGrant } from "../worker/portfolioAccess.ts";
 
 const membership = { userId: "user-uuid-123", plan: "monthly", status: "trial" as const, endsAt: new Date(Date.now() + 60_000).toISOString() };
 
@@ -33,12 +33,10 @@ test("عقد البوابة يبقي المحتوى الأساسي مجانيً�
   assert.doesNotMatch(access, /HMAC/);
 });
 
-test("مواقع بلا معالج إتمام حي تستخدم رابطًا احتياطيًا بعد فحص العضوية دون تمرير منحة", () => {
+test("كل مواقع المنظومة تستخدم معالج إتمام حي بعد فحص العضوية", () => {
   const route = readFileSync(new URL("../app/api/portfolio/authorize/route.ts", import.meta.url), "utf8");
   assert.equal(PORTFOLIO_SSO_ENABLED.learning, true);
-  assert.equal(PORTFOLIO_SSO_ENABLED.fitness, false);
-  assert.equal(PORTFOLIO_SSO_ENABLED.kids, false);
-  assert.equal(PORTFOLIO_APP_HOMES.fitness, "https://fitness.navixasa.com/");
-  assert.equal(PORTFOLIO_APP_HOMES.kids, "https://kids.navixasa.com/");
-  assert.match(route, /if \(!PORTFOLIO_SSO_ENABLED\[requested\]\) return NextResponse\.redirect\(new URL\(PORTFOLIO_APP_HOMES\[requested\]\), \{ headers \}\);/);
+  assert.equal(PORTFOLIO_SSO_ENABLED.fitness, true);
+  assert.equal(PORTFOLIO_SSO_ENABLED.kids, true);
+  assert.match(route, /PORTFOLIO_APPS/);
 });

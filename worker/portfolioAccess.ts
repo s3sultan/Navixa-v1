@@ -15,13 +15,12 @@ export const PORTFOLIO_APP_HOMES = {
   learning: "https://learning.navixasa.com/",
 } as const;
 
-// Fitness and Kids do not yet serve their verified completion handlers in
-// production. Keep the central membership check, but avoid redirecting a
-// verified member to their known 404 endpoints or exposing a signed grant in
-// a URL that cannot consume it.
+// Every portfolio app now serves its verified completion handler. Keep the
+// central membership check and send a short-lived, audience-scoped grant only
+// to an app that is explicitly marked ready for SSO.
 export const PORTFOLIO_SSO_ENABLED = {
-  fitness: false,
-  kids: false,
+  fitness: true,
+  kids: true,
   learning: true,
 } as const;
 
