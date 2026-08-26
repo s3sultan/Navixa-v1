@@ -9,6 +9,22 @@ export const PORTFOLIO_APPS = {
   learning: "https://learning.navixasa.com/api/navixa/complete",
 } as const;
 
+export const PORTFOLIO_APP_HOMES = {
+  fitness: "https://fitness.navixasa.com/",
+  kids: "https://kids.navixasa.com/",
+  learning: "https://learning.navixasa.com/",
+} as const;
+
+// Fitness and Kids do not yet serve their verified completion handlers in
+// production. Keep the central membership check, but avoid redirecting a
+// verified member to their known 404 endpoints or exposing a signed grant in
+// a URL that cannot consume it.
+export const PORTFOLIO_SSO_ENABLED = {
+  fitness: false,
+  kids: false,
+  learning: true,
+} as const;
+
 export const PORTFOLIO_PUBLIC_JWK: JsonWebKey = { key_ops: ["verify"], ext: true, kty: "EC", x: "3t4IG1-SSwzOL6me14lxVhh4a2Oab6-xxgLURaqtHNU", y: "Fm3gm4pXJlkhso9ITBTW6B9U1SuVy5V0EKabg9KL9wk", crv: "P-256" };
 export type PortfolioApp = keyof typeof PORTFOLIO_APPS;
 export type PortfolioMembership = { userId: string; plan: string; status: "trial" | "active"; endsAt: string };
