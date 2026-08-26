@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isFeatureAccessActive, type FeatureAccessSession } from "./featureAccess";
+import type { FeatureAccessSession } from "./featureAccess";
 
 type AccountSession = FeatureAccessSession & {
   user?: { email?: string } | null;
@@ -34,15 +34,18 @@ export const platformAnnouncements = [
   },
 ] as const;
 
+export const hasPaidPlatformAccess = (session: FeatureAccessSession | null | undefined) =>
+  session?.signedIn === true && session?.plus?.status === "active";
+
 export default function MemberPlatformRibbon() {
   const [isEligible, setIsEligible] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch("/api/account/session", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : null)
+      .then(response => response.ok ? response.json() : null)
       .then((session: AccountSession | null) => {
-        if (active) setIsEligible(isFeatureAccessActive(session));
+        if (active) setIsEligible(hasPaidPlatformAccess(session));
       })
       .catch(() => { if (active) setIsEligible(false); });
     return () => { active = false; };
