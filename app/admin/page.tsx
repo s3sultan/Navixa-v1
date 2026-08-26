@@ -99,6 +99,7 @@ export default function AdminPage() {
             <button onClick={() => { window.location.href = "/admin/ads"; }}><i>▣</i><span>الإعلانات</span></button>
             <button onClick={() => { window.location.href = "/admin/emergency"; }}><i>!</i><span>الطوارئ</span></button>
             <button onClick={() => { window.location.href = "/admin/social"; }}><i>◎</i><span>التواصل</span></button>
+            <button onClick={() => { window.location.href = "/admin/support"; }}><i>?</i><span>الدعم الموحد</span></button>
           </div>
         </nav>
 

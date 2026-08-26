@@ -10,6 +10,7 @@ import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
 import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics";
 import { runWeeklySiteHealthCheck } from "./siteHealth";
 import { portfolioJwksFromPrivateKey } from "./portfolioAccess";
+import { pruneClosedSupportTickets } from "./supportTickets";
 
 interface Env {
   ASSETS: Fetcher;
@@ -163,6 +164,7 @@ const publicMutationLimits: Record<string, number> = {
   "/api/performance": 30,
   "/api/usage/event": 120,
   "/api/security/csp-report": 20,
+  "/api/support/tickets": 5,
 };
 
 function publicMutationGuard(request: Request, url: URL) {
@@ -290,6 +292,7 @@ const worker = {
     ctx.waitUntil(pruneUsageAnalytics(env).catch(error => console.log(JSON.stringify({ event: "usage_analytics_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(scanUsageAnalyticsAlerts(env).then(result => console.log(JSON.stringify({ event: "usage_analytics_alert_scan", ...result }))).catch(error => console.log(JSON.stringify({ event: "usage_analytics_alert_scan_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(runWeeklySiteHealthCheck(env).then(result => console.log(JSON.stringify({ event: "weekly_site_health", ...result }))).catch(error => console.log(JSON.stringify({ event: "weekly_site_health_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(pruneClosedSupportTickets(env.DB).catch(error => console.log(JSON.stringify({ event: "support_ticket_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
