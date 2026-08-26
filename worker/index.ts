@@ -9,7 +9,7 @@ import { deliverDueImportantReminders } from "./importantReminders";
 import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
 import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics";
 import { runWeeklySiteHealthCheck } from "./siteHealth";
-import { PORTFOLIO_JWKS } from "./portfolioAccess";
+import { portfolioJwksFromPrivateKey } from "./portfolioAccess";
 
 interface Env {
   ASSETS: Fetcher;
@@ -21,6 +21,7 @@ interface Env {
   RESEND_FROM_EMAIL?: string;
   NAVIXA_AUTH_FROM?: string;
   NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
+  NAVIXA_PORTFOLIO_PRIVATE_JWK?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -316,7 +317,14 @@ const worker = {
     }
 
     if (request.method === "GET" && url.pathname === "/api/portfolio/jwks.json" && !url.search) {
-      const response = new Response(JSON.stringify(PORTFOLIO_JWKS), {
+      const jwks = env.NAVIXA_PORTFOLIO_PRIVATE_JWK ? portfolioJwksFromPrivateKey(env.NAVIXA_PORTFOLIO_PRIVATE_JWK) : null;
+      if (!jwks) {
+        return auditResponse(request, url, new Response(JSON.stringify({ error: "منظومة التحقق غير جاهزة" }), {
+          status: 503,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        }), startedAt, "public");
+      }
+      const response = new Response(JSON.stringify(jwks), {
         headers: {
           "content-type": "application/jwk-set+json; charset=utf-8",
           "cache-control": "public, max-age=300, s-maxage=3600",

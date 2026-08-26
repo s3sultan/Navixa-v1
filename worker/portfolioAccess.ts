@@ -25,9 +25,6 @@ export const PORTFOLIO_SSO_ENABLED = {
 } as const;
 
 export const PORTFOLIO_PUBLIC_JWK: JsonWebKey = { key_ops: ["verify"], ext: true, kty: "EC", x: "3t4IG1-SSwzOL6me14lxVhh4a2Oab6-xxgLURaqtHNU", y: "Fm3gm4pXJlkhso9ITBTW6B9U1SuVy5V0EKabg9KL9wk", crv: "P-256" };
-export const PORTFOLIO_JWKS = {
-  keys: [{ ...PORTFOLIO_PUBLIC_JWK, kid: "navixa-portfolio-es256-v1", use: "sig", alg: "ES256" }],
-} as const;
 export type PortfolioApp = keyof typeof PORTFOLIO_APPS;
 export type PortfolioMembership = { userId: string; plan: string; status: "trial" | "active"; endsAt: string };
 
@@ -51,6 +48,17 @@ function privateJwk(value: string): JsonWebKey | null {
     const parsed = JSON.parse(value) as JsonWebKey;
     return parsed.kty === "EC" && parsed.crv === "P-256" && typeof parsed.d === "string" ? parsed : null;
   } catch { return null; }
+}
+
+export function portfolioJwksFromPrivateKey(value: string) {
+  const privateKey = privateJwk(value);
+  if (!privateKey || typeof privateKey.x !== "string" || typeof privateKey.y !== "string") return null;
+  return {
+    keys: [{
+      key_ops: ["verify"], ext: true, kty: "EC", x: privateKey.x, y: privateKey.y, crv: "P-256",
+      kid: "navixa-portfolio-es256-v1", use: "sig", alg: "ES256",
+    }],
+  } as const;
 }
 
 async function signingKey(value: string) {
