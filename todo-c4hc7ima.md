@@ -192,8 +192,12 @@
 - [ ] Review the owner-provided Moyasar audit log read-only and classify the latest status as approval, pending information, rejection, or unrelated before changing any payment setting.
 - [x] Classify the owner-provided Moyasar sales email as a follow-up update only, not a live-payment approval or activation; make no payment-setting change.
 - [x] Diagnose the owner-reported Moyasar registration-form submission failure and provide a field-by-field pre-submit checklist before any retry.
-- [ ] Disable all public Salla checkout/request-review entry points in NAVIXA while Salla remains unavailable publicly, without deleting the Salla technical foundation.
-- [ ] Keep NAVIXA Plus activation available only through the protected admin subscription/manual-review controls until an approved payment gateway is live.
-- [ ] Update the Plus/public copy to say payments are temporarily under provider review and access is activated by admin approval only.
+- [x] Disable all public Salla checkout/request-review entry points in NAVIXA while Salla remains unavailable publicly, without deleting the Salla technical foundation.
+- [x] Keep NAVIXA Plus activation available only through the protected admin subscription/manual-review controls until an approved payment gateway is live.
+- [x] Update the Plus/public copy to say payments are temporarily under provider review and access is activated by admin approval only.
 - [x] Review the owner-provided Tap subscription packages link, extract the fees from the official page, and recommend wording for the package field without accepting any agreement.
 - [x] Remove internal administrative-review notes from the public terms and refunds pages, keeping any legal-review reminder only in private documentation.
+- [x] Run a comprehensive NAVIXA readiness audit covering mobile UX, live pages, admin dashboard, policies, integrations, images/assets, performance-heavy features, and public payment state without changing payment-provider settings.
+- [x] Identify non-essential or heavy public features and add or reuse admin-controlled kill switches so the owner can disable them without code changes.
+- [x] Disable currently unnecessary heavy public features by default where safe, while keeping core account, Today, support, policies, and admin controls available.
+- [x] Produce a concise owner-facing recommendation list for what to keep, pause, improve, or defer before paid launch.

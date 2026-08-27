@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server.js";
 import { resolveUserSession, trustedUserMutation, type D1Database } from "../../../../worker/userAuth.ts";
 import { ensureUsageAnalyticsSchema } from "../../../../worker/usageAnalytics.ts";
+import { isRuntimeFeatureEnabled } from "../../../runtimeFeatures.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
@@ -11,6 +12,7 @@ async function db(): Promise<Database | null> { try { return (await import("clou
 export async function POST(request: Request) {
   if (!trustedUserMutation(request)) return NextResponse.json({ error: "مصدر الطلب غير موثوق" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   const database = await db(); if (!database) return NextResponse.json({ error: "التخزين غير مهيأ" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  if (!await isRuntimeFeatureEnabled(database, "usage_analytics_enabled")) return NextResponse.json({ ok: true, ignored: "analytics_disabled" }, { headers: { "Cache-Control": "no-store" } });
   const session = await resolveUserSession(request, database); if (!session) return NextResponse.json({ error: "سجّل دخولك أولًا" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   const body = await request.json().catch(() => ({})) as { path?: unknown; event?: unknown; x?: unknown; y?: unknown; durationSeconds?: unknown };
   const path = typeof body.path === "string" && paths.has(body.path) ? body.path : "";

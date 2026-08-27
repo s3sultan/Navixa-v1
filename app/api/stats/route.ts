@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isRuntimeFeatureEnabled } from "../../runtimeFeatures.ts";
 
 type D1Result = { meta?: { changes?: number } };
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; run: () => Promise<D1Result>; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }> };
@@ -44,6 +45,7 @@ export async function GET() {
   try {
     const db = await getDb();
     if (!db) return statsResponse({ ok: false, configured: false, stats: { visits: 0, ehsan: 0 } }, NO_STORE);
+    if (!await isRuntimeFeatureEnabled(db, "public_counter_enabled")) return statsResponse({ ok: true, configured: false, stats: { visits: 0, ehsan: 0 } }, NO_STORE);
     // This public read runs frequently. Schema creation stays on the mutation path
     // so a cached counter read never performs DDL against D1.
     return statsResponse({ ok: true, configured: true, stats: await readStats(db) });
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
   try {
     const db = await getDb();
     if (!db) return NextResponse.json({ ok: false, configured: false }, { status: 503, headers: { "Cache-Control": NO_STORE } });
+    if (!await isRuntimeFeatureEnabled(db, "public_counter_enabled")) return statsResponse({ ok: true, configured: false, stats: { visits: 0, ehsan: 0 } }, NO_STORE);
     const body = await request.json().catch(() => ({}));
     const event = body?.event === "ehsan" ? "ehsan" : body?.event === "visit" ? "visit" : null;
     const visitorKey = typeof body?.visitorKey === "string" ? body.visitorKey.slice(0, 120) : "";

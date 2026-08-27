@@ -21,16 +21,8 @@ import AdminUsageAnalytics from "./settings/AdminUsageAnalytics";
 import AdminUsageHeatmap from "./settings/AdminUsageHeatmap";
 import AdminSiteHealth from "./settings/AdminSiteHealth";
 import AdminPerformanceDashboard from "./settings/AdminPerformanceDashboard";
+import AdminRuntimeFeatureSettings from "./settings/AdminRuntimeFeatureSettings";
 import { useAdminAuth } from "./useAdminAuth";
-
-const features = [
-  ["سماع الاسم والكلمات", "الاستماع والتنبيه وإضافة المهام", "◉"],
-  ["متابعة الشاشة", "مراقبة محلية بموافقة المستخدم", "▣"],
-  ["الصحة والعافية", "الحركة والماء والتمارين الخفيفة", "♡"],
-  ["المواعيد والمهام", "تذكيرات وتقويم وأتمتة", "▦"],
-  ["جلسات التركيز", "مؤقت وتحسين الإنتاجية", "◎"],
-  ["الاجتماعات والملخصات", "التفريغ والتلخيص والتصدير", "▤"],
-] as const;
 
 const permissions = [
   ["المستخدمون والأدوار", "إضافة وتعديل وإيقاف وتعيين الأدوار"],
@@ -50,20 +42,12 @@ const navGroups = [
 
 export default function AdminPage() {
   const { allowed, checking } = useAdminAuth();
-  const [enabled, setEnabled] = useState(features.map(() => true));
   const [active, setActive] = useState("نظرة عامة");
   const [toast, setToast] = useState("");
 
   const tell = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2200);
-  };
-
-  const toggle = (index: number) => {
-    const next = [...enabled];
-    next[index] = !next[index];
-    setEnabled(next);
-    tell(`${features[index][0]}: ${next[index] ? "مفعّلة" : "متوقفة"}`);
   };
 
   const go = (name: string, id: string) => {
@@ -118,39 +102,36 @@ export default function AdminPage() {
             <p>كل ما تحتاجه لإدارة المنصة، مرتب في أقسام واضحة.</p>
           </div>
           <div className="admin-header-actions">
-            <button className="status-button" onClick={() => tell("لا توجد أعطال حرجة")}>حالة النظام <i /></button>
+            <button className="status-button" onClick={() => go("صحة الموقع", "site-health")}>فتح فحص الصحة <i /></button>
             <Link href="/">عرض التطبيق ↗</Link>
           </div>
         </header>
 
         <section className="health-banner">
-          <div><span className="health-icon">✓</span><div><small>الحالة الآن</small><h2>منصة NAVIXA تعمل بشكل طبيعي</h2><p>الخصوصية المحلية · الإدارة محمية · التنبيهات جاهزة</p></div></div>
+          <div><span className="health-icon">✓</span><div><small>الحالة الآن</small><h2>راجع صحة المنصة من المصدر</h2><p>تعرض لوحات الصحة والأداء النتائج المسجلة؛ لا نعتمد بطاقة ثابتة كدليل على الجاهزية.</p></div></div>
           <div className="service-pills"><span><i /> الخصوصية</span><span><i /> المساعد</span><span><i /> التنبيهات</span><span><i /> الحسابات</span></div>
         </section>
 
         <section className="admin-status-grid" aria-label="حالة الخدمات">
-          <article><span className="status-dot green" /><div><small>الموقع</small><b>متصل</b></div></article>
-          <article><span className="status-dot purple" /><div><small>حماية الإدارة</small><b>مفعّلة</b></div></article>
-          <article><span className="status-dot blue" /><div><small>التنبيهات</small><b>جاهزة</b></div></article>
+          <article><span className="status-dot green" /><div><small>الموقع</small><b>افتح فحص الصحة</b></div></article>
+          <article><span className="status-dot purple" /><div><small>حماية الإدارة</small><b>محكومة بجلسة المدير</b></div></article>
+          <article><span className="status-dot blue" /><div><small>التنبيهات</small><b>تحتاج تحقق قناة الإرسال</b></div></article>
           <article><span className="status-dot gold" /><div><small>الدومين</small><b>navixasa.com</b></div></article>
         </section>
 
         <section className="admin-section admin-fold" id="features"><details className="admin-fold-card"><summary><span>الميزات والتحكم المباشر</span><small>فعّل ما تحتاجه فقط</small></summary><div className="admin-fold-content"><div className="admin-grid">
-          <section className="panel feature-panel">
-            <div className="panel-head"><div><small>تحكم مباشر</small><h2>ميزات NAVIXA</h2></div><button onClick={() => tell("تم حفظ إعدادات الميزات")}>حفظ الإعدادات</button></div>
-            <p className="panel-intro">فعّل الميزات التي تريد إتاحتها، واترك الباقي متوقفًا حتى تكتمل مراجعته.</p>
-            {features.map((feature, index) => <div className="feature-row" key={feature[0]}><span className={`feature-icon f${index}`}>{feature[2]}</span><div><b>{feature[0]}</b><small>{feature[1]}</small></div><span className={enabled[index] ? "state active" : "state"}>{enabled[index] ? "مفعّلة" : "متوقفة"}</span><label><input type="checkbox" checked={enabled[index]} onChange={() => toggle(index)} aria-label={`تفعيل ${feature[0]}`} /><i /></label></div>)}
-          </section>
+          <AdminRuntimeFeatureSettings />
           <section className="panel" id="users">
             <div className="panel-head"><div><small>اختصارات</small><h2>إجراءات سريعة</h2></div></div>
-            <div className="admin-actions"><button onClick={() => tell("فتح نموذج إضافة مستخدم")}>＋ إضافة مستخدم</button><button onClick={() => tell("فتح إدارة الأدوار")}>♙ إدارة الأدوار</button><button onClick={() => tell("تم تجهيز ملف التصدير")}>⇩ تصدير البيانات</button><button onClick={() => tell("فتح طلبات حذف البيانات")}>⌫ طلبات الحذف</button></div>
+            <p className="panel-intro">لا توجد هنا أزرار شكلية لإضافة مستخدمين أو تصدير بيانات. استخدم الإعدادات والسجل المتصلين بالفعل، وادخل للدعم الموحد لمعالجة الطلبات.</p>
+            <div className="admin-actions"><button onClick={() => go("الإعدادات", "settings")}>ضبط الدخول والحسابات</button><button onClick={() => go("السجل", "activity")}>مراجعة التحليلات المجمعة</button><button onClick={() => { window.location.href = "/admin/support"; }}>فتح الدعم الموحد</button></div>
           </section>
         </div></div></details></section>
 
         <section className="admin-section admin-fold" id="permissions"><details className="admin-fold-card"><summary><span>الصلاحيات والوصول</span><small>الأدوار وصلاحيات المدير</small></summary><div className="admin-fold-content"><section className="panel permissions-panel">
           <div className="panel-head"><div><small>الوصول</small><h2>صلاحيات المدير</h2></div><span className="full-access">كاملة</span></div>
-          <p className="panel-intro">حساب المدير الأعلى يملك صلاحية إدارة جميع أقسام NAVIXA.</p>
-          <div className="permission-list">{permissions.map(permission => <div className="permission-row" key={permission[0]}><span>✓</span><div><b>{permission[0]}</b><small>{permission[1]}</small></div><em>كاملة</em><button onClick={() => tell(`فتح إعدادات ${permission[0]}`)}>إدارة</button></div>)}</div>
+          <p className="panel-intro">هذه خريطة نطاق صلاحيات المدير، وليست محرر أدوار مستقلًا. استخدم الإعدادات المتصلة أدناه لتغيير القواعد المتاحة فعليًا.</p>
+          <div className="permission-list">{permissions.map(permission => <div className="permission-row" key={permission[0]}><span>✓</span><div><b>{permission[0]}</b><small>{permission[1]}</small></div><em>للمدير</em></div>)}</div>
         </section></div></details></section>
 
         <section className="admin-section admin-fold" id="content"><details className="admin-fold-card"><summary><span>المحتوى والخدمات المرتبطة</span><small>المحتوى والتكاملات</small></summary><div className="admin-fold-content">
@@ -169,8 +150,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>آخر العمليات والقنوات</small></summary><div className="admin-fold-content"><AdminUsageAnalytics /><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
-        <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>الإيميلات · الاستخدام · التنبيهات</small></summary><div className="admin-fold-content"><AdminUsageAnalytics /><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>آخر النشاط</h2></div><button onClick={() => tell("تم تجهيز سجل النشاط")}>تصدير السجل</button></div><div className="log-row"><span className="log-icon">✓</span><div><b>تم تحديث إعدادات الإدارة</b><small>آخر تغيير محفوظ في النظام</small></div><time>الآن</time></div><div className="log-row"><span className="log-icon">⌁</span><div><b>قنوات التنبيه جاهزة للمراجعة</b><small>Telegram · البريد الإداري</small></div><time>اليوم</time></div></section></div></details></section>
+        <section className="admin-section admin-fold" id="activity"><details className="admin-fold-card"><summary><span>سجل النشاط والمراجعة</span><small>استخدام مجمع · تنبيهات · حفظ سياسات</small></summary><div className="admin-fold-content"><AdminUsageAnalytics /><section className="panel activity-panel"><div className="panel-head"><div><small>المراجعة</small><h2>الحالة المتصلة</h2></div><button onClick={() => go("صحة الموقع", "site-health")}>فتح فحص الصحة</button></div><p className="panel-intro">تعرض التحليلات والأداء في الأقسام المخصصة أدلة فعلية عند توفر العينة، ولا تستبدلها عبارات حالة ثابتة أو سجلًا شكليًا.</p></section></div></details></section>
         <section className="admin-section admin-fold" id="heatmap"><details className="admin-fold-card"><summary><span>الخريطة الحرارية</span><small>مناطق التفاعل المجمعة · قراءة مستقلة</small></summary><div className="admin-fold-content"><AdminUsageHeatmap /></div></details></section>
         <section className="admin-section admin-fold" id="site-health"><details className="admin-fold-card"><summary><span>صحة الموقع وتوافق CSP</span><small>فحص أسبوعي دفاعي · تقارير الحظر المجمعة</small></summary><div className="admin-fold-content"><AdminSiteHealth /></div></details></section>
         <section className="admin-section admin-fold" id="performance"><details className="admin-fold-card"><summary><span>أداء NAVIXA الأسبوعي</span><small>TTFB · LCP · INP · CLS · مقارنة ميدانية</small></summary><div className="admin-fold-content"><AdminPerformanceDashboard /></div></details></section>
