@@ -47,10 +47,10 @@ export default function NavixaPlusPage() {
       <header><small>{ar.plus.plansEyebrow}</small><h2 id="plans-title">{ar.plus.plansTitle}</h2><p>{ar.plus.plansDescription}</p></header>
       <div className="plan-grid">
         <article className="plan-card trial"><span className="plan-tag">ابدأ مجانًا</span><h3>جرّب Plus بهدوء</h3><div className="plan-price"><b>بدون</b><span>بطاقة<br/>ولا التزام</span></div><p>ابدأ التجربة الآن. يمكنك إيقافها في أي وقت، ولن يُخصم أي مبلغ تلقائيًا. تنتهي التجربة في 19 سبتمبر 2026 الساعة 11:59 مساءً بتوقيت أم القرى.</p><Link href="/#account">ابدأ تجربتك المجانية</Link></article>
-        <article className="plan-card featured"><span className="plan-tag">عرض مؤسسي NAVIXA</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>سعر ترحيبي شخصي للشهر الأول؛ يظهر لك كاملًا قبل الدفع، ثم يستمر Plus بالسعر الشهري الواضح.</p><a href="#checkout">اشترك مباشرة</a></article>
-        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>ادفع 3 أشهر وخذ الشهر الرابع مجانًا عند الإطلاق.</p><a href="#checkout">اختر باقتك</a></article>
+        <article className="plan-card featured"><span className="plan-tag">عرض مؤسسي NAVIXA</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>السعر الترحيبي محفوظ للمرحلة القادمة. التفعيل الحالي يتم يدويًا من لوحة الإدارة إلى أن تُعتمد بوابة الدفع الرسمية.</p><a href="#checkout">حالة التفعيل الحالية</a></article>
+        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>هذه الباقة مؤجلة حتى اعتماد بوابة الدفع وتشغيل الاشتراكات العامة بصورة آمنة.</p><a href="#checkout">مؤجلة حاليًا</a></article>
       </div>
-      <aside className="founders-note"><span>✦</span><p><b>عرض مؤسسي NAVIXA.</b> تحصل على سعر ترحيبي للشهر الأول، وتظهر لك تفاصيل التجديد قبل تأكيد الدفع.</p></aside>
+      <aside className="founders-note"><span>✦</span><p><b>عرض مؤسسي NAVIXA.</b> السعر الترحيبي محفوظ، وسيُفتح الدفع العام بعد اعتماد مزود دفع رسمي وربط التحقق الخادمي الآمن.</p></aside>
     </section>
 
     <CheckoutPanel/>
