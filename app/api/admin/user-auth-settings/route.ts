@@ -13,7 +13,14 @@ const defaults: Record<(typeof settingKeys)[number], string> = { user_auth_enabl
 const flag = (value: unknown) => value === true || value === "true";
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
-async function env(): Promise<Env> { try { return (await import("cloudflare:workers") as { env?: Env }).env || {}; } catch { return globalThis as Env; } }
+async function env(): Promise<Env> {
+  let bindings: Env = {};
+  try { bindings = (await import("cloudflare:workers") as { env?: Env }).env || {}; }
+  catch { /* nodejs_compat and local tests use fallbacks below. */ }
+  const processEnv = typeof process === "undefined" ? {} : process.env as Env;
+  const globals = globalThis as Env;
+  return { ...globals, ...processEnv, ...bindings };
+}
 async function allowed(request: Request) {
   const secret = await resolveAdminJwtSecret();
   const session = secret ? await verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret) : null;
@@ -43,7 +50,7 @@ async function snapshot(database: Database, secrets: Env) {
     webhookSecretConfigured: Boolean(secrets.NAVIXA_TELEGRAM_WEBHOOK_SECRET),
     encryptionKeyConfigured: Boolean(secrets.NAVIXA_TELEGRAM_ENCRYPTION_KEY),
   };
-  return { settings, readiness: { emailProviderConfigured: Boolean(secrets.RESEND_API_KEY && secrets.NAVIXA_AUTH_FROM && secrets.NAVIXA_AUTH_CODE_PEPPER), telegramBotConfigured: Object.values(telegram).every(Boolean), telegram, users: Number(users.results[0]?.count || 0), activeSessions: Number(sessions.results[0]?.count || 0), recentAccounts: accounts.results } };
+  return { settings, readiness: { emailProviderConfigured: Boolean(secrets.RESEND_API_KEY && secrets.NAVIXA_AUTH_FROM && secrets.NAVIXA_AUTH_CODE_PEPPER), googleLoginConfigured: true, telegramBotConfigured: Object.values(telegram).every(Boolean), telegram, users: Number(users.results[0]?.count || 0), activeSessions: Number(sessions.results[0]?.count || 0), recentAccounts: accounts.results } };
 }
 
 export async function GET(request: Request) {
@@ -61,13 +68,15 @@ export async function POST(request: Request) {
   const secrets = await env();
   const wantsAuth = flag(body.userAuthEnabled), wantsPasskeys = flag(body.passkeysEnabled), wantsEarlyAccess = flag(body.earlyAccessEnabled), wantsTelegramBot = flag(body.telegramBotEnabled), wantsTelegramBackground = flag(body.telegramBackgroundAlertsEnabled);
   const trialDays = Math.min(31, Math.max(1, Number.parseInt(String(body.trialDays || "14"), 10) || 14));
-  if (wantsAuth && (!secrets.RESEND_API_KEY || !secrets.NAVIXA_AUTH_FROM || !secrets.NAVIXA_AUTH_CODE_PEPPER)) return NextResponse.json({ error: "أضف أولًا مزود البريد وعنوان الإرسال قبل فتح حسابات المستخدمين" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  const emailReady = Boolean(secrets.RESEND_API_KEY && secrets.NAVIXA_AUTH_FROM && secrets.NAVIXA_AUTH_CODE_PEPPER);
+  // Google Identity هو مسار دخول مستقل يتحقق من البريد الموثق من Google خادميًا.
+  if (wantsAuth && !emailReady) return NextResponse.json({ error: "أضف أولًا مزود البريد وعنوان الإرسال قبل فتح حسابات المستخدمين. سيظهر دخول Google بعد النشر كخيار احتياطي، لكنه لا يلغي ضرورة بريد الاسترداد." }, { status: 409, headers: { "Cache-Control": "no-store" } });
   if (wantsPasskeys && !wantsAuth) return NextResponse.json({ error: "فعّل حسابات المستخدمين أولًا قبل Passkeys" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   if (wantsEarlyAccess && !wantsAuth) return NextResponse.json({ error: "فعّل حسابات المستخدمين أولًا قبل تجربة Plus" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   if (wantsTelegramBot && (!wantsAuth || !secrets.NAVIXA_TELEGRAM_BOT_TOKEN || !secrets.NAVIXA_TELEGRAM_WEBHOOK_SECRET || !secrets.NAVIXA_TELEGRAM_ENCRYPTION_KEY || !secrets.NAVIXA_TELEGRAM_BOT_USERNAME)) return NextResponse.json({ error: "أضف أسرار بوت NAVIXA الرسمية وفعّل حسابات المستخدمين قبل فتح الربط" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   if (wantsTelegramBackground && !wantsTelegramBot) return NextResponse.json({ error: "فعّل بوت NAVIXA أولًا قبل التنبيهات الخلفية" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   await schema(database);
-  const next: Record<(typeof settingKeys)[number], string> = { user_auth_enabled: String(wantsAuth), email_otp_enabled: String(wantsAuth), passkeys_enabled: String(wantsPasskeys), early_access_enabled: String(wantsEarlyAccess), telegram_bot_enabled: String(wantsTelegramBot), telegram_background_alerts_enabled: String(wantsTelegramBackground), trial_days: String(trialDays) };
+  const next: Record<(typeof settingKeys)[number], string> = { user_auth_enabled: String(wantsAuth), email_otp_enabled: String(wantsAuth && emailReady), passkeys_enabled: String(wantsPasskeys), early_access_enabled: String(wantsEarlyAccess), telegram_bot_enabled: String(wantsTelegramBot), telegram_background_alerts_enabled: String(wantsTelegramBackground), trial_days: String(trialDays) };
   const now = new Date().toISOString();
   for (const key of settingKeys) await database.prepare("INSERT INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES (?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at").bind(key, next[key], now).run();
   return NextResponse.json({ ok: true, message: wantsAuth ? "تم حفظ إعدادات حسابات المستخدمين" : "بقيت حسابات المستخدمين وتجربة Plus مقفلة" }, { headers: { "Cache-Control": "no-store" } });

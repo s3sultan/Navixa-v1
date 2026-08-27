@@ -9,7 +9,7 @@ type GoogleProfile = {
   exp?: string;
 };
 
-export async function verifyAdminGoogleCredential(credential: string, fetcher: typeof fetch = fetch) {
+export async function verifyGoogleCredential(credential: string, fetcher: typeof fetch = fetch) {
   if (!credential || typeof credential !== "string") return { ok: false as const, status: 400, error: "لم يصل تأكيد Google" };
 
   try {
@@ -21,15 +21,21 @@ export async function verifyAdminGoogleCredential(credential: string, fetcher: t
     const validIssuer = profile.iss === "accounts.google.com" || profile.iss === "https://accounts.google.com";
     const email = profile.email?.toLowerCase() || "";
 
-    if (profile.aud !== GOOGLE_CLIENT_ID || !verified || !validIssuer) {
+    if (profile.aud !== GOOGLE_CLIENT_ID || !verified || !validIssuer || !email) {
       return { ok: false as const, status: 401, error: "تأكيد Google غير صالح لهذا الموقع" };
-    }
-    if (email !== ADMIN_EMAIL) {
-      return { ok: false as const, status: 403, error: "هذا الحساب غير مخوّل لدخول الإدارة" };
     }
 
     return { ok: true as const, email };
   } catch {
     return { ok: false as const, status: 503, error: "تعذر الاتصال بخدمة تحقق Google" };
   }
+}
+
+export async function verifyAdminGoogleCredential(credential: string, fetcher: typeof fetch = fetch) {
+  const verified = await verifyGoogleCredential(credential, fetcher);
+  if (!verified.ok) return verified;
+  if (verified.email !== ADMIN_EMAIL) {
+      return { ok: false as const, status: 403, error: "هذا الحساب غير مخوّل لدخول الإدارة" };
+  }
+  return verified;
 }

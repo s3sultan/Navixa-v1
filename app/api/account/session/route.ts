@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       enabled: true,
       signedIn: Boolean(session),
       trialDays: settings.trialDays,
+      googleLoginEnabled: settings.userAuthEnabled,
       passkeysEnabled: settings.passkeysEnabled,
       earlyAccessEnabled: settings.earlyAccessEnabled,
       user: session ? { email: session.email, status: session.status, expiresAt: session.expiresAt } : null,

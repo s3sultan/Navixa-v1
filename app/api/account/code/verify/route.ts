@@ -7,7 +7,14 @@ type Env = Record<string, string | undefined>;
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
-async function env(): Promise<Env> { try { return (await import("cloudflare:workers") as { env?: Env }).env || {}; } catch { return globalThis as Env; } }
+async function env(): Promise<Env> {
+  let bindings: Env = {};
+  try { bindings = (await import("cloudflare:workers") as { env?: Env }).env || {}; }
+  catch { /* nodejs_compat and local tests use fallbacks below. */ }
+  const processEnv = typeof process === "undefined" ? {} : process.env as Env;
+  const globals = globalThis as Env;
+  return { ...globals, ...processEnv, ...bindings };
+}
 function consume(key: string) { const now = Date.now(), existing = attempts.get(key); const bucket = !existing || existing.resetAt <= now ? { count: 0, resetAt: now + 10 * 60_000 } : existing; bucket.count += 1; attempts.set(key, bucket); return bucket.count <= 8; }
 function code(value: unknown) { return typeof value === "string" ? value.replace(/\D/g, "").slice(0, 6) : ""; }
 

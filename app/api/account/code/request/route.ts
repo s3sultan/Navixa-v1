@@ -8,7 +8,14 @@ const requests = new Map<string, { count: number; resetAt: number }>();
 const generic = { ok: true, message: "إذا كان هذا البريد صالحًا لاستقبال الدخول، سيصلك رمز NAVIXA خلال دقائق." };
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
-async function env(): Promise<Env> { try { return (await import("cloudflare:workers") as { env?: Env }).env || {}; } catch { return globalThis as Env; } }
+async function env(): Promise<Env> {
+  let bindings: Env = {};
+  try { bindings = (await import("cloudflare:workers") as { env?: Env }).env || {}; }
+  catch { /* nodejs_compat and local tests use fallbacks below. */ }
+  const processEnv = typeof process === "undefined" ? {} : process.env as Env;
+  const globals = globalThis as Env;
+  return { ...globals, ...processEnv, ...bindings };
+}
 function consume(key: string, limit: number, windowMs: number) { const now = Date.now(), existing = requests.get(key); const bucket = !existing || existing.resetAt <= now ? { count: 0, resetAt: now + windowMs } : existing; bucket.count += 1; requests.set(key, bucket); return bucket.count <= limit; }
 function code() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0"); }
 
