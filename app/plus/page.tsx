@@ -1,63 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ar } from "../content/ar";
-import { arCta } from "../content/cta/ar";
 import { languageIdentity } from "../content/languages";
 import "./plus.css";
+import "./plus-simple.css";
 import InterestForm from "./InterestForm";
 import ReferralCapture from "./ReferralCapture";
-import CheckoutPanel from "./CheckoutPanel";
 
 export const metadata: Metadata = {
-  title: "NAVIXA Plus — يفهم يومك بعمق أكبر",
-  description: "خطط NAVIXA Plus التجريبية: مساعد أذكى، تخصيص أوسع، وتجربة خاصة تحترم خصوصيتك.",
+  title: "NAVIXA Plus — مزايا أوسع عندما تتاح رسميًا",
+  description: "تعرف على القيمة الإضافية في NAVIXA Plus وسجل اهتمامك بالتجارب القادمة، دون دفع أو طلب بطاقة حاليًا.",
 };
 
 const included = [
-  ["✦", "المساعد الذكي Plus", "ردود أعمق، محادثات أطول، وتنظيم أفكارك بأسلوبك."],
-  ["◉", "سماع نداء الاسم", "متابعة كلماتك وأسمائك المهمة محليًا بعد موافقتك."],
-  ["▣", "متابعة الشاشة", "تنبيهات محلية لما يهمك في الشاشة أو المنطقة التي تحددها."],
-  ["⚽", "تنبيهات مباريات متقدمة", "أكثر من توقيت لفريقك، مع عدّاد واضح قبل البداية."],
-  ["⌁", "مزامنة مشفّرة", "استمرارية اختيارية بين أجهزتك مع بقاء بياناتك محمية."],
-  ["◐", "مظهر أكثر تخصيصًا", "ألوان وطرق عرض أوسع لتجربة تناسبك."],
+  ["◉", "سماع نداء الاسم", "تنبيه محلي اختياري لأسماء وكلمات تهمك بعد موافقتك."],
+  ["▣", "متابعة الشاشة", "متابعة محلية لما تختاره في الشاشة، من دون إرسال محتواها."],
+  ["⌁", "استمرارية بين الأجهزة", "خيارات إضافية للاستخدام المنظم عند تفعيلها لحسابك."],
 ];
 
 export default function NavixaPlusPage() {
-  return <main className="plus-page" dir={languageIdentity.ar.direction}><ReferralCapture/>
-    <nav className="plus-nav">
-      <Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt=""/><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link>
-      <Link href="/" className="plus-back">العودة للرئيسية ←</Link>
-    </nav>
+  return <main className="plus-page plus-simple" dir={languageIdentity.ar.direction}>
+    <ReferralCapture />
+    <nav className="plus-nav"><Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><Link href="/" className="plus-back">العودة للرئيسية ←</Link></nav>
 
-    <section className="plus-hero">
-      <span className="plus-eyebrow">{ar.plus.eyebrow}</span>
-      <h1>{ar.plus.heroFirst}<br/><strong>{ar.plus.heroEmphasis}</strong></h1>
-      <p>{ar.plus.heroDescription}</p>
-      <div className="plus-hero-actions"><a href="#plans">{arCta.explorePlans}</a><a className="ghost" href="#included">{arCta.whatsIncluded}</a></div>
-      <div className="plus-trust"><span>✓ {ar.plus.trialTrust}</span><span>✓ {ar.plus.noChargeTrust}</span><span>✓ {ar.plus.cancellationTrust}</span></div>
-      <div className="plus-orbit a"/><div className="plus-orbit b"/><div className="plus-mark"><img src="/navixa-mark.webp" alt=""/></div>
-    </section>
+    <section className="plus-hero" aria-labelledby="plus-title"><span className="plus-eyebrow">NAVIXA Plus</span><h1 id="plus-title">مزايا أوسع،<br /><strong>عندما تحتاجها.</strong></h1><p>Plus امتداد اختياري لتجربة NAVIXA. نعرض القيمة بوضوح، ونبقي التفعيل والدفع خارج الصفحة إلى أن تكتمل بوابة دفع رسمية وآمنة.</p><div className="plus-hero-actions"><a href="#included">ما الذي تضيفه Plus؟</a><a className="ghost" href="#interest">سجّل اهتمامك</a></div><div className="plus-trust"><span>✓ لا يوجد دفع حاليًا</span><span>✓ لا نطلب بطاقة</span><span>✓ الخصوصية أولًا</span></div><div className="plus-mark"><img src="/navixa-mark.webp" alt="" /></div></section>
 
-    <section className="plus-value" id="included" aria-labelledby="included-title">
-      <header><small>{ar.plus.includedEyebrow}</small><h2 id="included-title">{ar.plus.includedTitle}</h2><p>{ar.plus.includedDescription}</p></header>
-      <div className="plus-feature-grid">{included.map(([icon,title,description])=><article key={title}><span>{icon}</span><div><h3>{title}</h3><p>{description}</p></div></article>)}</div>
-    </section>
+    <section className="plus-value" id="included" aria-labelledby="included-title"><header><small>القيمة الإضافية</small><h2 id="included-title">أدوات مفيدة، عند اختيارك لها</h2><p>لا تعمل ميزات الجهاز إلا بعد موافقة صريحة منك، ويمكنك متابعة الأساسيات في NAVIXA دون Plus.</p></header><div className="plus-feature-grid">{included.map(([icon, title, description]) => <article key={title}><span>{icon}</span><div><h3>{title}</h3><p>{description}</p></div></article>)}</div></section>
 
-    <section className="plus-plans" id="plans" aria-labelledby="plans-title">
-      <header><small>{ar.plus.plansEyebrow}</small><h2 id="plans-title">{ar.plus.plansTitle}</h2><p>{ar.plus.plansDescription}</p></header>
-      <div className="plan-grid">
-        <article className="plan-card trial"><span className="plan-tag">ابدأ مجانًا</span><h3>جرّب Plus بهدوء</h3><div className="plan-price"><b>بدون</b><span>بطاقة<br/>ولا التزام</span></div><p>ابدأ التجربة الآن. يمكنك إيقافها في أي وقت، ولن يُخصم أي مبلغ تلقائيًا. تنتهي التجربة في 19 سبتمبر 2026 الساعة 11:59 مساءً بتوقيت أم القرى.</p><Link href="/#account">ابدأ تجربتك المجانية</Link></article>
-        <article className="plan-card featured"><span className="plan-tag">عرض مؤسسي NAVIXA</span><h3>Plus الشهري</h3><div className="plan-price"><b>19</b><span>ر.س<br/>شهريًا</span></div><p>السعر الترحيبي محفوظ للمرحلة القادمة. التفعيل الحالي يتم يدويًا من لوحة الإدارة إلى أن تُعتمد بوابة الدفع الرسمية.</p><a href="#checkout">حالة التفعيل الحالية</a></article>
-        <article className="plan-card"><span className="plan-tag">قيمة أوفر</span><h3>3 + 1</h3><div className="plan-price"><b>57</b><span>ر.س<br/>لـ 4 أشهر</span></div><p>هذه الباقة مؤجلة حتى اعتماد بوابة الدفع وتشغيل الاشتراكات العامة بصورة آمنة.</p><a href="#checkout">مؤجلة حاليًا</a></article>
-      </div>
-      <aside className="founders-note"><span>✦</span><p><b>عرض مؤسسي NAVIXA.</b> السعر الترحيبي محفوظ، وسيُفتح الدفع العام بعد اعتماد مزود دفع رسمي وربط التحقق الخادمي الآمن.</p></aside>
-    </section>
+    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">التفعيل العام غير متاح الآن</h2><p>لا يوجد زر شراء أو تحويل خارجي في هذه الصفحة. إذا مُنح حسابك تجربة أو وصولًا إداريًا، ستظهر حالته داخل حسابك.</p></div></div><Link href="/account">إدارة حسابك ←</Link></section>
 
-    <CheckoutPanel/>
-    <InterestForm/>
+    <InterestForm />
 
-    <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>لا نبيع بياناتك لنموذج الاشتراك.</h2><p>الدفع سيكون عبر بوابة خارجية آمنة عند الإطلاق. تفضيلاتك وخصوصيتك المحلية تبقى كما هي.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
-
-    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt=""/><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><span>الإطلاق الثاني · التجربة حتى 19 سبتمبر 2026</span></footer>
+    <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>بياناتك ليست ثمن الاشتراك.</h2><p>لن تحفظ NAVIXA بيانات بطاقات أو محافظ. وعند إتاحة الدفع رسميًا سيكون عبر مزود معتمد وتحقيق خادمي آمن.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
+    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><span>NAVIXA Plus · تُعلن حالة التفعيل عند جاهزيتها</span></footer>
   </main>;
 }

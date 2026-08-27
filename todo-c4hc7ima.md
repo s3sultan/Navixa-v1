@@ -202,3 +202,4 @@
 - [x] Disable currently unnecessary heavy public features by default where safe, while keeping core account, Today, support, policies, and admin controls available.
 - [x] Produce a concise owner-facing recommendation list for what to keep, pause, improve, or defer before paid launch.
 - [x] Redesign the protected NAVIXA admin dashboard with an RTL operational layout inspired by the supplied Shadcn e-commerce reference, preserving only real connected controls and metrics.
+- [x] Simplify the public NAVIXA Plus page so it presents only the current non-payment state, concise value, and safe next steps without stale campaign pricing or dates.
