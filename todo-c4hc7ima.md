@@ -196,4 +196,4 @@
 - [ ] Keep NAVIXA Plus activation available only through the protected admin subscription/manual-review controls until an approved payment gateway is live.
 - [ ] Update the Plus/public copy to say payments are temporarily under provider review and access is activated by admin approval only.
 - [x] Review the owner-provided Tap subscription packages link, extract the fees from the official page, and recommend wording for the package field without accepting any agreement.
-- [ ] Remove internal administrative-review notes from the public terms and refunds pages, keeping any legal-review reminder only in private documentation.
+- [x] Remove internal administrative-review notes from the public terms and refunds pages, keeping any legal-review reminder only in private documentation.

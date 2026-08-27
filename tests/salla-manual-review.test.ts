@@ -15,7 +15,9 @@ test("قبول المراجعة اليدوية محصور في طلب معلق �
 test("تفعيل المراجعة اليدوية لا يقبل دليل العميل ويتطلب سجلًا ذريًا واستحقاقًا واحدًا", async () => {
   const route = await readFile(new URL("../app/api/admin/salla-manual-reviews/route.ts", import.meta.url), "utf8");
   const requestRoute = await readFile(new URL("../app/api/billing/salla/manual-review/route.ts", import.meta.url), "utf8");
-  assert.match(requestRoute, /resolveUserSession/);
+  assert.match(requestRoute, /تم إيقاف مسار سلة مؤقتًا/);
+  assert.match(requestRoute, /status: 503/);
+  assert.doesNotMatch(requestRoute, /SALLA_PRODUCT_URL|window\.location|checkoutUrl|resolveUserSession/);
   assert.doesNotMatch(requestRoute, /receipt|paymentStatus|customerEmail|sallaOrderId/);
   assert.match(route, /isTrustedSameOriginRequest/);
   assert.match(route, /UPDATE navixa_salla_manual_reviews SET status='processing'/);
