@@ -201,3 +201,4 @@
 - [x] Identify non-essential or heavy public features and add or reuse admin-controlled kill switches so the owner can disable them without code changes.
 - [x] Disable currently unnecessary heavy public features by default where safe, while keeping core account, Today, support, policies, and admin controls available.
 - [x] Produce a concise owner-facing recommendation list for what to keep, pause, improve, or defer before paid launch.
+- [x] Redesign the protected NAVIXA admin dashboard with an RTL operational layout inspired by the supplied Shadcn e-commerce reference, preserving only real connected controls and metrics.
