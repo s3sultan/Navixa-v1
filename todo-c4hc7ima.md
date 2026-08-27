@@ -120,6 +120,7 @@
 - [ ] Inspect existing Cloudflare Email Routing aliases for navixasa.com and identify a safe existing address for Tap correspondence without DNS or routing changes.
 - [ ] Evaluate safe outbound-email options for NAVIXA aliases on mobile and desktop, then resume Tap onboarding with an existing official address without submitting the application.
 - [ ] Run a read-only eight-hour mailbox review through 2026-08-29T23:59:00+03:00 for Moyasar approval and payment-provider offers, with no external contact, checkout, charge, or payment-setting change.
+- [x] Schedule a time-limited eight-hourly review of the owner mailbox for explicit Moyasar approval and provider offers through 2026-08-29T23:59:00+03:00, with no provider outreach, payment-setting changes, payment intent, or financial test.
 - [x] Evaluate Salla-hosted checkout with secure NAVIXA entitlement synchronization, without creating products, enabling payment, or accepting any subscription or provider terms.
 - [x] Produce a detailed Salla-to-NAVIXA payment-confirmation and entitlement-flow design without activating Salla payments or creating any financial transaction.
 - [x] Prepare a closed-by-default Salla webhook and return-flow foundation with unit tests, without registering a webhook, product, secret, payment method, or live checkout.
@@ -175,3 +176,24 @@
 - [ ] Implement a NAVIXA session-bound Salla manual-review request that records no payment proof and remains pending until an administrator confirms the paid order inside Salla.
 - [ ] Implement a restricted administrator settlement action with immutable audit fields, one-time entitlement creation, and no customer-supplied order-status trust.
 - [ ] Add focused tests and an operator guide for manual order verification in Salla Plus, including duplicate, mismatch, and re-review rejection cases.
+- [ ] Verify the publicly accessible NAVIXA privacy, terms, refund, product, and price pages requested by Tap before any document submission or provider reply.
+- [ ] Prepare a Tap onboarding response draft with only verified NAVIXA details and placeholders for owner-provided freelance document, certified IBAN, expected volume, and chosen package; do not send it.
+- [x] Diagnose and restore the NAVIXA email-login availability gate so verified users can request an OTP without weakening rate limits, session security, or payment controls.
+- [x] Review the login-fix change set and its direct security dependencies, then run the relevant tests and production build before preparing a limited publish commit.
+- [x] Add Google OAuth as a user-login fallback alongside email OTP, with verified Google identity claims, account linking by normalized email, server-side Google credential verification, and no change to payment access.
+- [x] Add focused tests for Google credential validation, cross-origin rejection, and server-side session creation before publishing the login fallback.
+- [x] Include the existing Salla webhook idempotency helper required by the production test suite in a separate verified commit, then rerun the deployment check.
+- [x] Redesign NAVIXA mobile-first navigation, hero, content density, touch targets, and typography so the first visit is clear and uncluttered without removing core features.
+- [x] Restrict the mobile first screen to the daily essentials and primary actions; keep secondary cards, insights, matches, support, and configuration discoverable through an explicit المزيد entry rather than displaying them by default.
+- [ ] Verify the published Google user-login flow in an isolated browser session without modifying the owner’s active session or creating unnecessary accounts.
+- [x] Prepare a no-cost customer auto-reply test using the already verified NAVIXA sender, with a reviewable message template and no customer-data collection beyond the recipient address.
+- [x] Consolidate Tap onboarding requirements into a private owner checklist, marking public NAVIXA links ready and leaving document, IBAN, volume, and package fields for owner completion.
+- [x] Remove the duplicate Google sign-in control and resolve the mobile horizontal overflow found on the unauthenticated NAVIXA account screen without weakening either login path.
+- [ ] Review the owner-provided Moyasar audit log read-only and classify the latest status as approval, pending information, rejection, or unrelated before changing any payment setting.
+- [x] Classify the owner-provided Moyasar sales email as a follow-up update only, not a live-payment approval or activation; make no payment-setting change.
+- [x] Diagnose the owner-reported Moyasar registration-form submission failure and provide a field-by-field pre-submit checklist before any retry.
+- [ ] Disable all public Salla checkout/request-review entry points in NAVIXA while Salla remains unavailable publicly, without deleting the Salla technical foundation.
+- [ ] Keep NAVIXA Plus activation available only through the protected admin subscription/manual-review controls until an approved payment gateway is live.
+- [ ] Update the Plus/public copy to say payments are temporarily under provider review and access is activated by admin approval only.
+- [x] Review the owner-provided Tap subscription packages link, extract the fees from the official page, and recommend wording for the package field without accepting any agreement.
+- [ ] Remove internal administrative-review notes from the public terms and refunds pages, keeping any legal-review reminder only in private documentation.
