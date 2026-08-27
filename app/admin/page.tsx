@@ -10,6 +10,7 @@ import AdminAlertSettings from "./settings/AdminAlertSettings";
 import AdminMatchSettings from "./settings/AdminMatchSettings";
 import AdminAssistantLearningSettings from "./settings/AdminAssistantLearningSettings";
 import AdminSubscriptionSettings from "./settings/AdminSubscriptionSettings";
+import AdminSallaManualReviews from "./settings/AdminSallaManualReviews";
 import AdminUserAuthSettings from "./settings/AdminUserAuthSettings";
 import AdminReferralSettings from "./settings/AdminReferralSettings";
 import AdminDiscountCodes from "./settings/AdminDiscountCodes";
@@ -164,7 +165,7 @@ export default function AdminPage() {
             <details className="settings-group"><summary>التنبيهات والمباريات <span>القنوات · القواعد · العرض</span></summary><div className="settings-group-content"><AdminAlertSettings /><AdminMatchSettings /></div></details>
             <details className="settings-group"><summary>المساعد والاجتماعات <span>الردود · التعلم · التلخيص</span></summary><div className="settings-group-content"><AdminAssistantSettings /><AdminAssistantLearningSettings /><AdminMeetingSettings /></div></details>
             <details className="settings-group"><summary>الصحة والمحتوى <span>العافية · العدادات · التمارين</span></summary><div className="settings-group-content"><AdminHealthSettings /><AdminCounterSettings /></div></details>
-            <details className="settings-group"><summary>Plus والإحالات <span>الاشتراك · التجربة · المكافآت · الخصومات</span></summary><div className="settings-group-content"><AdminSubscriptionSettings /><AdminReferralSettings /><AdminDiscountCodes /></div></details>
+            <details className="settings-group"><summary>Plus والإحالات <span>الاشتراك · التجربة · المكافآت · الخصومات</span></summary><div className="settings-group-content"><AdminSubscriptionSettings /><AdminSallaManualReviews /><AdminReferralSettings /><AdminDiscountCodes /></div></details>
           </div>
         </section>
 

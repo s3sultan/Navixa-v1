@@ -50,18 +50,28 @@ export default function CheckoutPanel(){
     }catch(error){setNotice(error instanceof Error?error.message:"تعذر تجهيز الدفع الآن. حاول لاحقًا أو تواصل مع الدعم.");}
     finally{setBusy(false);}
   };
+  const startSallaManualReview=async()=>{
+    setBusy(true);setNotice("");
+    try{
+      const response=await fetch("/api/billing/salla/manual-review",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:"{}"});
+      const data=await response.json().catch(()=>({})) as {checkoutUrl?:string;error?:string};
+      if(!response.ok||!data.checkoutUrl)throw new Error(data.error||"تعذر تجهيز المراجعة الآن");
+      window.location.assign(data.checkoutUrl);
+    }catch(error){setNotice(error instanceof Error?error.message:"تعذر الانتقال إلى سلة الآن. سجّل الدخول إلى NAVIXA أولًا ثم حاول مرة أخرى.");}
+    finally{setBusy(false);}
+  };
 
   return <section className="plus-checkout" id="checkout" aria-labelledby="checkout-title">
-    <header><small>اشتراك مباشر وآمن</small><h2 id="checkout-title">اختر باقتك ثم ادفع بالطريقة المناسبة</h2><p>يمكنك الاشتراك في أي يوم من التجربة، أو إكمال التجربة أولًا. لن تُفعّل Plus إلا بعد تحقق NAVIXA من الدفع.</p></header>
+    <header><small>اشتراك عبر سلة</small><h2 id="checkout-title">ابدأ طلبك ثم أكمل الدفع في سلة</h2><p>سجّل الدخول إلى NAVIXA أولًا. بعد الدفع تظل الحالة «بانتظار المراجعة» حتى يطابق المدير الطلب المدفوع من لوحة سلة؛ لا يفعّل الرابط وحده اشتراكًا.</p></header>
     <div className="checkout-options" role="radiogroup" aria-label="الباقة">
       <label className={plan==="monthly"?"selected":""}><input type="radio" name="plan" value="monthly" checked={plan==="monthly"} onChange={()=>setPlan("monthly")}/><span><b>Plus الشهري</b><small>19 ر.س شهريًا</small></span></label>
       <label className={plan==="quarterly"?"selected":""}><input type="radio" name="plan" value="quarterly" checked={plan==="quarterly"} onChange={()=>setPlan("quarterly")} disabled={Boolean(foundersIntentId)}/><span><b>باقة 3 + 1</b><small>{foundersIntentId?"سعر المؤسس مخصص للباقة الشهرية":"57 ر.س لأربعة أشهر"}</small></span></label>
     </div>
     {foundersIntentId?<p className="checkout-notice">تم تخصيص سعر مؤسس لحسابك. يظهر المبلغ النهائي داخل نموذج الدفع، ولا يمكن دمجه مع كود خصم آخر.</p>:<div className="checkout-code"><label htmlFor="discount-code">كود خصم (اختياري)</label><input id="discount-code" value={discountCode} onChange={event=>setDiscountCode(event.target.value.toUpperCase())} maxLength={32} placeholder="مثال: FOUNDERS100" autoCapitalize="characters"/></div>}
-    <div className="checkout-methods" aria-label="طرق الدفع"><span>البطاقات ومدى</span><span>Apple Pay عند توفره</span></div>
-    {availability?.available?<button className="checkout-start" disabled={busy} onClick={()=>void start()}>{busy?"جارٍ تجهيز الدفع…":"المتابعة إلى الدفع الآمن"}</button>:<Link className="checkout-start checkout-closed" href="/#account">ابدأ أو أكمل تجربة Plus</Link>}
-    {(availability&&!availability.available)&&<p className="checkout-notice" role="status">{availability.message}</p>}{notice&&<p className="checkout-notice" role="status">{notice}</p>}
+    <div className="checkout-methods" aria-label="طريقة الاشتراك"><span>الدفع المستضاف في سلة</span><span>التفعيل بعد مراجعة يدوية</span></div>
+    <button className="checkout-start" disabled={busy} onClick={()=>void startSallaManualReview()}>{busy?"جارٍ التجهيز…":"الانتقال إلى اشتراك NAVIXA في سلة"}</button>
+    <p className="checkout-notice">لا نطلب رقم طلب أو إيصالًا منك في NAVIXA. استخدم بريد NAVIXA نفسه في سلة، ثم عُد إلى حسابك وانتظر المراجعة.</p>{notice&&<p className="checkout-notice" role="status">{notice}</p>}
     <div ref={formRef} className="navixa-moyasar-form" aria-live="polite"/>
-    <p className="checkout-footnote">تُعالج بيانات الدفع داخل نموذج مُيسر الآمن. لا تحفظ NAVIXA رقم البطاقة أو بيانات Apple Pay.</p>
+    <p className="checkout-footnote">تُعالج بيانات الدفع داخل سلة. لا تحفظ NAVIXA رقم البطاقة أو بيانات المحفظة، ولا يمنح طلب المراجعة استحقاقًا قبل اعتماد المدير.</p>
   </section>;
 }
