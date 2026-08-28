@@ -18,6 +18,12 @@ assert.match(sitemap, /organize-your-day|meeting-summaries|smart-reminders|local
 assert.match(sitemap, /guides/);
 assert.match(worker, /Strict-Transport-Security/);
 assert.match(worker, /X-Content-Type-Options/);
+assert.match(worker, /const CSP_ENFORCED = \[/);
+assert.match(worker, /base-uri 'self'/);
+assert.match(worker, /object-src 'none'/);
+assert.match(worker, /frame-ancestors 'self'/);
+assert.match(worker, /form-action 'self'/);
+assert.match(worker, /set\("Content-Security-Policy", CSP_ENFORCED\)/);
 assert.match(worker, /Content-Security-Policy-Report-Only/);
 assert.match(worker, /report-uri \/api\/security\/csp-report/);
 assert.match(worker, /static\.cloudflareinsights\.com/);
