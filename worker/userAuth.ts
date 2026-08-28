@@ -110,7 +110,7 @@ export async function createUserSession(database: D1Database, userId: string, re
   const expiresAt = new Date(now.getTime() + USER_SESSION_TTL_SECONDS * 1000).toISOString();
   const deviceClass = resolveUserDeviceClass(request);
   await database.prepare("UPDATE navixa_user_sessions SET revoked_at=? WHERE user_id=? AND device_class=? AND revoked_at='' ").bind(nowIso, userId, deviceClass).run();
-  await database.prepare("INSERT INTO navixa_user_sessions(id,user_id,token_hash,device_class,created_at,expires_at,last_seen_at,revoked_at) VALUES (?,?,?,?,?,?,?, '')").bind(crypto.randomUUID(), userId, await hashOpaqueValue(token), deviceClass, nowIso, expiresAt, nowIso).run();
+  await database.prepare("INSERT INTO navixa_user_sessions(id,user_id,token_hash,created_at,expires_at,last_seen_at,revoked_at,device_class) VALUES (?,?,?,?,?,?, '',?)").bind(crypto.randomUUID(), userId, await hashOpaqueValue(token), nowIso, expiresAt, nowIso, deviceClass).run();
   return { token, expiresAt, deviceClass };
 }
 
