@@ -9,6 +9,8 @@ type GoogleIdentity = { accounts: { id: { initialize: (options: { client_id: str
 const headers = { "Content-Type": "application/json" };
 const REMEMBERED_EMAIL_KEY = "navixa-last-login-email";
 const GOOGLE_CLIENT_ID = "876266145464-i4pigjbevro3ki0d0lj0gds6geivecvb.apps.googleusercontent.com";
+let googleIdentityInitialized = false;
+let googleCredentialHandler: ((credential: string) => void) | null = null;
 
 export default function AccountAccess() {
   const [session, setSession] = useState<Session | null>(null);
@@ -45,12 +47,16 @@ export default function AccountAccess() {
   }, []);
   useEffect(() => {
     if (!session?.enabled || session.signedIn || !session.googleLoginEnabled) return;
+    googleCredentialHandler = finishGoogleLogin;
     let active = true, timeout: ReturnType<typeof setTimeout> | undefined;
     const mount = () => {
       const google = (window as Window & { google?: GoogleIdentity }).google, target = googleButton.current;
       if (!active || !google?.accounts?.id || !target) return false;
       target.replaceChildren();
-      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: ({ credential }) => void finishGoogleLogin(credential), itp_support: true, auto_select: false, cancel_on_tap_outside: true });
+      if (!googleIdentityInitialized) {
+        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: ({ credential }) => googleCredentialHandler?.(credential), itp_support: true, auto_select: false, cancel_on_tap_outside: true });
+        googleIdentityInitialized = true;
+      }
       google.accounts.id.renderButton(target, { type: "standard", theme: "outline", size: "large", text: "continue_with", shape: "rectangular", logo_alignment: "left", width: Math.max(240, Math.min(360, Math.floor(target.getBoundingClientRect().width || 360))), locale: "ar" });
       setGoogleState("ready"); return true;
     };
@@ -63,7 +69,7 @@ export default function AccountAccess() {
     if (!script) { script = document.createElement("script"); script.src = "https://accounts.google.com/gsi/client"; script.async = true; script.dataset.navixaGoogle = "true"; script.addEventListener("load", loaded, { once: true }); script.addEventListener("error", failed, { once: true }); document.head.appendChild(script); }
     else script.addEventListener("load", loaded, { once: true });
     timeout = setTimeout(() => { if (active && !mount()) setGoogleState("error"); }, 12000);
-    return () => { active = false; if (timeout) clearTimeout(timeout); script?.removeEventListener("load", loaded); script?.removeEventListener("error", failed); };
+    return () => { active = false; if (googleCredentialHandler === finishGoogleLogin) googleCredentialHandler = null; if (timeout) clearTimeout(timeout); script?.removeEventListener("load", loaded); script?.removeEventListener("error", failed); };
   }, [finishGoogleLogin, session?.enabled, session?.googleLoginEnabled, session?.signedIn]);
   const rememberVerifiedEmail = () => { const value = email.trim().toLowerCase(); if (!value) return; window.localStorage.setItem(REMEMBERED_EMAIL_KEY, value); setRememberedEmail(value); };
   const forgetRememberedEmail = () => { window.localStorage.removeItem(REMEMBERED_EMAIL_KEY); setRememberedEmail(""); setEmail(""); setSent(false); setCode(""); setNotice("تم نسيان البريد من هذا الجهاز."); };
