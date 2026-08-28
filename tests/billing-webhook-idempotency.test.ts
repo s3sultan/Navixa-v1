@@ -36,10 +36,10 @@ test("الطلبات المتزامنة لنفس الحدث تمنح معالج�
   assert.equal(claims.filter((claim) => claim === "busy").length, 19);
 });
 
-test("حدث سلة المكرر بالتزامن لا يمنح الاستحقاق إلا مرة واحدة", async () => {
+test("حدث الدفع المكرر بالتزامن لا يمنح الاستحقاق إلا مرة واحدة", async () => {
   const store = new MemoryStore(); let settlements = 0;
   const attempts = await Promise.all(Array.from({ length: 12 }, () => processWebhookOnce({
-    store, provider: "salla", eventId: "order:1942:payment_updated", eventType: "order.payment.updated", payloadHash: hash("a"),
+    store, provider: "moyasar", eventId: "payment:1942:paid", eventType: "payment_paid", payloadHash: hash("a"),
     verify: async () => true,
     settle: async () => { settlements += 1; },
   })));

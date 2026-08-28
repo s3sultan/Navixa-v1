@@ -151,3 +151,24 @@ test("local passwordless flow limits repeated code requests from the same networ
     globalThis.fetch = previous.fetch;
   }
 });
+
+test("OTP delivery retries one transient provider failure", async () => {
+  const database = new LocalAuthDatabase();
+  const host = globalThis as typeof globalThis & { DB?: LocalAuthDatabase; RESEND_API_KEY?: string; RESEND_FROM_EMAIL?: string; NAVIXA_AUTH_CODE_PEPPER?: string };
+  const previous = { DB: host.DB, key: host.RESEND_API_KEY, from: host.RESEND_FROM_EMAIL, pepper: host.NAVIXA_AUTH_CODE_PEPPER, fetch: globalThis.fetch };
+  let attempts = 0;
+  host.DB = database; host.RESEND_API_KEY = "local-resend-key"; host.RESEND_FROM_EMAIL = "دخول NAVIXA <login@navixa.local>"; host.NAVIXA_AUTH_CODE_PEPPER = "local-only-pepper-with-enough-length";
+  globalThis.fetch = async () => { attempts += 1; return attempts === 1 ? new Response("temporary", { status: 503 }) : new Response(JSON.stringify({ id: "local-mail" }), { status: 200 }); };
+  try {
+    const response = await requestCode(post("/api/account/code/request", { email: "retry@example.com" }, { "cf-connecting-ip": "198.51.100.88" }));
+    assert.equal(response.status, 200);
+    assert.equal(attempts, 2);
+    assert.equal(database.codes.filter(row => !row.consumedAt).length, 1);
+  } finally {
+    if (previous.DB === undefined) delete host.DB; else host.DB = previous.DB;
+    if (previous.key === undefined) delete host.RESEND_API_KEY; else host.RESEND_API_KEY = previous.key;
+    if (previous.from === undefined) delete host.RESEND_FROM_EMAIL; else host.RESEND_FROM_EMAIL = previous.from;
+    if (previous.pepper === undefined) delete host.NAVIXA_AUTH_CODE_PEPPER; else host.NAVIXA_AUTH_CODE_PEPPER = previous.pepper;
+    globalThis.fetch = previous.fetch;
+  }
+});
