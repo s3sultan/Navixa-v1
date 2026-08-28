@@ -16,7 +16,7 @@ export function clientIp(request: Request) {
     || "anonymous";
 }
 
-function consumeLocal(bucketHash: string, limit: number, expiresAt: number, now: number) {
+function consumeLocal(bucketHash: string, expiresAt: number, now: number) {
   const current = localFallback.get(bucketHash);
   const bucket = !current || current.expiresAt <= now ? { attempts: 0, expiresAt } : current;
   bucket.attempts += 1;
@@ -53,9 +53,7 @@ export async function consumeAuthRateLimit(
       database.prepare("DELETE FROM navixa_auth_rate_limits WHERE expires_at<?").bind(new Date(now - 86_400_000).toISOString()).run().catch(() => {});
     }
   } catch {
-    // Migration is applied before production deploy. This fallback preserves a per-instance guard
-    // during local tests or a temporary D1 schema error instead of disabling rate limiting entirely.
-    attempts = consumeLocal(bucketHash, limit, windowEnd, now);
+    attempts = consumeLocal(bucketHash, windowEnd, now);
   }
 
   return {
