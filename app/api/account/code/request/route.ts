@@ -5,7 +5,7 @@ import { getUserAuthSettings, hashOpaqueValue, isValidUserEmail, normalizeUserEm
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
 type Env = Record<string, string | undefined>;
-const generic = { ok: true, message: "إذا كان هذا البريد صالحًا لاستقبال الدخول، سيصلك رمز NAVIXA خلال دقائق." };
+const generic = { ok: true, message: "إذا كان البريد صالحًا لاستقبال الرسائل، سيصلك رمز NAVIXA خلال دقائق. يدعم NAVIXA Gmail وiCloud وOutlook وغيرها." };
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
 async function env(): Promise<Env> {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const settings = await getUserAuthSettings(database).catch(() => null);
   const secrets = await env();
   const authFrom = secrets.NAVIXA_AUTH_FROM || secrets.RESEND_FROM_EMAIL;
-  if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !secrets.RESEND_API_KEY || !authFrom || !secrets.NAVIXA_AUTH_CODE_PEPPER) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !secrets.RESEND_API_KEY || !authFrom || !secrets.NAVIXA_AUTH_CODE_PEPPER) return NextResponse.json({ error: "إرسال رمز البريد غير متاح مؤقتًا. جرّب Google أو أعد المحاولة لاحقًا." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const body = await request.json().catch(() => ({})) as { email?: unknown };
   const email = normalizeUserEmail(body.email);
   const ipLimit = await consumeAuthRateLimit(database, "otp-request-ip", clientIp(request), secrets.NAVIXA_AUTH_CODE_PEPPER, 5, 10 * 60_000);
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const delivered = await sendCode(secrets.RESEND_API_KEY, authFrom, email, loginCode).catch(() => false);
   if (!delivered) {
     await database.prepare("UPDATE navixa_user_login_codes SET consumed_at=? WHERE email_hash=? AND purpose='login' AND consumed_at='' ").bind(new Date().toISOString(), emailHash).run();
-    return NextResponse.json({ error: "تعذر إرسال الرمز الآن، حاول لاحقًا" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ error: "تعذر إرسال الرمز إلى مزود البريد الآن. تحقق من العنوان أو حاول مرة أخرى بعد قليل." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
   return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
 }
