@@ -49,7 +49,6 @@ export async function POST(request: Request) {
       let ipUsageCount = 0;
       try { const ipUsage = await database.prepare("SELECT COUNT(*) AS count FROM navixa_trial_issuance WHERE ip_hash=? AND issued_at>=?").bind(ipHash, previousWindow).all<{count:number}>(); ipUsageCount = ipUsage.results[0]?.count || 0; } catch { ipUsageCount = 0; }
       if (ipUsageCount >= 2) return NextResponse.json({ error: "تم استخدام الحد المسموح للتجربة من هذه الشبكة خلال الفترة الحالية." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": "86400" } });
-      // نهاية الحملة: 19 سبتمبر 2026، 23:59:59 بتوقيت أم القرى (UTC+3).
       const campaignEnd = Date.parse("2026-09-19T20:59:59.999Z");
       const requestedEnd = Date.now() + settings.trialDays * 86_400_000;
       if (Date.now() >= campaignEnd) return NextResponse.json({ error: "انتهت فترة التجربة المجانية حاليًا. يمكنك الاشتراك في Plus عند توفر الباقة." }, { status: 403, headers: { "Cache-Control": "no-store" } });
@@ -60,6 +59,6 @@ export async function POST(request: Request) {
       await database.prepare("UPDATE navixa_subscribers SET user_id=?,updated_at=? WHERE id=?").bind(userId, now, subscriber.results[0].id).run();
     }
   }
-  const session = await createUserSession(database, userId);
+  const session = await createUserSession(database, userId, request);
   return NextResponse.json({ ok: true, user: { email }, passkeysAvailable: settings.passkeysEnabled }, { headers: { "Set-Cookie": makeUserSessionCookie(session.token), "Cache-Control": "no-store" } });
 }
