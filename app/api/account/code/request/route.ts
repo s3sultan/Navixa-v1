@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server.js";
+import { clientIp, consumeAuthRateLimit } from "../../../../../worker/authRateLimit.ts";
 import { getUserAuthSettings, hashOpaqueValue, isValidUserEmail, normalizeUserEmail, trustedUserMutation, type D1Database } from "../../../../../worker/userAuth.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
 type Env = Record<string, string | undefined>;
-const requests = new Map<string, { count: number; resetAt: number }>();
 const generic = { ok: true, message: "إذا كان هذا البريد صالحًا لاستقبال الدخول، سيصلك رمز NAVIXA خلال دقائق." };
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
@@ -16,7 +16,6 @@ async function env(): Promise<Env> {
   const globals = globalThis as Env;
   return { ...globals, ...processEnv, ...bindings };
 }
-function consume(key: string, limit: number, windowMs: number) { const now = Date.now(), existing = requests.get(key); const bucket = !existing || existing.resetAt <= now ? { count: 0, resetAt: now + windowMs } : existing; bucket.count += 1; requests.set(key, bucket); return bucket.count <= limit; }
 function code() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0"); }
 
 async function sendCode(apiKey: string, from: string, to: string, loginCode: string) {
@@ -38,8 +37,12 @@ export async function POST(request: Request) {
   if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !secrets.RESEND_API_KEY || !authFrom || !secrets.NAVIXA_AUTH_CODE_PEPPER) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   const body = await request.json().catch(() => ({})) as { email?: unknown };
   const email = normalizeUserEmail(body.email);
-  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "anonymous";
-  if (!consume(`ip:${ip}`, 5, 10 * 60_000) || (email && !consume(`email:${email}`, 3, 10 * 60_000))) return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": "600", "Cache-Control": "no-store" } });
+  const ipLimit = await consumeAuthRateLimit(database, "otp-request-ip", clientIp(request), secrets.NAVIXA_AUTH_CODE_PEPPER, 5, 10 * 60_000);
+  const emailLimit = email ? await consumeAuthRateLimit(database, "otp-request-email", email, secrets.NAVIXA_AUTH_CODE_PEPPER, 3, 10 * 60_000) : { allowed: true, retryAfterSeconds: 600 };
+  if (!ipLimit.allowed || !emailLimit.allowed) {
+    const retryAfter = Math.max(ipLimit.retryAfterSeconds, emailLimit.retryAfterSeconds);
+    return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } });
+  }
   if (!isValidUserEmail(email)) return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
   const now = new Date(), emailHash = await hashOpaqueValue(email), loginCode = code();
   const codeHash = await hashOpaqueValue(`${email}:${loginCode}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`);
