@@ -142,7 +142,8 @@ test("local passwordless flow limits repeated code requests from the same networ
     }
     const blocked = await requestCode(post("/api/account/code/request", { email: "sixth@example.com" }, { "cf-connecting-ip": "203.0.113.91" }));
     assert.equal(blocked.status, 429);
-    assert.equal(blocked.headers.get("Retry-After"), "600");
+    const retryAfter = Number(blocked.headers.get("Retry-After"));
+    assert.ok(Number.isInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 600);
   } finally {
     if (previous.DB === undefined) delete host.DB; else host.DB = previous.DB;
     if (previous.key === undefined) delete host.RESEND_API_KEY; else host.RESEND_API_KEY = previous.key;

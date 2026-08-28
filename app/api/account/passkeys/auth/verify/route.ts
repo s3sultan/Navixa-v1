@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     await database.prepare("UPDATE navixa_user_webauthn_challenges SET consumed_at=? WHERE id=? AND consumed_at=''").bind(now, active.id).run();
     await database.prepare("UPDATE navixa_user_passkeys SET counter=?,last_used_at=? WHERE id=?").bind(verified.authenticationInfo.newCounter, now, passkey.id).run();
     await database.prepare("UPDATE navixa_users SET last_login_at=?,updated_at=? WHERE id=?").bind(now, now, user.id).run();
-    const session = await createUserSession(database, user.id);
+    const session = await createUserSession(database, user.id, request);
     return NextResponse.json({ ok: true }, { headers: { "Set-Cookie": makeUserSessionCookie(session.token), "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "تعذر التحقق من Passkey. استخدم رمز البريد أو حاول من جهازك المعتاد." }, { status: 401, headers: { "Cache-Control": "no-store" } });

@@ -41,6 +41,6 @@ export async function POST(request: Request) {
   const userId = existing.results[0]?.id || crypto.randomUUID();
   if (!existing.results[0]) await database.prepare("INSERT INTO navixa_users(id,email,email_hash,webauthn_user_id,status,created_at,updated_at,last_login_at) VALUES (?,?,?,?, 'active',?,?,?)").bind(userId, email, emailHash, createOpaqueToken(), now, now, now).run();
   else await database.prepare("UPDATE navixa_users SET status='active',updated_at=?,last_login_at=? WHERE id=?").bind(now, now, userId).run();
-  const session = await createUserSession(database, userId);
+  const session = await createUserSession(database, userId, request);
   return NextResponse.json({ ok: true, user: { email }, passkeysAvailable: settings.passkeysEnabled }, { headers: { "Set-Cookie": makeUserSessionCookie(session.token), "Cache-Control": "no-store" } });
 }
