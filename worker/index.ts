@@ -124,6 +124,14 @@ function canStorePublicDocument(response: Response) {
     && (response.headers.get("content-type") || "").includes("text/html");
 }
 
+const CSP_ENFORCED = [
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "form-action 'self'",
+  "upgrade-insecure-requests",
+].join("; ");
+
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -147,8 +155,9 @@ function applyBrowserSecurityHeaders(response: Response) {
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "geolocation=(), usb=(), serial=(), accelerometer=(), gyroscope=(), magnetometer=()");
-  // Monitor CSP compatibility first so browser-based microphone and screen
-  // capabilities are not blocked before their external sources are verified.
+  // Enforce only low-risk navigation/embed protections at the edge. Keep the
+  // complete resource policy in report-only mode until browser compatibility is verified.
+  response.headers.set("Content-Security-Policy", CSP_ENFORCED);
   response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return response;
 }
