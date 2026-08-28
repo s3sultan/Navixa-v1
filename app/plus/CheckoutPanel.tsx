@@ -15,7 +15,7 @@ export default function CheckoutPanel() {
         <small>اشتراك NAVIXA Plus</small>
         <h2 id="checkout-title">التفعيل مؤقتًا من لوحة الإدارة فقط</h2>
         <p>
-          أوقفنا التحويل إلى سلة مؤقتًا لأن صفحة الدفع هناك غير متاحة للعامة بسبب وضع الصيانة. لن يظهر للمستخدم زر دفع أو تحويل خارجي حتى تُعتمد بوابة دفع رسمية.
+          لن يظهر للمستخدم زر دفع أو تحويل خارجي حتى تُعتمد بوابة دفع رسمية وتنجح اختبارات الربط.
         </p>
       </header>
 
@@ -43,7 +43,7 @@ export default function CheckoutPanel() {
       ) : null}
 
       <div className="checkout-methods" aria-label="حالة التفعيل">
-        <span>لا يوجد تحويل إلى سلة</span>
+        <span>الدفع العام متوقف مؤقتًا</span>
         <span>التفعيل عبر لوحة الإدارة فقط</span>
       </div>
 
