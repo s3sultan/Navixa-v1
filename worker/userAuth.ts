@@ -11,6 +11,7 @@ type D1Statement = {
   run: () => Promise<unknown>;
 };
 export type D1Database = { prepare: (sql: string) => D1Statement };
+export type UserDeviceClass = "computer" | "mobile";
 
 export type UserAuthSettings = {
   userAuthEnabled: boolean;
@@ -63,6 +64,14 @@ export function createOpaqueToken() {
   return base64Url(bytes);
 }
 
+export function resolveUserDeviceClass(request: Request): UserDeviceClass {
+  const clientHint = (request.headers.get("sec-ch-ua-mobile") || "").trim();
+  if (clientHint === "?1") return "mobile";
+  if (clientHint === "?0") return "computer";
+  const userAgent = (request.headers.get("user-agent") || "").toLowerCase();
+  return /android|iphone|ipad|ipod|mobile|windows phone|opera mini|opera mobi/.test(userAgent) ? "mobile" : "computer";
+}
+
 export async function getUserAuthSettings(database: D1Database): Promise<UserAuthSettings> {
   const rows = await database.prepare("SELECT setting_key,setting_value FROM navixa_user_auth_settings").all<{ setting_key: string; setting_value: string }>();
   const values = new Map(rows.results.map(row => [row.setting_key, row.setting_value]));
@@ -87,19 +96,22 @@ export async function resolveUserSession(request: Request, database: D1Database)
   if (!token || token.length < 30) return null;
   const tokenHash = await hashOpaqueValue(token);
   const rows = await database.prepare(
-    "SELECT s.user_id,u.email,u.status,s.expires_at FROM navixa_user_sessions s JOIN navixa_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at='' LIMIT 1",
+    "SELECT s.user_id,u.email,u.status,s.expires_at FROM navixa_user_sessions s JOIN navixa_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at='' AND s.device_class IN ('computer','mobile') LIMIT 1",
   ).bind(tokenHash).all<{ user_id: string; email: string; status: UserSession["status"]; expires_at: string }>();
   const row = rows.results[0];
   if (!row || Date.parse(row.expires_at) <= Date.now() || row.status === "suspended") return null;
   return { userId: row.user_id, email: row.email, status: row.status, expiresAt: row.expires_at };
 }
 
-export async function createUserSession(database: D1Database, userId: string) {
+export async function createUserSession(database: D1Database, userId: string, request: Request) {
   const token = createOpaqueToken();
   const now = new Date();
+  const nowIso = now.toISOString();
   const expiresAt = new Date(now.getTime() + USER_SESSION_TTL_SECONDS * 1000).toISOString();
-  await database.prepare("INSERT INTO navixa_user_sessions(id,user_id,token_hash,created_at,expires_at,last_seen_at,revoked_at) VALUES (?,?,?,?,?,?, '')").bind(crypto.randomUUID(), userId, await hashOpaqueValue(token), now.toISOString(), expiresAt, now.toISOString()).run();
-  return { token, expiresAt };
+  const deviceClass = resolveUserDeviceClass(request);
+  await database.prepare("UPDATE navixa_user_sessions SET revoked_at=? WHERE user_id=? AND device_class=? AND revoked_at='' ").bind(nowIso, userId, deviceClass).run();
+  await database.prepare("INSERT INTO navixa_user_sessions(id,user_id,token_hash,device_class,created_at,expires_at,last_seen_at,revoked_at) VALUES (?,?,?,?,?,?,?, '')").bind(crypto.randomUUID(), userId, await hashOpaqueValue(token), deviceClass, nowIso, expiresAt, nowIso).run();
+  return { token, expiresAt, deviceClass };
 }
 
 export async function refreshUserSessionIfNeeded(request: Request, database: D1Database, session: UserSession): Promise<{ session: UserSession; cookie: string | null }> {
