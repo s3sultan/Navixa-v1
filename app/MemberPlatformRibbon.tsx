@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FeatureAccessSession } from "./featureAccess";
 
@@ -23,11 +24,11 @@ export default function MemberPlatformRibbon() {
   if (!isEligible) return null;
 
   return <aside className="member-platform-ribbon" aria-label="عالم NAVIXA للمشتركين">
-    <a className="member-platform-ribbon-head" href="/projects">
+    <Link className="member-platform-ribbon-head" href="/projects">
       <span aria-hidden="true">✦</span>
       <b>عالم NAVIXA</b>
       <small>خدمات إضافية مشمولة مع اشتراكك Plus</small>
       <em>استكشف مشاريعك <i aria-hidden="true">←</i></em>
-    </a>
+    </Link>
   </aside>;
 }
