@@ -2,6 +2,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 type RuntimeTelegramEnv = {
+  ADMIN_JWT_SECRET?: string;
   NAVIXA_TELEGRAM_BOT_TOKEN?: string;
   NAVIXA_TELEGRAM_WEBHOOK_SECRET?: string;
   NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
@@ -26,6 +27,11 @@ function fromBase64Url(value: string) {
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
 
+async function deriveTelegramSecret(rootSecret: string, purpose: "webhook" | "encryption") {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`navixa:telegram:${purpose}:${rootSecret}`));
+  return base64Url(new Uint8Array(digest));
+}
+
 export async function telegramRuntimeEnv(): Promise<RuntimeTelegramEnv> {
   let runtime: RuntimeTelegramEnv;
   try {
@@ -33,7 +39,15 @@ export async function telegramRuntimeEnv(): Promise<RuntimeTelegramEnv> {
   } catch {
     runtime = (globalThis as { __NAVIXA_TELEGRAM_ENV__?: RuntimeTelegramEnv }).__NAVIXA_TELEGRAM_ENV__ || {};
   }
-  return { ...runtime, NAVIXA_TELEGRAM_BOT_USERNAME: officialTelegramBotUsername(runtime.NAVIXA_TELEGRAM_BOT_USERNAME) };
+  const rootSecret = runtime.ADMIN_JWT_SECRET?.trim() || "";
+  const webhookSecret = runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET?.trim() || (rootSecret ? await deriveTelegramSecret(rootSecret, "webhook") : "");
+  const encryptionSecret = runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY?.trim() || (rootSecret ? await deriveTelegramSecret(rootSecret, "encryption") : "");
+  return {
+    ...runtime,
+    NAVIXA_TELEGRAM_WEBHOOK_SECRET: webhookSecret || undefined,
+    NAVIXA_TELEGRAM_ENCRYPTION_KEY: encryptionSecret || undefined,
+    NAVIXA_TELEGRAM_BOT_USERNAME: officialTelegramBotUsername(runtime.NAVIXA_TELEGRAM_BOT_USERNAME),
+  };
 }
 
 export async function hashTelegramValue(value: string, secret: string) {
