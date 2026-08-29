@@ -32,7 +32,11 @@ test("emergency mode is admin-only and sends only approved Plus continuity alert
   assert.match(notifications, /status='active'/);
   assert.match(notifications, /subscription_ends_at>\?/);
   assert.match(notifications, /notification_type='emergency'/);
-  assert.match(notifications, /claimIncidentNotification/);
+  assert.match(notifications, /navixa_emergency_deliveries/);
+  assert.match(notifications, /INSERT OR IGNORE INTO navixa_emergency_deliveries/);
+  assert.match(notifications, /status='failed'/);
+  assert.match(notifications, /status='sent'/);
+  assert.match(notifications, /attempts=attempts\+1/);
   assert.match(notifications, /input\.state === "outage"/);
   assert.match(notifications, /input\.state === "recovery"/);
   assert.doesNotMatch(notifications, /status IN \('trial','active'\)|moyasar|payment/i);
