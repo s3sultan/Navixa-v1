@@ -6,11 +6,12 @@ const root = new URL("../", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("emergency mode is admin-only and sends only approved Plus continuity alerts", async () => {
-  const [core, route, notifications, preferences, plan] = await Promise.all([
+  const [core, route, notifications, preferences, account, plan] = await Promise.all([
     read("worker/emergencyMode.ts"),
     read("app/api/admin/emergency-mode/route.ts"),
     read("worker/emergencyNotifications.ts"),
     read("app/api/account/telegram/preferences/route.ts"),
+    read("app/account/AccountAccess.tsx"),
     read("docs/emergency-mode-plan.md"),
   ]);
 
@@ -42,6 +43,13 @@ test("emergency mode is admin-only and sends only approved Plus continuity alert
   assert.doesNotMatch(notifications, /status IN \('trial','active'\)|moyasar|payment/i);
 
   assert.match(preferences, /"renewal","emergency"/);
+  assert.match(preferences, /notification_type IN \('renewal','emergency'\)/);
+  assert.match(preferences, /preferences: state/);
+  assert.match(account, /setEmergencyTelegram/);
+  assert.match(account, /type: "emergency"/);
+  assert.match(account, /فعّل تنبيهات الطوارئ/);
+  assert.match(account, /إيقاف تنبيهات الطوارئ/);
+
   assert.match(plan, /Payment remains disabled/);
   assert.match(plan, /short-lived signed access grants/);
   assert.match(plan, /Do not assume `chatgpt\.site` can remove ChatGPT-account requirements/);

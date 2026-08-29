@@ -9,11 +9,16 @@ function reply(body: Record<string, unknown>, status = 200) { return NextRespons
 
 export async function GET(request: Request) {
   const database = await db();
-  if (!database) return reply({ enabled: false }, 503);
+  if (!database) return reply({ enabled: false, preferences: { renewal: false, emergency: false } }, 503);
   const session = await resolveUserSession(request, database);
-  if (!session) return reply({ enabled: false }, 401);
-  const preference = await database.prepare("SELECT enabled FROM navixa_user_telegram_preferences WHERE user_id=? AND notification_type='renewal' LIMIT 1").bind(session.userId).all<{ enabled: number }>();
-  return reply({ enabled: preference.results[0]?.enabled === 1 });
+  if (!session) return reply({ enabled: false, preferences: { renewal: false, emergency: false } }, 401);
+  const preferences = await database.prepare("SELECT notification_type,enabled FROM navixa_user_telegram_preferences WHERE user_id=? AND notification_type IN ('renewal','emergency')").bind(session.userId).all<{ notification_type: string; enabled: number }>();
+  const state = { renewal: false, emergency: false };
+  for (const preference of preferences.results) {
+    if (preference.notification_type === "renewal") state.renewal = preference.enabled === 1;
+    if (preference.notification_type === "emergency") state.emergency = preference.enabled === 1;
+  }
+  return reply({ enabled: state.renewal, preferences: state });
 }
 
 export async function POST(request: Request) {
