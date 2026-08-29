@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server.js";
 import { ADMIN_SESSION_COOKIE, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../worker/adminAuth.ts";
 import { listEmergencyIncidents, readEmergencyState, setEmergencyState, type EmergencyDatabase } from "../../../../worker/emergencyMode.ts";
+import { deliverEmergencyIncidentNotifications, type EmergencyNotificationEnv } from "../../../../worker/emergencyNotifications.ts";
 
-type RuntimeEnv = { DB?: EmergencyDatabase };
+type RuntimeEnv = EmergencyNotificationEnv & { DB: EmergencyDatabase };
 
-async function runtimeEnv(): Promise<RuntimeEnv> {
-  try { return (await import("cloudflare:workers") as { env?: RuntimeEnv }).env || {}; }
-  catch { return (globalThis as { __NAVIXA_EMERGENCY_ENV__?: RuntimeEnv }).__NAVIXA_EMERGENCY_ENV__ || {}; }
+async function runtimeEnv(): Promise<Partial<RuntimeEnv>> {
+  try { return (await import("cloudflare:workers") as { env?: Partial<RuntimeEnv> }).env || {}; }
+  catch { return (globalThis as { __NAVIXA_EMERGENCY_ENV__?: Partial<RuntimeEnv> }).__NAVIXA_EMERGENCY_ENV__ || {}; }
 }
 
 async function adminAllowed(request: Request, requireSameOrigin = false) {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   if (!env.DB) return noStore({ error: "قاعدة بيانات NAVIXA غير متاحة" }, 503);
   try {
     const [state, incidents] = await Promise.all([readEmergencyState(env.DB), listEmergencyIncidents(env.DB, 20)]);
-    return noStore({ ok: true, state, incidents, dryRunNotifications: true });
+    return noStore({ ok: true, state, incidents, notificationsLive: true });
   } catch {
     return noStore({ error: "تعذر قراءة وضع الطوارئ" }, 500);
   }
@@ -47,7 +48,20 @@ export async function POST(request: Request) {
       reason: typeof body.reason === "string" ? body.reason : "",
       source: "admin-manual",
     });
-    return noStore({ ok: true, state, notificationsSent: false, dryRunNotifications: true });
+
+    let notificationResult = { claimed: false, checked: 0, emailSent: 0, telegramSent: 0 };
+    if ((state.state === "outage" || state.state === "recovery") && state.incident_id) {
+      try {
+        notificationResult = await deliverEmergencyIncidentNotifications(env as EmergencyNotificationEnv, {
+          incidentId: state.incident_id,
+          state: state.state,
+        });
+      } catch {
+        // State changes must remain durable even if an external notification provider is temporarily unavailable.
+      }
+    }
+
+    return noStore({ ok: true, state, notifications: notificationResult });
   } catch (error) {
     if (error instanceof Error && error.message === "invalid_state") return noStore({ error: "حالة طوارئ غير صالحة" }, 400);
     if (error instanceof Error && error.message === "invalid_transition") return noStore({ error: "الانتقال بين حالتي الطوارئ غير مسموح" }, 409);
