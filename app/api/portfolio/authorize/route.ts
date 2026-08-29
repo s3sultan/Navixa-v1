@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   if (!requested) return NextResponse.json({ error: "وجهة NAVIXA غير معروفة" }, { status: 400, headers });
   const env = await bindings();
   if (!env.DB || !env.NAVIXA_PORTFOLIO_PRIVATE_JWK) return NextResponse.json({ error: "منظومة NAVIXA غير جاهزة مؤقتًا" }, { status: 503, headers });
-  const membership = await resolvePortfolioMembership(request, env.DB).catch(() => null);
+  const membership = await resolvePortfolioMembership(request, env.DB, requested).catch(() => null);
   if (!membership) return accountRedirect(request, requested);
   if (!PORTFOLIO_SSO_ENABLED[requested]) return NextResponse.redirect(new URL(PORTFOLIO_APP_HOMES[requested]), { headers });
   const grant = await createPortfolioGrant({ app: requested, membership, privateKeyJwk: env.NAVIXA_PORTFOLIO_PRIVATE_JWK });

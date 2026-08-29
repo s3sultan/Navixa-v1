@@ -1,4 +1,5 @@
 import { resolveUserSession, type D1Database } from "./userAuth.ts";
+import { memberCanAccessProject, type NavixaMemberProject, type NavixaMemberRole } from "./subscriptionMembers.ts";
 
 type Statement = { bind: (...values: unknown[]) => Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }> };
 type PortfolioDatabase = D1Database & { prepare: (sql: string) => Statement };
@@ -15,9 +16,6 @@ export const PORTFOLIO_APP_HOMES = {
   learning: "https://learning.navixasa.com/",
 } as const;
 
-// Every portfolio app now serves its verified completion handler. Keep the
-// central membership check and send a short-lived, audience-scoped grant only
-// to an app that is explicitly marked ready for SSO.
 export const PORTFOLIO_SSO_ENABLED = {
   fitness: true,
   kids: true,
@@ -26,7 +24,18 @@ export const PORTFOLIO_SSO_ENABLED = {
 
 export const PORTFOLIO_PUBLIC_JWK: JsonWebKey = { key_ops: ["verify"], ext: true, kty: "EC", x: "3t4IG1-SSwzOL6me14lxVhh4a2Oab6-xxgLURaqtHNU", y: "Fm3gm4pXJlkhso9ITBTW6B9U1SuVy5V0EKabg9KL9wk", crv: "P-256" };
 export type PortfolioApp = keyof typeof PORTFOLIO_APPS;
-export type PortfolioMembership = { userId: string; plan: string; status: "trial" | "active"; endsAt: string };
+export type PortfolioMembership = {
+  userId: string;
+  plan: string;
+  status: "trial" | "active";
+  endsAt: string;
+  source?: "owner" | "member";
+  memberRole?: NavixaMemberRole;
+  memberProject?: string;
+};
+
+type SubscriptionRow = { plan: string; status: "trial" | "active"; trial_ends_at: string; subscription_ends_at: string };
+type MemberRow = SubscriptionRow & { role: NavixaMemberRole; project: string };
 
 const encoder = new TextEncoder();
 
@@ -71,17 +80,48 @@ export function portfolioApp(value: string | null): PortfolioApp | null {
   return value && Object.prototype.hasOwnProperty.call(PORTFOLIO_APPS, value) ? value as PortfolioApp : null;
 }
 
-export async function resolvePortfolioMembership(request: Request, database: PortfolioDatabase): Promise<PortfolioMembership | null> {
+function validSubscription(row: SubscriptionRow | undefined) {
+  if (!row) return null;
+  const endsAt = row.status === "trial" ? row.trial_ends_at : row.subscription_ends_at;
+  if (!endsAt || !Number.isFinite(Date.parse(endsAt)) || Date.parse(endsAt) <= Date.now()) return null;
+  return endsAt;
+}
+
+export async function resolvePortfolioMembership(request: Request, database: PortfolioDatabase, requestedApp?: PortfolioApp): Promise<PortfolioMembership | null> {
   const session = await resolveUserSession(request, database);
   if (!session) return null;
-  const rows = await database.prepare(
-    "SELECT plan,status,trial_ends_at,subscription_ends_at FROM navixa_subscribers WHERE (user_id=? OR contact=?) AND status IN ('trial','active') ORDER BY updated_at DESC LIMIT 1",
-  ).bind(session.userId, session.email).all<{ plan: string; status: "trial" | "active"; trial_ends_at: string; subscription_ends_at: string }>();
-  const subscription = rows.results[0];
-  if (!subscription) return null;
-  const endsAt = subscription.status === "trial" ? subscription.trial_ends_at : subscription.subscription_ends_at;
-  if (!endsAt || !Number.isFinite(Date.parse(endsAt)) || Date.parse(endsAt) <= Date.now()) return null;
-  return { userId: session.userId, plan: subscription.plan, status: subscription.status, endsAt };
+
+  const directRows = await database.prepare(
+    "SELECT plan,status,trial_ends_at,subscription_ends_at FROM navixa_subscribers WHERE (user_id=? OR lower(contact)=lower(?)) AND status IN ('trial','active') ORDER BY updated_at DESC LIMIT 1",
+  ).bind(session.userId, session.email).all<SubscriptionRow>();
+  const direct = directRows.results[0];
+  const directEndsAt = validSubscription(direct);
+  if (direct && directEndsAt) return { userId: session.userId, plan: direct.plan, status: direct.status, endsAt: directEndsAt, source: "owner" };
+
+  const memberRows = await database.prepare(
+    `SELECT m.role,m.project,s.plan,s.status,s.trial_ends_at,s.subscription_ends_at
+     FROM navixa_subscription_members m
+     JOIN navixa_subscribers s ON s.id=m.owner_subscriber_id
+     WHERE m.status='active'
+       AND (m.member_user_id=? OR lower(m.member_email)=lower(?))
+       AND s.status='active'
+     ORDER BY m.updated_at DESC,s.updated_at DESC LIMIT 1`,
+  ).bind(session.userId, session.email).all<MemberRow>();
+  const member = memberRows.results[0];
+  const memberEndsAt = validSubscription(member);
+  if (!member || !memberEndsAt) return null;
+  if (!requestedApp && member.role !== "full_member") return null;
+  if (requestedApp && !memberCanAccessProject(member.role, member.project, requestedApp as NavixaMemberProject)) return null;
+
+  return {
+    userId: session.userId,
+    plan: member.plan,
+    status: member.status,
+    endsAt: memberEndsAt,
+    source: "member",
+    memberRole: member.role,
+    memberProject: member.project,
+  };
 }
 
 export async function createPortfolioGrant(input: { app: PortfolioApp; membership: PortfolioMembership; privateKeyJwk: string }) {
@@ -93,8 +133,9 @@ export async function createPortfolioGrant(input: { app: PortfolioApp; membershi
   const header = toBase64Url(encoder.encode(JSON.stringify({ alg: "ES256", typ: "JWT" })));
   const payload = toBase64Url(encoder.encode(JSON.stringify({
     iss: "navixasa.com", aud: input.app, sub: input.membership.userId, plan: input.membership.plan,
-    membership: input.membership.status, membershipEndsAt: input.membership.endsAt, iat: Math.floor(now / 1000),
-    exp: Math.floor(expiresAt / 1000), jti: crypto.randomUUID(),
+    membership: input.membership.status, membershipEndsAt: input.membership.endsAt,
+    memberRole: input.membership.memberRole, memberProject: input.membership.memberProject,
+    iat: Math.floor(now / 1000), exp: Math.floor(expiresAt / 1000), jti: crypto.randomUUID(),
   })));
   const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, encoder.encode(`${header}.${payload}`)));
   return `${header}.${payload}.${toBase64Url(signature)}`;
