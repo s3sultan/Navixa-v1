@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS navixa_subscription_members (
   id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL,
+  owner_subscriber_id TEXT NOT NULL,
   member_user_id TEXT NOT NULL DEFAULT '',
   member_email TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('full_member','project_member','kid')),
@@ -15,7 +16,7 @@ CREATE TABLE IF NOT EXISTS navixa_subscription_members (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   removed_at TEXT NOT NULL DEFAULT '',
-  CHECK ((role='project_member' AND project<>'') OR (role='kid' AND project='kids') OR (role='full_member' AND project=''))
+  CHECK ((role='project_member' AND project<>'' AND seat_no=1) OR (role='kid' AND project='kids' AND seat_no BETWEEN 1 AND 2) OR (role='full_member' AND project='' AND seat_no=1))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_navixa_members_active_email
@@ -26,3 +27,5 @@ CREATE INDEX IF NOT EXISTS idx_navixa_members_identity
   ON navixa_subscription_members(member_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_navixa_members_owner
   ON navixa_subscription_members(owner_user_id, status, role);
+CREATE INDEX IF NOT EXISTS idx_navixa_members_subscription
+  ON navixa_subscription_members(owner_subscriber_id, status);
