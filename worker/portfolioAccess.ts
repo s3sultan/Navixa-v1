@@ -16,9 +16,6 @@ export const PORTFOLIO_APP_HOMES = {
   learning: "https://learning.navixasa.com/",
 } as const;
 
-// Every portfolio app now serves its verified completion handler. Keep the
-// central membership check and send a short-lived, audience-scoped grant only
-// to an app that is explicitly marked ready for SSO.
 export const PORTFOLIO_SSO_ENABLED = {
   fitness: true,
   kids: true,
@@ -104,15 +101,16 @@ export async function resolvePortfolioMembership(request: Request, database: Por
   const memberRows = await database.prepare(
     `SELECT m.role,m.project,s.plan,s.status,s.trial_ends_at,s.subscription_ends_at
      FROM navixa_subscription_members m
-     JOIN navixa_subscribers s ON s.user_id=m.owner_user_id
+     JOIN navixa_subscribers s ON s.id=m.owner_subscriber_id
      WHERE m.status='active'
        AND (m.member_user_id=? OR lower(m.member_email)=lower(?))
-       AND s.status IN ('trial','active')
+       AND s.status='active'
      ORDER BY m.updated_at DESC,s.updated_at DESC LIMIT 1`,
   ).bind(session.userId, session.email).all<MemberRow>();
   const member = memberRows.results[0];
   const memberEndsAt = validSubscription(member);
   if (!member || !memberEndsAt) return null;
+  if (!requestedApp && member.role !== "full_member") return null;
   if (requestedApp && !memberCanAccessProject(member.role, member.project, requestedApp as NavixaMemberProject)) return null;
 
   return {
