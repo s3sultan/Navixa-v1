@@ -15,3 +15,5 @@ Still required before live payments:
 - Configure Moyasar live credentials only after acceptance.
 - Complete sandbox purchase, callback/webhook verification, activation, cancellation and refund tests.
 - Confirm official support/complaints contact is visible to customers.
+
+No live payment was enabled by this readiness work.
