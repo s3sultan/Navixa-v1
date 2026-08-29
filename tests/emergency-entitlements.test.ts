@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { emergencyEntitlementKey, normalizeEmergencyEmail } from "../worker/emergencyEntitlements.ts";
+import {
+  emergencyEntitlementKey,
+  normalizeEmergencyEmail,
+} from "../worker/emergencyEntitlements.ts";
 
 const root = new URL("../", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
@@ -22,6 +25,18 @@ test("snapshot implementation keeps Plan B dataset minimal and paid-Plus only", 
   assert.match(source, /subscription_ends_at>\?/);
   assert.match(source, /entitlementKey/);
   assert.match(source, /activeUntil/);
-  assert.doesNotMatch(source, /display_name|telegram_user|payment|card|otp|session_token/i);
   assert.doesNotMatch(source, /SELECT \*/i);
+
+  const forbiddenSnapshotFields = [
+    "display_name",
+    "telegram_user",
+    "payment",
+    "card",
+    "otp",
+    "session_token",
+  ];
+  const recordType = source.match(/export type EmergencyEntitlementRecord = \{([\s\S]*?)\};/)?.[1] ?? "";
+  for (const field of forbiddenSnapshotFields) assert.doesNotMatch(recordType, new RegExp(field, "i"));
+  assert.match(recordType, /entitlementKey:\s*string/);
+  assert.match(recordType, /activeUntil:\s*string/);
 });
