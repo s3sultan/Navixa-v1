@@ -15,9 +15,6 @@ export const PORTFOLIO_APP_HOMES = {
   learning: "https://learning.navixasa.com/",
 } as const;
 
-// Every portfolio app now serves its verified completion handler. Keep the
-// central membership check and send a short-lived, audience-scoped grant only
-// to an app that is explicitly marked ready for SSO.
 export const PORTFOLIO_SSO_ENABLED = {
   fitness: true,
   kids: true,
@@ -26,7 +23,7 @@ export const PORTFOLIO_SSO_ENABLED = {
 
 export const PORTFOLIO_PUBLIC_JWK: JsonWebKey = { key_ops: ["verify"], ext: true, kty: "EC", x: "3t4IG1-SSwzOL6me14lxVhh4a2Oab6-xxgLURaqtHNU", y: "Fm3gm4pXJlkhso9ITBTW6B9U1SuVy5V0EKabg9KL9wk", crv: "P-256" };
 export type PortfolioApp = keyof typeof PORTFOLIO_APPS;
-export type PortfolioMembership = { userId: string; plan: string; status: "trial" | "active"; endsAt: string };
+export type PortfolioMembership = { userId: string; plan: string; status: "active"; endsAt: string };
 
 const encoder = new TextEncoder();
 
@@ -75,13 +72,15 @@ export async function resolvePortfolioMembership(request: Request, database: Por
   const session = await resolveUserSession(request, database);
   if (!session) return null;
   const rows = await database.prepare(
-    "SELECT plan,status,trial_ends_at,subscription_ends_at FROM navixa_subscribers WHERE (user_id=? OR contact=?) AND status IN ('trial','active') ORDER BY updated_at DESC LIMIT 1",
-  ).bind(session.userId, session.email).all<{ plan: string; status: "trial" | "active"; trial_ends_at: string; subscription_ends_at: string }>();
+    "SELECT plan,status,subscription_ends_at FROM navixa_subscribers WHERE (user_id=? OR contact=?) AND status='active' ORDER BY updated_at DESC LIMIT 1",
+  ).bind(session.userId, session.email).all<{ plan: string; status: "active"; subscription_ends_at: string }>();
   const subscription = rows.results[0];
   if (!subscription) return null;
-  const endsAt = subscription.status === "trial" ? subscription.trial_ends_at : subscription.subscription_ends_at;
+  const plan = String(subscription.plan || "").trim().toLowerCase();
+  if (plan !== "plus") return null;
+  const endsAt = subscription.subscription_ends_at;
   if (!endsAt || !Number.isFinite(Date.parse(endsAt)) || Date.parse(endsAt) <= Date.now()) return null;
-  return { userId: session.userId, plan: subscription.plan, status: subscription.status, endsAt };
+  return { userId: session.userId, plan: subscription.plan, status: "active", endsAt };
 }
 
 export async function createPortfolioGrant(input: { app: PortfolioApp; membership: PortfolioMembership; privateKeyJwk: string }) {
@@ -111,7 +110,7 @@ export async function verifyPortfolioGrant(token: string, app: PortfolioApp, pub
     if (!valid) return null;
     const data = JSON.parse(new TextDecoder().decode(fromBase64Url(payload))) as { iss?: unknown; aud?: unknown; sub?: unknown; plan?: unknown; membership?: unknown; membershipEndsAt?: unknown; exp?: unknown };
     if (data.iss !== "navixasa.com" || data.aud !== app || typeof data.sub !== "string" || typeof data.plan !== "string") return null;
-    if (data.membership !== "trial" && data.membership !== "active") return null;
+    if (data.membership !== "active" || String(data.plan).trim().toLowerCase() !== "plus") return null;
     if (typeof data.membershipEndsAt !== "string" || Date.parse(data.membershipEndsAt) <= Date.now()) return null;
     if (typeof data.exp !== "number" || data.exp * 1000 <= Date.now()) return null;
     return { userId: data.sub, plan: data.plan, membership: data.membership, membershipEndsAt: data.membershipEndsAt };

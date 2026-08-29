@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createPortfolioGrant, PORTFOLIO_SSO_ENABLED, verifyPortfolioGrant } from "../worker/portfolioAccess.ts";
 
-const membership = { userId: "user-uuid-123", plan: "monthly", status: "trial" as const, endsAt: new Date(Date.now() + 60_000).toISOString() };
+const activePlusMembership = { userId: "user-uuid-123", plan: "plus", status: "active" as const, endsAt: new Date(Date.now() + 60_000).toISOString() };
 
 async function testKeyPair() {
   const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
@@ -13,13 +13,23 @@ async function testKeyPair() {
   };
 }
 
-test("تفويض المنظومة يقبل تجربة نشطة فقط للوجهة المحددة", async () => {
+test("تفويض المنظومة يقبل Plus نشطًا فقط وللوجهة المحددة", async () => {
   const keys = await testKeyPair();
-  const grant = await createPortfolioGrant({ app: "fitness", membership, privateKeyJwk: keys.privateKeyJwk });
+  const grant = await createPortfolioGrant({ app: "fitness", membership: activePlusMembership, privateKeyJwk: keys.privateKeyJwk });
   const verified = await verifyPortfolioGrant(grant, "fitness", keys.publicJwk);
-  assert.deepEqual(verified, { userId: membership.userId, plan: "monthly", membership: "trial", membershipEndsAt: membership.endsAt });
+  assert.deepEqual(verified, { userId: activePlusMembership.userId, plan: "plus", membership: "active", membershipEndsAt: activePlusMembership.endsAt });
   assert.equal(await verifyPortfolioGrant(grant, "kids", keys.publicJwk), null);
   assert.equal(grant.includes("@"), false);
+});
+
+test("تفويض المنظومة يرفض التجربة والخطط غير Plus", async () => {
+  const keys = await testKeyPair();
+  const trialMembership = { userId: "trial-user", plan: "plus", status: "trial" as const, endsAt: new Date(Date.now() + 60_000).toISOString() };
+  const monthlyMembership = { userId: "monthly-user", plan: "monthly", status: "active" as const, endsAt: new Date(Date.now() + 60_000).toISOString() };
+  const trialGrant = await createPortfolioGrant({ app: "learning", membership: trialMembership as never, privateKeyJwk: keys.privateKeyJwk });
+  const monthlyGrant = await createPortfolioGrant({ app: "learning", membership: monthlyMembership as never, privateKeyJwk: keys.privateKeyJwk });
+  assert.equal(await verifyPortfolioGrant(trialGrant, "learning", keys.publicJwk), null);
+  assert.equal(await verifyPortfolioGrant(monthlyGrant, "learning", keys.publicJwk), null);
 });
 
 test("عقد البوابة يبقي المحتوى الأساسي مجانيًا ولا يوسّع كوكي NAVIXA إلى النطاقات الفرعية", () => {
