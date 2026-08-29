@@ -13,18 +13,19 @@ export async function listMemberSeats(database: MemberDatabase, ownerUserId: str
   return rows.results;
 }
 
-async function ownerHasActivePlus(database: MemberDatabase, ownerUserId: string, ownerEmail: string) {
+async function activeOwnerSubscription(database: MemberDatabase, ownerUserId: string, ownerEmail: string) {
   const rows = await database.prepare(
     "SELECT id FROM navixa_subscribers WHERE (user_id=? OR lower(contact)=lower(?)) AND status='active' AND subscription_ends_at>? ORDER BY updated_at DESC LIMIT 1",
   ).bind(ownerUserId, ownerEmail, new Date().toISOString()).all<{ id: string }>();
-  return Boolean(rows.results[0]);
+  return rows.results[0] || null;
 }
 
 export async function addMemberSeat(database: MemberDatabase, input: AddMemberInput) {
   const email = normalizeUserEmail(input.email);
   if (!isValidUserEmail(email)) throw new Error("invalid_email");
   if (email === normalizeUserEmail(input.ownerEmail)) throw new Error("owner_email");
-  if (!await ownerHasActivePlus(database, input.ownerUserId, input.ownerEmail)) throw new Error("plus_required");
+  const ownerSubscription = await activeOwnerSubscription(database, input.ownerUserId, input.ownerEmail);
+  if (!ownerSubscription) throw new Error("plus_required");
 
   const project = input.role === "full_member" ? "" : input.role === "kid" ? "kids" : input.project || "";
   if (input.role === "project_member" && !project) throw new Error("project_required");
@@ -50,11 +51,12 @@ export async function addMemberSeat(database: MemberDatabase, input: AddMemberIn
 
   const user = await database.prepare("SELECT id FROM navixa_users WHERE lower(email)=lower(?) AND status<>'suspended' LIMIT 1").bind(email).all<{ id: string }>();
   const now = new Date().toISOString();
+  const lockedUntil = memberLockUntil();
   const id = crypto.randomUUID();
   await database.prepare(
-    "INSERT INTO navixa_subscription_members(id,owner_user_id,member_user_id,member_email,role,project,seat_no,status,locked_until,cooldown_until,created_at,updated_at,removed_at) VALUES(?,?,?,?,?,?,?,'active',?,'',?,?,'')",
-  ).bind(id, input.ownerUserId, user.results[0]?.id || "", email, input.role, project, seatNo, memberLockUntil(), now, now).run();
-  return { id, email, role: input.role, project, seatNo, status: "active", lockedUntil: memberLockUntil(), cooldownUntil: "" };
+    "INSERT INTO navixa_subscription_members(id,owner_user_id,owner_subscriber_id,member_user_id,member_email,role,project,seat_no,status,locked_until,cooldown_until,created_at,updated_at,removed_at) VALUES(?,?,?,?,?,?,?,?,'active',?,'',?,?,'')",
+  ).bind(id, input.ownerUserId, ownerSubscription.id, user.results[0]?.id || "", email, input.role, project, seatNo, lockedUntil, now, now).run();
+  return { id, email, role: input.role, project, seatNo, status: "active", lockedUntil, cooldownUntil: "" };
 }
 
 export async function removeMemberSeat(database: MemberDatabase, ownerUserId: string, id: string) {
