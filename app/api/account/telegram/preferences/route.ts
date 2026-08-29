@@ -3,7 +3,7 @@ import { getUserAuthSettings, resolveUserSession, trustedUserMutation, type D1Da
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
-const alertTypes = new Set(["adhan","iqama","water","break","focus","name","wird","sadaqah","task","renewal"]);
+const alertTypes = new Set(["adhan","iqama","water","break","focus","name","wird","sadaqah","task","renewal","emergency"]);
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
 function reply(body: Record<string, unknown>, status = 200) { return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } }); }
 
