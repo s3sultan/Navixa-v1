@@ -1,7 +1,0 @@
-import { NextResponse } from "next/server.js";
-
-type D1Statement={bind:(...values:unknown[])=>D1Statement;run:()=>Promise<unknown>;first:<T=Record<string,unknown>>()=>Promise<T|null>};
-type D1Database={prepare:(sql:string)=>D1Statement};
-async function db():Promise<D1Database|null>{try{return (await import("cloudflare:workers") as {env?:{DB?:D1Database}}).env?.DB||null}catch{return (globalThis as {DB?:D1Database}).DB||null}}
-async function schema(database:D1Database){await database.prepare("CREATE TABLE IF NOT EXISTS navixa_match_display_settings (id INTEGER PRIMARY KEY CHECK(id=1), ribbon_speed_seconds INTEGER NOT NULL DEFAULT 36, ribbon_theme TEXT NOT NULL DEFAULT 'teal', show_logos INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)").run();await database.prepare("INSERT OR IGNORE INTO navixa_match_display_settings (id,ribbon_speed_seconds,ribbon_theme,show_logos,updated_at) VALUES (1,36,'teal',1,?)").bind(new Date().toISOString()).run()}
-export async function GET(){const database=await db();if(!database)return NextResponse.json({speedSeconds:36,theme:"teal",showLogos:true},{headers:{"Cache-Control":"public, max-age=120"}});await schema(database);const row=await database.prepare("SELECT ribbon_speed_seconds,ribbon_theme,show_logos FROM navixa_match_display_settings WHERE id=1").first<Record<string,unknown>>();return NextResponse.json({speedSeconds:Number(row?.ribbon_speed_seconds||36),theme:String(row?.ribbon_theme||"teal"),showLogos:Number(row?.show_logos??1)===1},{headers:{"Cache-Control":"public, max-age=120"}})}
