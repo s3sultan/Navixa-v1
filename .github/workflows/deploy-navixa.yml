@@ -21,6 +21,9 @@ jobs:
     env:
       ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
       NAVIXA_PORTFOLIO_PRIVATE_JWK: ${{ secrets.NAVIXA_PORTFOLIO_PRIVATE_JWK }}
+      NAVIXA_TELEGRAM_BOT_TOKEN: ${{ secrets.NAVIXA_TELEGRAM_BOT_TOKEN }}
+      NAVIXA_TELEGRAM_WEBHOOK_SECRET: ${{ secrets.NAVIXA_TELEGRAM_WEBHOOK_SECRET }}
+      NAVIXA_TELEGRAM_ENCRYPTION_KEY: ${{ secrets.NAVIXA_TELEGRAM_ENCRYPTION_KEY }}
       MOYASAR_TEST_PUBLISHABLE_KEY: ${{ secrets.MOYASAR_TEST_PUBLISHABLE_KEY }}
       MOYASAR_TEST_SECRET_KEY: ${{ secrets.MOYASAR_TEST_SECRET_KEY }}
       MOYASAR_TEST_WEBHOOK_SECRET: ${{ secrets.MOYASAR_TEST_WEBHOOK_SECRET }}
@@ -125,6 +128,38 @@ jobs:
           upload_secret RESEND_API_KEY "$RESEND_API_KEY"
           upload_secret NAVIXA_AUTH_FROM "$NAVIXA_AUTH_FROM"
           upload_secret NAVIXA_AUTH_CODE_PEPPER "$NAVIXA_AUTH_CODE_PEPPER"
+
+      - name: Upload Telegram secrets when configured
+        if: env.ADMIN_JWT_SECRET != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          upload_secret() {
+            name="$1"
+            value="$2"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --no-install wrangler secret put "$name" --config dist/server/wrangler.json --name navixa
+            fi
+          }
+          upload_secret NAVIXA_TELEGRAM_BOT_TOKEN "$NAVIXA_TELEGRAM_BOT_TOKEN"
+          upload_secret NAVIXA_TELEGRAM_WEBHOOK_SECRET "$NAVIXA_TELEGRAM_WEBHOOK_SECRET"
+          upload_secret NAVIXA_TELEGRAM_ENCRYPTION_KEY "$NAVIXA_TELEGRAM_ENCRYPTION_KEY"
+
+      - name: Restore Telegram webhook when bot token is configured
+        if: env.ADMIN_JWT_SECRET != '' && env.NAVIXA_TELEGRAM_BOT_TOKEN != ''
+        shell: bash
+        run: |
+          webhook_secret="$NAVIXA_TELEGRAM_WEBHOOK_SECRET"
+          if [ -z "$webhook_secret" ]; then
+            webhook_secret=$(node -e "const c=require('node:crypto'); process.stdout.write(c.createHash('sha256').update('navixa:telegram:webhook:'+process.env.ADMIN_JWT_SECRET).digest('base64url'))")
+          fi
+          response=$(curl --fail-with-body --silent --show-error \
+            --request POST "https://api.telegram.org/bot${NAVIXA_TELEGRAM_BOT_TOKEN}/setWebhook" \
+            --data-urlencode "url=https://navixa.s2shug.workers.dev/api/telegram/webhook" \
+            --data-urlencode "secret_token=${webhook_secret}" \
+            --data-urlencode 'allowed_updates=["message"]')
+          printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(!j.ok)process.exit(1);console.log('Telegram webhook ready')})"
 
       - name: Upload Moyasar secrets when configured
         if: env.ADMIN_JWT_SECRET != ''
