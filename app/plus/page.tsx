@@ -37,11 +37,11 @@ export default function NavixaPlusPage() {
 
     <section className="plus-confidence" aria-labelledby="confidence-title"><div className="plus-confidence-copy"><small>قبل ما تشترك</small><h2 id="confidence-title">اعرف بالضبط وش يشتغل ووش ما يشتغل.</h2><p>نبي قرار الاشتراك يكون سهل لأن القيمة واضحة، مو لأن الصفحة ضغطت عليك.</p></div><div className="plus-confidence-grid">{trust.map(([title, description]) => <article key={title}><b>{title}</b><p>{description}</p></article>)}</div></section>
 
-    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">Plus جاهز للتجهيز، والدفع ننتظر اعتماده</h2><p>نقدر الآن نسجل اهتمامك فقط. عند فتح بوابة الدفع الرسمية ستظهر الخطة والسعر وكل التفاصيل قبل أي تحصيل.</p></div></div><Link href="/account">إدارة حسابك ←</Link></section>
+    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">Plus جاهز للتجهيز، والدفع ننتظر اعتماده</h2><p>نقدر الآن نسجل اهتمامك فقط. عند فتح بوابة الدفع الرسمية ستظهر الخطة والسعر ومدة الاشتراك وسياسة الإلغاء والاسترداد قبل أي تحصيل.</p></div></div><Link href="/account">إدارة حسابك ←</Link></section>
 
     <InterestForm />
 
     <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>بياناتك ليست ثمن الاشتراك.</h2><p>لن تحفظ NAVIXA بيانات بطاقات أو محافظ. وعند إتاحة الدفع رسميًا سيكون عبر مزود معتمد وتحقيق خادمي آمن.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
-    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><span>NAVIXA Plus · القيمة أولًا، والاشتراك بدون مفاجآت</span></footer>
+    <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><span><Link href="/terms">الشروط</Link> · <Link href="/privacy">الخصوصية</Link> · <Link href="/cancellation-refund">الإلغاء والاسترداد</Link> · <Link href="/support">الدعم</Link></span></footer>
   </main>;
 }
