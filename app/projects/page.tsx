@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FeatureAccessSession } from "../featureAccess";
 import "./projects.css";
@@ -26,7 +27,7 @@ export default function ProjectsPage() {
 
   return <main className="projects-world" dir="rtl">
     <div className="projects-shell">
-      <a className="projects-back" href="/">العودة إلى NAVIXA <span aria-hidden="true">←</span></a>
+      <Link className="projects-back" href="/">العودة إلى NAVIXA <span aria-hidden="true">←</span></Link>
       <header className="projects-hero">
         <div className="projects-orbit" aria-hidden="true"><span>✦</span></div>
         <p>PLUS • YOUR NAVIXA</p>
@@ -39,7 +40,7 @@ export default function ProjectsPage() {
       {loaded && !eligible && <section className="projects-state locked">
         <b>هذه المساحة مخصصة لعضوية Plus النشطة</b>
         <span>سجّل الدخول بحساب NAVIXA المشترك أو ارجع للصفحة الرئيسية.</span>
-        <a href="/account">حساب NAVIXA</a>
+        <Link href="/account">حساب NAVIXA</Link>
       </section>}
 
       {eligible && <section className="projects-grid" aria-label="مشاريع NAVIXA المتاحة">
