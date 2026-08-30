@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server.js";
-import { resolveUserSession, trustedUserMutation, type D1Database } from "../../../../../../worker/userAuth.ts";
-import { decryptTelegramIdentifier, encryptTelegramIdentifier, telegramRuntimeEnv, validTelegramChatId } from "../../../../../../worker/telegramBot.ts";
+import { resolveUserSession, trustedUserMutation, type D1Database } from "../../../../../worker/userAuth.ts";
+import { encryptTelegramIdentifier, telegramRuntimeEnv, validTelegramChatId } from "../../../../../worker/telegramBot.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
@@ -60,6 +60,7 @@ export async function DELETE(request: Request) {
   if (!database) return noStore({ error: "التخزين غير مهيأ" }, 503);
   const session = await resolveUserSession(request, database);
   if (!session) return noStore({ error: "سجّل الدخول أولًا" }, 401);
-  await database.prepare("UPDATE navixa_user_telegram_manual SET revoked_at=?,updated_at=? WHERE user_id=? AND revoked_at='' ").bind(new Date().toISOString(), new Date().toISOString(), session.userId).run().catch(() => {});
+  const now = new Date().toISOString();
+  await database.prepare("UPDATE navixa_user_telegram_manual SET revoked_at=?,updated_at=? WHERE user_id=? AND revoked_at='' ").bind(now, now, session.userId).run().catch(() => {});
   return noStore({ ok: true });
 }
