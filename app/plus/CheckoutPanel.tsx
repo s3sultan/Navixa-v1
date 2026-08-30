@@ -1,58 +1,27 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-
-type Plan = "monthly" | "quarterly";
-
 export default function CheckoutPanel() {
-  const searchParams = useSearchParams();
-  const foundersIntentId = searchParams.get("founders_intent") || "";
-  const plan: Plan = foundersIntentId ? "monthly" : "monthly";
-
   return (
     <section className="plus-checkout" id="checkout" aria-labelledby="checkout-title">
       <header>
         <small>اشتراك NAVIXA Plus</small>
-        <h2 id="checkout-title">التفعيل مؤقتًا من لوحة الإدارة فقط</h2>
+        <h2 id="checkout-title">الفترة الحالية مجانية للجميع</h2>
         <p>
-          لن يظهر للمستخدم زر دفع أو تحويل خارجي حتى تُعتمد بوابة دفع رسمية وتنجح اختبارات الربط.
+          أسعار الاشتراكات وعروض المؤسسين مخفية مؤقتًا خلال الفترة المجانية، ولن يظهر أي سعر أو طلب دفع للمستخدم الآن.
         </p>
       </header>
 
-      <div className="checkout-options" role="radiogroup" aria-label="الباقة">
-        <label className={plan === "monthly" ? "selected" : ""}>
-          <input type="radio" name="plan" value="monthly" checked readOnly />
-          <span>
-            <b>Plus الشهري</b>
-            <small>19 ر.س شهريًا عند فتح الدفع</small>
-          </span>
-        </label>
-        <label aria-disabled="true">
-          <input type="radio" name="plan" value="quarterly" disabled />
-          <span>
-            <b>باقة 3 + 1</b>
-            <small>مؤجلة حتى اعتماد بوابة الدفع</small>
-          </span>
-        </label>
-      </div>
-
-      {foundersIntentId ? (
-        <p className="checkout-notice">
-          تم حفظ إشارة عرض المؤسسين لحسابك، لكن التحصيل العام متوقف مؤقتًا إلى أن تكتمل موافقة بوابة الدفع.
-        </p>
-      ) : null}
-
-      <div className="checkout-methods" aria-label="حالة التفعيل">
-        <span>الدفع العام متوقف مؤقتًا</span>
-        <span>التفعيل عبر لوحة الإدارة فقط</span>
+      <div className="checkout-methods" aria-label="حالة الاشتراك">
+        <span>كل المزايا متاحة للتجربة الآن</span>
+        <span>الأسعار ستظهر عند فتح الاشتراكات رسميًا</span>
       </div>
 
       <p className="checkout-notice" role="status">
-        إذا تم منحك وصولًا تجريبيًا أو اشتراكًا يدويًا، سيظهر في حسابك بعد اعتماده من الإدارة. لا ترسل إيصالًا أو رقم طلب عبر هذه الصفحة.
+        عند انتهاء الفترة المجانية ستظهر الباقات المتاحة ومدتها وسعرها بوضوح قبل التسجيل أو الدفع.
       </p>
 
       <p className="checkout-footnote">
-        لا تحفظ NAVIXA بيانات بطاقات أو محافظ. سيعود الدفع العام بعد اعتماد مزود دفع رسمي وربط التحقق الخادمي الآمن.
+        لا تحفظ NAVIXA بيانات بطاقات أو محافظ. الدفع سيبقى متوقفًا حتى اعتماد مزود دفع رسمي وربط التحقق الخادمي الآمن.
       </p>
     </section>
   );
