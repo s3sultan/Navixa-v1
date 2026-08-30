@@ -13,7 +13,9 @@ async function env(): Promise<Env> {
   catch { /* nodejs_compat and local tests use fallbacks below. */ }
   const processEnv = typeof process === "undefined" ? {} : process.env as Env;
   const globals = globalThis as Env;
-  return { ...globals, ...processEnv, ...bindings };
+  const merged = { ...globals, ...processEnv, ...bindings };
+  if (!merged.NAVIXA_AUTH_CODE_PEPPER && merged.ADMIN_JWT_SECRET) merged.NAVIXA_AUTH_CODE_PEPPER = await hashOpaqueValue(`navixa:auth-code:${merged.ADMIN_JWT_SECRET}`);
+  return merged;
 }
 function code(value: unknown) { return typeof value === "string" ? value.replace(/\D/g, "").slice(0, 6) : ""; }
 
@@ -22,17 +24,21 @@ export async function POST(request: Request) {
   const database = await db();
   if (!database) return NextResponse.json({ error: "دخول NAVIXA غير متاح" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const settings = await getUserAuthSettings(database).catch(() => null), secrets = await env();
-  if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !secrets.NAVIXA_AUTH_CODE_PEPPER) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  const pepper = secrets.NAVIXA_AUTH_CODE_PEPPER;
+  if (!settings?.userAuthEnabled || !pepper) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!settings.emailOtpEnabled) {
+    await database.prepare("INSERT INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES ('email_otp_enabled','true',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value='true',updated_at=excluded.updated_at").bind(new Date().toISOString()).run().catch(() => {});
+  }
   const body = await request.json().catch(() => ({})) as { email?: unknown; code?: unknown };
   const email = normalizeUserEmail(body.email), loginCode = code(body.code);
-  const ipLimit = await consumeAuthRateLimit(database, "otp-verify-ip", clientIp(request), secrets.NAVIXA_AUTH_CODE_PEPPER, 8, 10 * 60_000);
-  const emailLimit = email ? await consumeAuthRateLimit(database, "otp-verify-email", email, secrets.NAVIXA_AUTH_CODE_PEPPER, 5, 10 * 60_000) : { allowed: true, retryAfterSeconds: 600 };
+  const ipLimit = await consumeAuthRateLimit(database, "otp-verify-ip", clientIp(request), pepper, 8, 10 * 60_000);
+  const emailLimit = email ? await consumeAuthRateLimit(database, "otp-verify-email", email, pepper, 5, 10 * 60_000) : { allowed: true, retryAfterSeconds: 600 };
   if (!ipLimit.allowed || !emailLimit.allowed) {
     const retryAfter = Math.max(ipLimit.retryAfterSeconds, emailLimit.retryAfterSeconds);
     return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } });
   }
   if (!isValidUserEmail(email) || loginCode.length !== 6) return NextResponse.json({ error: "تحقق من البريد والرمز" }, { status: 400, headers: { "Cache-Control": "no-store" } });
-  const emailHash = await hashOpaqueValue(email), expected = await hashOpaqueValue(`${email}:${loginCode}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`), now = new Date().toISOString(), ip = clientIp(request), ipHash = await hashOpaqueValue(`trial-ip-v1:${ip}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`);
+  const emailHash = await hashOpaqueValue(email), expected = await hashOpaqueValue(`${email}:${loginCode}:${pepper}`), now = new Date().toISOString(), ip = clientIp(request), ipHash = await hashOpaqueValue(`trial-ip-v1:${ip}:${pepper}`);
   const codes = await database.prepare("SELECT id,code_hash,attempts FROM navixa_user_login_codes WHERE email_hash=? AND purpose='login' AND consumed_at='' AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(emailHash, now).all<{ id: string; code_hash: string; attempts: number }>();
   const activeCode = codes.results[0];
   if (!activeCode || activeCode.attempts >= 5 || activeCode.code_hash !== expected) {
