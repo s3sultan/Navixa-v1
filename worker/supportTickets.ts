@@ -1,9 +1,9 @@
 export type SupportProduct = "main" | "learning" | "fitness" | "kids";
-export type SupportCategory = "account" | "technical" | "learning" | "fitness" | "kids" | "billing" | "privacy" | "suggestion";
+export type SupportCategory = "account" | "technical" | "learning" | "fitness" | "kids" | "billing" | "privacy" | "complaint" | "suggestion";
 export type SupportStatus = "new" | "in_review" | "waiting_user" | "resolved" | "closed";
 
 export const SUPPORT_PRODUCTS: SupportProduct[] = ["main", "learning", "fitness", "kids"];
-export const SUPPORT_CATEGORIES: SupportCategory[] = ["account", "technical", "learning", "fitness", "kids", "billing", "privacy", "suggestion"];
+export const SUPPORT_CATEGORIES: SupportCategory[] = ["account", "technical", "learning", "fitness", "kids", "billing", "privacy", "complaint", "suggestion"];
 export const SUPPORT_STATUSES: SupportStatus[] = ["new", "in_review", "waiting_user", "resolved", "closed"];
 export const SUPPORT_CLOSED_RETENTION_DAYS = 90;
 
