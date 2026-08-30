@@ -27,10 +27,10 @@ export async function POST(request: Request) {
   if (validTelegramChatId(chatId) && !match?.[1] && /^\/(start|help|settings|stop|activate|link)(?:@\w+)?$/i.test(text)) {
     const command = text.replace(/^\//, "").split("@")[0].toLowerCase();
     const answers: Record<string, string> = {
-      start: "أهلًا بك في NAVIXA SA. لربط تنبيهاتك الخاصة، افتح حسابك في NAVIXA ثم اختر ربط Telegram. لا تصل إليك إلا التنبيهات التي توافق عليها.",
-      help: "المساعدة: اكتب /activate لشرح التفعيل. الربط الحقيقي يتم من حسابك في NAVIXA عبر رابط آمن لمرة واحدة، ثم تختار التنبيهات التي توافق عليها.",
-      activate: "طريقة التفعيل: 1) سجّل دخولك إلى NAVIXA بالبريد. 2) افتح الحساب ثم إعدادات Telegram. 3) اضغط ربط Telegram. 4) افتح الرابط الآمن واضغط Start. 5) ارجع واختر التنبيهات التي تريدها. لا تحتاج Token أو Chat ID.",
-      link: "لربط الحساب اكتب /activate أولًا، ثم نفّذ الخطوات من داخل إعدادات Telegram في حساب NAVIXA. /start العادي يشرح البوت فقط ولا يربط الحساب.",
+      start: "أهلًا بك في NAVIXA SA. /start العادي لا يربط الحساب. افتح حسابك في NAVIXA واضغط «ربط Telegram». إذا لم يظهر زر START في Telegram Web، الصق أمر الربط الذي نسخه NAVIXA تلقائيًا ثم أرسله.",
+      help: "المساعدة: الربط الحقيقي يبدأ من حسابك في NAVIXA عبر «ربط Telegram». افتح الرابط واضغط START. إذا لم يظهر START في Telegram Web، الصق أمر الربط المنسوخ تلقائيًا. لا تحتاج Token أو Chat ID.",
+      activate: "طريقة التفعيل: 1) سجّل دخولك إلى NAVIXA بالبريد. 2) افتح الحساب. 3) اضغط ربط Telegram. 4) في Telegram اضغط START. إذا لم يظهر START، الصق أمر الربط الذي نسخه NAVIXA تلقائيًا. 5) ارجع واختر التنبيهات التي تريدها.",
+      link: "الربط يبدأ من زر «ربط Telegram» داخل حساب NAVIXA. /start العادي لا يربط الحساب. إذا لم يظهر START بعد فتح الرابط، الصق أمر الربط الذي نسخه NAVIXA تلقائيًا.",
       settings: "إعدادات التنبيهات تُدار من حسابك في NAVIXA لضمان خصوصيتك. اكتب /activate لخطوات الربط، ثم شغّل أو أوقف كل نوع تنبيه بعد الربط.",
       stop: "لن تصلك تنبيهات جديدة عند إيقافها من إعدادات Telegram داخل حساب NAVIXA. يمكنك الرجوع إليها في أي وقت.",
     };
