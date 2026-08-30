@@ -4,13 +4,15 @@ import { useEffect } from "react";
 
 type TelegramLinkResponse = { link?: string; error?: string };
 
-function validTelegramLink(value: unknown): value is string {
-  if (typeof value !== "string") return false;
+function parseTelegramLink(value: unknown) {
+  if (typeof value !== "string") return null;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "t.me" && /^\/[A-Za-z0-9_]{5,}\/?$/.test(url.pathname) && Boolean(url.searchParams.get("start"));
+    const token = url.searchParams.get("start") || "";
+    if (url.protocol !== "https:" || url.hostname !== "t.me" || !/^\/[A-Za-z0-9_]{5,}\/?$/.test(url.pathname) || !/^[A-Za-z0-9_-]{32,64}$/.test(token)) return null;
+    return { link: url.toString(), token };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -18,8 +20,8 @@ export default function TelegramOneClickLink() {
   useEffect(() => {
     const handleClick = async (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      const button = target?.closest("button.account-secondary");
-      if (!(button instanceof HTMLButtonElement) || button.textContent?.trim() !== "ربط Telegram") return;
+      const button = target?.closest(".account-telegram button.account-secondary");
+      if (!(button instanceof HTMLButtonElement) || !button.textContent?.includes("ربط Telegram")) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -27,7 +29,7 @@ export default function TelegramOneClickLink() {
 
       const previousText = button.textContent || "ربط Telegram";
       button.disabled = true;
-      button.textContent = "جارٍ فتح Telegram…";
+      button.textContent = "جارٍ تجهيز الربط…";
 
       try {
         const response = await fetch("/api/account/telegram/link", {
@@ -37,12 +39,15 @@ export default function TelegramOneClickLink() {
         });
         const data = await response.json().catch(() => ({})) as TelegramLinkResponse;
         if (!response.ok) throw new Error(data.error || "تعذر بدء ربط Telegram");
-        if (!validTelegramLink(data.link)) throw new Error("رابط Telegram غير صالح");
+        const telegram = parseTelegramLink(data.link);
+        if (!telegram) throw new Error("رابط Telegram غير صالح");
 
-        // Top-level navigation is intentionally used instead of window.open.
-        // Safari/iOS may block a popup created after an awaited fetch, while
-        // assigning the current tab remains a reliable one-click handoff to Telegram.
-        window.location.assign(data.link);
+        // Telegram Web/Desktop may sometimes open an already-started chat without
+        // surfacing the deep-link START action. Keep a short-lived fallback command
+        // on the clipboard so the same secure token can still complete the link.
+        try { await navigator.clipboard?.writeText(`/start ${telegram.token}`); } catch {}
+        button.textContent = "افتح Telegram واضغط START";
+        window.location.assign(telegram.link);
       } catch (error) {
         button.disabled = false;
         button.textContent = previousText;

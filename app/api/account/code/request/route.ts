@@ -6,6 +6,7 @@ type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Reco
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
 type Env = Record<string, string | undefined>;
 const generic = { ok: true, message: "إذا كان البريد صالحًا لاستقبال الرسائل، سيصلك رمز NAVIXA خلال دقائق. يدعم NAVIXA Gmail وiCloud وOutlook وYahoo وبريد العمل وغيرها." };
+const DEFAULT_AUTH_FROM = "NAVIXA SA <login@navixasa.com>";
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
 async function env(): Promise<Env> {
@@ -14,7 +15,10 @@ async function env(): Promise<Env> {
   catch { /* nodejs_compat and local tests use fallbacks below. */ }
   const processEnv = typeof process === "undefined" ? {} : process.env as Env;
   const globals = globalThis as Env;
-  return { ...globals, ...processEnv, ...bindings };
+  const merged = { ...globals, ...processEnv, ...bindings };
+  if (!merged.NAVIXA_AUTH_CODE_PEPPER && merged.ADMIN_JWT_SECRET) merged.NAVIXA_AUTH_CODE_PEPPER = await hashOpaqueValue(`navixa:auth-code:${merged.ADMIN_JWT_SECRET}`);
+  if (!merged.NAVIXA_AUTH_FROM && !merged.RESEND_FROM_EMAIL) merged.NAVIXA_AUTH_FROM = DEFAULT_AUTH_FROM;
+  return merged;
 }
 function code() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0"); }
 
@@ -34,11 +38,10 @@ export async function POST(request: Request) {
   const settings = await getUserAuthSettings(database).catch(() => null);
   const secrets = await env();
   const authFrom = secrets.NAVIXA_AUTH_FROM || secrets.RESEND_FROM_EMAIL;
-  const providerReady = Boolean(secrets.RESEND_API_KEY && authFrom && secrets.NAVIXA_AUTH_CODE_PEPPER);
+  const pepper = secrets.NAVIXA_AUTH_CODE_PEPPER;
+  const providerReady = Boolean(secrets.RESEND_API_KEY && authFrom && pepper);
   if (!settings?.userAuthEnabled || !providerReady) return NextResponse.json({ error: "إرسال رمز البريد غير متاح مؤقتًا. جرّب Google أو أعد المحاولة لاحقًا.", code: "EMAIL_OTP_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
 
-  // email_otp_enabled historically followed user_auth_enabled and has no independent public toggle.
-  // Heal older/stale rows automatically once the provider prerequisites are present.
   if (!settings.emailOtpEnabled) {
     const now = new Date().toISOString();
     await database.prepare("INSERT INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES ('email_otp_enabled','true',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value='true',updated_at=excluded.updated_at").bind(now).run().catch(() => {});
@@ -46,15 +49,15 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({})) as { email?: unknown };
   const email = normalizeUserEmail(body.email);
-  const ipLimit = await consumeAuthRateLimit(database, "otp-request-ip", clientIp(request), secrets.NAVIXA_AUTH_CODE_PEPPER!, 5, 10 * 60_000);
-  const emailLimit = email ? await consumeAuthRateLimit(database, "otp-request-email", email, secrets.NAVIXA_AUTH_CODE_PEPPER!, 3, 10 * 60_000) : { allowed: true, retryAfterSeconds: 600 };
+  const ipLimit = await consumeAuthRateLimit(database, "otp-request-ip", clientIp(request), pepper!, 5, 10 * 60_000);
+  const emailLimit = email ? await consumeAuthRateLimit(database, "otp-request-email", email, pepper!, 3, 10 * 60_000) : { allowed: true, retryAfterSeconds: 600 };
   if (!ipLimit.allowed || !emailLimit.allowed) {
     const retryAfter = Math.max(ipLimit.retryAfterSeconds, emailLimit.retryAfterSeconds);
     return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } });
   }
   if (!isValidUserEmail(email)) return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
   const now = new Date(), emailHash = await hashOpaqueValue(email), loginCode = code();
-  const codeHash = await hashOpaqueValue(`${email}:${loginCode}:${secrets.NAVIXA_AUTH_CODE_PEPPER}`);
+  const codeHash = await hashOpaqueValue(`${email}:${loginCode}:${pepper}`);
   await database.prepare("UPDATE navixa_user_login_codes SET consumed_at=? WHERE email_hash=? AND purpose='login' AND consumed_at='' ").bind(now.toISOString(), emailHash).run();
   await database.prepare("INSERT INTO navixa_user_login_codes(id,email_hash,code_hash,purpose,created_at,expires_at,consumed_at,attempts) VALUES (?,?,?,?,?,?, '',0)").bind(crypto.randomUUID(), emailHash, codeHash, "login", now.toISOString(), new Date(now.getTime() + 10 * 60_000).toISOString()).run();
   const delivered = await sendCode(secrets.RESEND_API_KEY!, authFrom!, email, loginCode).catch(() => false);

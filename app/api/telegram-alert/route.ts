@@ -24,20 +24,35 @@ export async function POST(request: Request) {
     const database = await db();
     if (!database) return noStore({ error: "Telegram غير مهيأ الآن" }, 503);
     const [settings, session, runtime] = await Promise.all([getUserAuthSettings(database).catch(() => null), resolveUserSession(request, database), telegramRuntimeEnv()]);
-    if (!settings?.userAuthEnabled || !settings.telegramBotEnabled) return noStore({ error: "بوت NAVIXA غير مفعّل" }, 404);
+    if (!settings?.userAuthEnabled) return noStore({ error: "حسابات NAVIXA غير مفعلة" }, 404);
     if (!session) return noStore({ error: "سجّل الدخول أولًا لربط Telegram" }, 401);
-    if (!runtime.NAVIXA_TELEGRAM_BOT_TOKEN || !runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY) return noStore({ error: "بوت NAVIXA غير مهيأ بعد" }, 503);
-    const link = await database.prepare("SELECT chat_id_ciphertext FROM navixa_user_telegram_links WHERE user_id=? AND revoked_at='' LIMIT 1").bind(session.userId).all<{ chat_id_ciphertext: string }>();
-    const linked = link.results[0];
-    if (!linked) return noStore({ error: "اربط Telegram بحسابك أولًا" }, 409);
+    if (!runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY) return noStore({ error: "تشفير Telegram غير مهيأ بعد" }, 503);
+
     if (notificationType) {
       const preference = await database.prepare("SELECT enabled FROM navixa_user_telegram_preferences WHERE user_id=? AND notification_type=? LIMIT 1").bind(session.userId, notificationType).all<{ enabled: number }>();
       if (preference.results[0]?.enabled === 0) return noStore({ ok: true, skipped: true });
     }
+
+    const manualRows = await database.prepare("SELECT bot_token_ciphertext,chat_id_ciphertext FROM navixa_user_telegram_manual WHERE user_id=? AND revoked_at='' LIMIT 1").bind(session.userId).all<{ bot_token_ciphertext: string; chat_id_ciphertext: string }>().catch(() => ({ results: [] }));
+    const manual = manualRows.results[0];
+    if (manual) {
+      const [token, chatId] = await Promise.all([
+        decryptTelegramIdentifier(manual.bot_token_ciphertext, runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY),
+        decryptTelegramIdentifier(manual.chat_id_ciphertext, runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY),
+      ]);
+      const sent = await sendOfficialTelegramMessage({ chatId, token, text });
+      if (!sent) return noStore({ error: "تعذر إرسال التنبيه عبر البوت الشخصي" }, 502);
+      return noStore({ ok: true, channel: "manual" });
+    }
+
+    if (!settings.telegramBotEnabled || !runtime.NAVIXA_TELEGRAM_BOT_TOKEN) return noStore({ error: "اربط البوت الشخصي أو فعّل بوت NAVIXA الرسمي" }, 409);
+    const link = await database.prepare("SELECT chat_id_ciphertext FROM navixa_user_telegram_links WHERE user_id=? AND revoked_at='' LIMIT 1").bind(session.userId).all<{ chat_id_ciphertext: string }>();
+    const linked = link.results[0];
+    if (!linked) return noStore({ error: "اربط Telegram بحسابك أولًا" }, 409);
     const chatId = await decryptTelegramIdentifier(linked.chat_id_ciphertext, runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY);
     const sent = await sendOfficialTelegramMessage({ chatId, token: runtime.NAVIXA_TELEGRAM_BOT_TOKEN, text });
     if (!sent) return noStore({ error: "تعذر إرسال التنبيه" }, 502);
-    return noStore({ ok: true });
+    return noStore({ ok: true, channel: "official" });
   } catch {
     return noStore({ error: "تعذر معالجة التنبيه" }, 500);
   }
