@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "NAVIXA | الخدمات والاشتراك",
-  description: "صفحة عامة لمراجعة خدمات NAVIXA وحالة التجربة المجانية والباقات والسياسات قبل تفعيل الدفع.",
+  description: "صفحة عامة لمراجعة خدمات NAVIXA وحالة التجربة المجانية والباقات والأسعار والسياسات قبل تفعيل الدفع.",
 };
 
 const services = [
@@ -12,6 +12,11 @@ const services = [
   ["الصحة والعبادة", "أدوات مساندة للعادات الصحية والعبادات ضمن تجربة موحدة."],
   ["NAVIXA Sprint", "باقة قصيرة لمدة خمسة أيام للدورات والمحاضرات والاجتماعات المكثفة، وتشمل الأدوات المرتبطة بهذه الاستخدامات."],
   ["NAVIXA Plus", "باقة أوسع تشمل مزايا متقدمة مثل الاستماع الاختياري للاسم ومتابعة الشاشة والاستمرارية بين الكمبيوتر والجوال."],
+];
+
+const plans = [
+  { name: "NAVIXA Sprint", duration: "5 أيام متتالية", price: "9 ر.س", note: "للدورات والاجتماعات والاستخدام المكثف القصير." },
+  { name: "NAVIXA Plus", duration: "شهر واحد", price: "19 ر.س", note: "للاستخدام المستمر والمزايا المتقدمة." },
 ];
 
 export default function PublicReviewPage() {
@@ -30,16 +35,17 @@ export default function PublicReviewPage() {
     <section aria-labelledby="services"><h2 id="services">الخدمات</h2><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>{services.map(([title,text])=><article key={title} style={{border:"1px solid #d9e3e1",borderRadius:18,padding:18}}><h3>{title}</h3><p>{text}</p></article>)}</div></section>
 
     <section style={{marginTop:34,padding:22,border:"1px solid #d9e3e1",borderRadius:18}} aria-labelledby="trial">
-      <h2 id="trial">الحالة الحالية والسعر</h2>
-      <p><strong>السعر الحالي: 0 ر.س.</strong> جميع المزايا المتاحة في التجربة العامة مفتوحة مجانًا حتى نهاية يوم السبت 12 سبتمبر 2026 بتوقيت السعودية.</p>
-      <p>لا يتم تحصيل أي مبلغ ولا طلب بيانات بطاقة خلال هذه الفترة. يبدأ نموذج الاشتراكات بعد انتهاء التجربة المجانية، ولن تُعرض أي عملية شراء قبل اعتماد مزود الدفع رسميًا.</p>
+      <h2 id="trial">الحالة الحالية</h2>
+      <p><strong>السعر الحالي للمستخدم: 0 ر.س.</strong> جميع المزايا المتاحة في التجربة العامة مفتوحة مجانًا حتى نهاية يوم السبت 12 سبتمبر 2026 بتوقيت السعودية.</p>
+      <p>لا يتم تحصيل أي مبلغ ولا طلب بيانات بطاقة خلال هذه الفترة. يبدأ نموذج الاشتراكات بعد انتهاء التجربة المجانية، ولن تُفعّل عملية شراء قبل اعتماد مزود الدفع رسميًا.</p>
     </section>
 
-    <section style={{marginTop:34,padding:22,border:"1px solid #d9e3e1",borderRadius:18}} aria-labelledby="subscription">
-      <h2 id="subscription">الباقات بعد الفترة المجانية</h2>
-      <p><strong>Sprint:</strong> مدة خمسة أيام للدورات والاجتماعات والاستخدام المكثف القصير. <strong>Plus:</strong> الباقة الأوسع للاستخدام المستمر والمزايا المتقدمة.</p>
-      <p>الأسعار المستقبلية ليست معروضة للبيع حاليًا. عند فتح الاشتراكات رسميًا سيظهر <strong>السعر النهائي والمدة والمزايا المشمولة</strong> بوضوح قبل التسجيل للدفع أو إتمام أي عملية، مع إتاحة الشروط وسياسة الإلغاء والاسترداد.</p>
-      <div style={{display:"flex",gap:14,flexWrap:"wrap"}}><Link href="/sprint">استعراض NAVIXA Sprint ←</Link><Link href="/plus">استعراض NAVIXA Plus ←</Link></div>
+    <section style={{marginTop:34}} aria-labelledby="pricing">
+      <h2 id="pricing">الأسعار القياسية بعد الفترة المجانية</h2>
+      <p>هذه هي الباقات القياسية المخصصة للبيع بعد انتهاء الفترة المجانية. لا توجد عروض ترويجية أو أسعار مؤسسين معروضة في هذه الصفحة.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14}}>{plans.map(plan=><article key={plan.name} style={{border:"1px solid #d9e3e1",borderRadius:18,padding:20}}><h3>{plan.name}</h3><p><strong>{plan.price}</strong></p><p>المدة: <strong>{plan.duration}</strong></p><p>{plan.note}</p></article>)}</div>
+      <p style={{marginTop:16}}>طريقة التسعير: سعر ثابت لكل مدة موضحة أعلاه، ويظهر السعر والمدة والمزايا المشمولة للمستخدم قبل الدفع. أي مدد أو باقات إضافية لا تُعرض للبيع إلا بعد تفعيلها رسميًا وإظهار سعرها بوضوح.</p>
+      <div style={{display:"flex",gap:14,flexWrap:"wrap"}}><Link href="/sprint">تفاصيل NAVIXA Sprint ←</Link><Link href="/plus">تفاصيل NAVIXA Plus ←</Link></div>
     </section>
 
     <section style={{marginTop:34}} aria-labelledby="policies"><h2 id="policies">السياسات والتواصل</h2><p>جميع المستندات التالية متاحة للعامة دون إنشاء حساب: <Link href="/terms">الشروط والأحكام</Link>، <Link href="/privacy">سياسة الخصوصية</Link>، <Link href="/refunds">سياسة الإلغاء والاسترداد</Link>، <Link href="/delivery">سياسة التسليم والتنفيذ</Link>، <Link href="/complaints">سياسة الشكاوى والمقترحات</Link>، و<Link href="/support">الدعم والتواصل</Link>.</p></section>
