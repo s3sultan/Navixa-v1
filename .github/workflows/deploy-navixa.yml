@@ -86,6 +86,40 @@ jobs:
           fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
           NODE
 
+      - name: Recover missing OTP secrets from last healthy Worker version
+        if: env.ADMIN_JWT_SECRET != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$RESEND_API_KEY" ]; then
+            echo "GitHub already supplies RESEND_API_KEY; historical recovery not needed."
+            exit 0
+          fi
+          current=$(npx --no-install wrangler secret list --config dist/server/wrangler.json --name navixa)
+          if printf '%s' "$current" | grep -q 'RESEND_API_KEY'; then
+            echo "Production Worker already has RESEND_API_KEY; historical recovery not needed."
+            exit 0
+          fi
+          recovery_version="7a4aedd6-738b-4f57-b056-891533cc1246"
+          payload=$(node -e 'process.stdout.write(JSON.stringify({strategy:"percentage",versions:[{percentage:100,version_id:process.argv[1]}],annotations:{"workers/message":"Temporary NAVIXA auth-secret recovery before immediate current-code redeploy","workers/triggered_by":"auth-recovery"}}))' "$recovery_version")
+          response=$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/navixa/deployments?force=true" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$payload")
+          printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);if(!j.success)process.exit(1);console.log("Historical auth bindings activated for recovery")})'
+          sleep 2
+          recovered=$(npx --no-install wrangler secret list --config dist/server/wrangler.json --name navixa)
+          printf '%s' "$recovered" | grep -q 'RESEND_API_KEY' || { echo "Historical version did not restore RESEND_API_KEY"; exit 1; }
+          printf '%s' "$recovered" | grep -q 'NAVIXA_AUTH_FROM' || { echo "Historical version did not restore NAVIXA_AUTH_FROM"; exit 1; }
+          printf '%s' "$recovered" | grep -q 'NAVIXA_AUTH_CODE_PEPPER' || { echo "Historical version did not restore NAVIXA_AUTH_CODE_PEPPER"; exit 1; }
+          echo "Historical OTP secrets restored; current code will be redeployed immediately."
+
       - name: Verify production OTP secret before deploy
         if: env.ADMIN_JWT_SECRET != ''
         env:
