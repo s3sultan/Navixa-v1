@@ -100,38 +100,29 @@ async function main() {
       const inspect = () => {
         const welcome = document.querySelector(".welcome-enter");
         if (welcome) { welcome.click(); return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100); }
-        const gate = document.querySelector(".feature-access-gate");
-        const action = gate?.querySelector('a[href="/account"], a[href="/plus"]');
-        if (!gate || !action) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
-        const rect = action.getBoundingClientRect();
-        const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-        resolve({ found: true, visible: getComputedStyle(gate).display !== "none", clickable: point === action || action.contains(point), assistantHidden: !document.querySelector(".assistant-bubble") });
+        const hub = document.querySelector(".mobile-home-hub");
+        if (!hub) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        resolve({ found: true, visible: getComputedStyle(hub).display !== "none", gateHidden: !document.querySelector(".feature-access-gate") });
       };
       inspect();
     })`);
-    assert.equal(accessGate.found, true, "يجب أن يرى الزائر بوابة الدخول والتفعيل");
-    assert.equal(accessGate.visible, true, "يجب أن تكون بوابة الدخول واضحة على الجوال");
-    assert.equal(accessGate.clickable, true, "يجب أن يكون رابط الحساب قابلاً للمس");
-    assert.equal(accessGate.assistantHidden, true, "يجب ألا تظهر أدوات المساعد قبل الدخول والتفعيل");
+    assert.equal(accessGate.found, true, "يجب أن يدخل الزائر إلى NAVIXA خلال الفترة المجانية");
+    assert.equal(accessGate.visible, true, "يجب أن تظهر الواجهة الرئيسية على الجوال");
+    assert.equal(accessGate.gateHidden, true, "يجب ألا تظهر بوابة الحساب خلال الفترة المجانية");
 
     await navigate(cdp, `${BASE_URL}/today`);
     const todayGate = await evaluate(cdp, `new Promise(resolve => {
       const deadline = performance.now() + 2_500;
       const inspect = () => {
-        const gate = document.querySelector(".feature-access-gate");
-        const action = gate?.querySelector('a[href="/account"], a[href="/plus"]');
-        if (!gate || !action) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
-        const rect = action.getBoundingClientRect();
-        const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-        resolve({ found: true, visible: getComputedStyle(gate).display !== "none", clickable: point === action || action.contains(point), todayHidden: !document.querySelector(".today-hero"), quickAddHidden: !document.querySelector(".quick-add-sheet") });
+        const hero = document.querySelector(".today-hero");
+        if (!hero) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        resolve({ found: true, visible: getComputedStyle(hero).display !== "none", gateHidden: !document.querySelector(".feature-access-gate") });
       };
       inspect();
     })`);
-    assert.equal(todayGate.found, true, "يجب أن تحمي صفحة يومي ببوابة الحساب");
-    assert.equal(todayGate.visible, true, "يجب أن تكون بوابة يومي واضحة على الجوال");
-    assert.equal(todayGate.clickable, true, "يجب أن يكون رابط الدخول من صفحة يومي قابلاً للمس");
-    assert.equal(todayGate.todayHidden, true, "يجب ألا تظهر بيانات يومي قبل الدخول والتفعيل");
-    assert.equal(todayGate.quickAddHidden, true, "يجب ألا يظهر درج الإضافة قبل الدخول والتفعيل");
+    assert.equal(todayGate.found, true, "يجب أن تفتح صفحة يومي خلال الفترة المجانية");
+    assert.equal(todayGate.visible, true, "يجب أن تظهر صفحة يومي على الجوال");
+    assert.equal(todayGate.gateHidden, true, "يجب ألا تظهر بوابة الحساب في يومي خلال الفترة المجانية");
 
     await navigate(cdp, `${BASE_URL}/admin/login`);
     const loginLayout = await evaluate(cdp, `(() => {
@@ -155,18 +146,15 @@ async function main() {
     const meetingGate = await evaluate(cdp, `new Promise(resolve => {
       const deadline = performance.now() + 2_500;
       const inspect = () => {
-        const gate = document.querySelector(".feature-access-gate");
-        const action = gate?.querySelector('a[href="/account"], a[href="/plus"]');
-        if (!gate || !action) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
-        const resources = performance.getEntriesByType("resource").map(entry => entry.name);
-        resolve({ found: true, studioHidden: !document.querySelector(".meeting-page"), transcriptionLoaded: resources.some(name => /transcription\.worker|transformers|onnx/i.test(name)), docxLoaded: resources.some(name => /docx/i.test(name)) });
+        const studio = document.querySelector(".meeting-page");
+        if (!studio) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        resolve({ found: true, visible: getComputedStyle(studio).display !== "none", gateHidden: !document.querySelector(".feature-access-gate") });
       };
       inspect();
     })`);
-    assert.equal(meetingGate.found, true, "يجب أن تحمي صفحة الاجتماعات ببوابة الحساب");
-    assert.equal(meetingGate.studioHidden, true, "يجب ألا تظهر أدوات التسجيل قبل الدخول والتفعيل");
-    assert.equal(meetingGate.transcriptionLoaded, false, "يجب ألا يحمل محرك التفريغ للزائر غير المفعّل");
-    assert.equal(meetingGate.docxLoaded, false, "يجب ألا تحمل مكتبة Word للزائر غير المفعّل");
+    assert.equal(meetingGate.found, true, "يجب أن تفتح صفحة الاجتماعات خلال الفترة المجانية");
+    assert.equal(meetingGate.visible, true, "يجب أن تظهر أدوات الاجتماعات للزائر خلال الفترة المجانية");
+    assert.equal(meetingGate.gateHidden, true, "يجب ألا تظهر بوابة الحساب في الاجتماعات خلال الفترة المجانية");
 
     console.log(JSON.stringify({
       status: "passed",
