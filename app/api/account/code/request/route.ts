@@ -23,7 +23,7 @@ async function env(): Promise<Env> {
 function code() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0"); }
 
 async function sendCode(apiKey: string, from: string, to: string, loginCode: string) {
-  const request = () => fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from, to: [to], subject: "رمز دخول NAVIXA", text: `رمز دخولك إلى NAVIXA هو: ${loginCode}\n\nصالح لمدة 10 دقائق ويُستخدم مرة واحدة فقط. لا تشاركه مع أي شخص.` }) });
+  const request = () => fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from, to: [to], subject: `رمز تسجيل الدخول إلى NAVIXA: ${loginCode}`, text: `رمز التحقق لتسجيل الدخول إلى NAVIXA هو: ${loginCode}\n\nأدخل هذا الرمز في NAVIXA. صالح لمدة 10 دقائق ويُستخدم مرة واحدة فقط. لا تشاركه مع أي شخص.` }) });
   const first = await request();
   if (first.ok) return true;
   if (first.status !== 429 && first.status < 500) return false;
