@@ -15,11 +15,10 @@ test("شاشة الدخول تعرض زر Google واحدًا وتمنع تجا�
   assert.match(styles, /max-width:calc\(100vw - 30px\)/);
 });
 
-test("تهيئة Google Identity تتم مرة واحدة مع تحديث معالج الدخول", async () => {
+test("تهيئة Google Identity تربط callback حيًا بكل تركيب للصفحة", async () => {
   const account = await readFile(new URL("../app/account/AccountAccess.tsx", import.meta.url), "utf8");
-  assert.match(account, /let googleIdentityInitialized = false/);
-  assert.match(account, /googleCredentialHandler = finishGoogleLogin/);
-  assert.match(account, /if \(!googleIdentityInitialized\)/);
-  assert.match(account, /googleIdentityInitialized = true/);
+  assert.doesNotMatch(account, /googleIdentityInitialized/);
+  assert.doesNotMatch(account, /googleCredentialHandler/);
+  assert.match(account, /callback: \(\{ credential \}\) => \{ if \(active\) void finishGoogleLogin\(credential\); \}/);
   assert.equal((account.match(/google\.accounts\.id\.initialize\(/g) || []).length, 1);
 });
