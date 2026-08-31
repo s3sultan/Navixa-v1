@@ -37,7 +37,7 @@ export default function NavixaPlusPage() {
 
     <section className="plus-confidence" aria-labelledby="confidence-title"><div className="plus-confidence-copy"><small>قبل ما تشترك</small><h2 id="confidence-title">اعرف بالضبط وش يشتغل ووش ما يشتغل.</h2><p>نبي قرار الاشتراك يكون سهل لأن القيمة واضحة، مو لأن الصفحة ضغطت عليك.</p></div><div className="plus-confidence-grid">{trust.map(([title, description]) => <article key={title}><b>{title}</b><p>{description}</p></article>)}</div></section>
 
-    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">Plus مفتوح للتجربة المجانية الآن</h2><p>السعر الحالي 0 ر.س حتى نهاية 12 سبتمبر 2026. لا يوجد تحصيل أو طلب بطاقة الآن. عند فتح بوابة الدفع الرسمية ستظهر الخطة والسعر ومدة الاشتراك وسياسة الإلغاء والاسترداد قبل أي تحصيل.</p></div></div><Link href="/account">إدارة حسابك ←</Link></section>
+    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">Plus مفتوح للتجربة المجانية الآن</h2><p>السعر الحالي 0 ر.س حتى نهاية 12 سبتمبر 2026. السعر القياسي بعد الفترة المجانية: <strong>19 ر.س لمدة شهر واحد</strong>. لا يوجد تحصيل أو طلب بطاقة الآن، ولن يُفعّل الدفع قبل اعتماد مزود الدفع الرسمي.</p></div></div><Link href="/account">إدارة حسابك ←</Link></section>
 
     <InterestForm />
 
