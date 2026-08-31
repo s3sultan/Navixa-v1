@@ -22,13 +22,13 @@ export default function AdminAlertSettings(){
   };
 
   if(!policy)return null;
-  return <section className="panel alert-settings-panel">
-    <div className="panel-head"><div><small>التنبيهات والتلقرام</small><h2>سياسة التنبيهات لكل ميزة</h2></div><button onClick={save}>{saved?"تم الحفظ":"حفظ الكل"}</button></div>
+  return <section className="panel alert-settings-panel admin-alert-settings">
+    <div className="panel-head alert-settings-head"><div><small>التنبيهات والتلقرام</small><h2>سياسة التنبيهات لكل ميزة</h2></div><button onClick={save}>{saved?"تم الحفظ":"حفظ الكل"}</button></div>
     <div className="alert-settings-table">{ALERT_TYPES.map(type=><div key={type} className="alert-settings-row">
-      <b>{ALERT_LABELS[type]}</b>
-      <div><small>شاشة</small><div className="policy-group">{policyLabels.map(([value,label])=><label key={value}><input type="radio" name={`${type}-screen`} checked={policy[type].screen===value} onChange={()=>updatePolicy(type,"screen",value)}/>{label}</label>)}</div></div>
-      <div><small>تلقرام</small><div className="policy-group">{policyLabels.map(([value,label])=><label key={value}><input type="radio" name={`${type}-telegram`} checked={policy[type].telegram===value} onChange={()=>updatePolicy(type,"telegram",value)}/>{label}</label>)}</div></div>
-      <input className="alert-message-input" placeholder="نص الرسالة (اختياري)" value={messages[type]||""} onChange={e=>setMessages({...messages,[type]:e.target.value})}/>
+      <div className="alert-feature-title"><b>{ALERT_LABELS[type]}</b><small>حدد طريقة الإرسال المناسبة لهذه الميزة</small></div>
+      <div className="alert-channel-card"><small>شاشة NAVIXA</small><div className="policy-group">{policyLabels.map(([value,label])=><label key={value}><input type="radio" name={`${type}-screen`} checked={policy[type].screen===value} onChange={()=>updatePolicy(type,"screen",value)}/><span>{label}</span></label>)}</div></div>
+      <div className="alert-channel-card"><small>تلقرام</small><div className="policy-group">{policyLabels.map(([value,label])=><label key={value}><input type="radio" name={`${type}-telegram`} checked={policy[type].telegram===value} onChange={()=>updatePolicy(type,"telegram",value)}/><span>{label}</span></label>)}</div></div>
+      <label className="admin-field alert-message-field"><small>نص مخصص اختياري</small><input className="alert-message-input" placeholder="اتركه فارغًا لاستخدام النص الافتراضي" value={messages[type]||""} onChange={e=>setMessages({...messages,[type]:e.target.value})}/></label>
     </div>)}</div>
   </section>
 }
