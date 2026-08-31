@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("صفحة Plus تعرض حالة التجربة المجانية بدون أسعار اشتراك مدفوعة أو تحويل عام للدفع", async () => {
+test("صفحة Plus تعرض السعر القياسي بوضوح بدون عروض أو تحويل عام للدفع", async () => {
   const [page, form, styles] = await Promise.all([
     readFile(new URL("../app/plus/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/plus/InterestForm.tsx", import.meta.url), "utf8"),
@@ -10,10 +10,11 @@ test("صفحة Plus تعرض حالة التجربة المجانية بدون �
   ]);
   assert.match(page, /Plus مفتوح للتجربة المجانية الآن/);
   assert.match(page, /السعر الحالي 0 ر\.س/);
+  assert.match(page, /19 ر\.س لمدة شهر واحد/);
   assert.match(page, /لا يوجد تحصيل أو طلب بطاقة الآن/);
   assert.match(page, /<InterestForm \/>/);
   assert.doesNotMatch(page, /CheckoutPanel/);
-  assert.doesNotMatch(page, /19 ر\.س|57 ر\.س|19 سبتمبر 2026|3 \+ 1|salla\.sa/);
+  assert.doesNotMatch(page, /57 ر\.س|19 سبتمبر 2026|3 \+ 1|سعر مؤسس|عرض مؤسسي|salla\.sa/);
   assert.doesNotMatch(form, /name,setName|الاسم \(اختياري\)/);
   assert.match(form, /JSON\.stringify\(\{ email \}\)/);
   assert.match(styles, /\.plus-status/);
