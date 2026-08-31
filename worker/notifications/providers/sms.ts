@@ -1,4 +1,5 @@
 import type { NotificationMessage, NotificationResult, NotificationTarget } from "../types";
+import { normalizeSaudiPhone } from "../phone";
 
 export type SmsProviderEnv = {
   NAVIXA_SMS_ENDPOINT?: string;
@@ -7,12 +8,11 @@ export type SmsProviderEnv = {
 };
 
 export async function sendSmsNotification(env: SmsProviderEnv, target: NotificationTarget, message: NotificationMessage): Promise<NotificationResult> {
-  const phone = target.phone?.trim() || "";
+  const phone = normalizeSaudiPhone(target.phone);
   const endpoint = env.NAVIXA_SMS_ENDPOINT?.trim() || "";
   const apiKey = env.NAVIXA_SMS_API_KEY?.trim() || "";
-  if (!phone || !endpoint || !apiKey) {
-    return { channel: "sms", ok: false, skipped: true, reason: "sms_not_configured" };
-  }
+  if (!phone) return { channel: "sms", ok: false, skipped: true, reason: "invalid_saudi_phone" };
+  if (!endpoint || !apiKey) return { channel: "sms", ok: false, skipped: true, reason: "sms_not_configured" };
 
   try {
     const response = await fetch(endpoint, {
