@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./admin-mobile.css";
 
 export const metadata: Metadata = {
   title: "مركز تحكم NAVIXA",
