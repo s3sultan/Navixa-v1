@@ -54,7 +54,7 @@ export async function startTawkedSmsVerification(env: TawkedVerifyEnv, phone: st
 }
 
 export async function checkTawkedSmsVerification(env: TawkedVerifyEnv, id: string, code: string): Promise<TawkedCheckResult> {
-  const apiKey = env.TAWED_API_KEY?.trim() || env.TAWKED_API_KEY?.trim() || "";
+  const apiKey = env.TAWKED_API_KEY?.trim() || "";
   const verificationId = id.trim();
   const cleanCode = code.replace(/\D/g, "").slice(0, 8);
   if (!apiKey) return { ok: false, verified: false, error: "tawked_not_configured" };
