@@ -6,6 +6,8 @@ import { isFeatureAccessActive, type FeatureAccessSession } from "./featureAcces
 import UsageTracker from "./UsageTracker";
 import "./feature-access.css";
 
+const PUBLIC_FREE_ACCESS_UNTIL = Date.parse("2026-09-13T00:00:00+03:00");
+
 type AccountSession = FeatureAccessSession & {
   user?: { email?: string } | null;
 };
@@ -16,17 +18,20 @@ type Props = {
 };
 
 export default function FeatureAccessGate({ children, feature = "مزايا NAVIXA" }: Props) {
+  const publicFreeAccess = Date.now() < PUBLIC_FREE_ACCESS_UNTIL;
   const [session, setSession] = useState<AccountSession | null>(null);
 
   useEffect(() => {
+    if (publicFreeAccess) return;
     let active = true;
     fetch("/api/account/session", { cache: "no-store" })
       .then(response => response.json())
       .then((value: AccountSession) => { if (active) setSession(value); })
       .catch(() => { if (active) setSession({ enabled: false, signedIn: false }); });
     return () => { active = false; };
-  }, []);
+  }, [publicFreeAccess]);
 
+  if (publicFreeAccess) return <>{children}</>;
   if (session && isFeatureAccessActive(session)) return <><UsageTracker />{children}</>;
 
   const signedIn = session?.signedIn === true;
