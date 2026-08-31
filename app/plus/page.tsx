@@ -26,10 +26,10 @@ const trust = [
 export default function NavixaPlusPage() {
   return <main className="plus-page plus-simple" dir={languageIdentity.ar.direction}>
     <ReferralCapture />
-    <nav className="plus-nav"><Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><Link href="/" className="plus-back">العودة للرئيسية →</Link></nav>
+    <nav className="plus-nav"><Link href="/" className="plus-brand" aria-label="العودة إلى NAVIXA"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><Link href="/" className="plus-back">العودة للرئيسية ←</Link></nav>
 
     <section className="plus-hero" aria-labelledby="plus-title">
-      <div className="plus-hero-copy"><span className="plus-eyebrow">NAVIXA Plus</span><h1 id="plus-title">خلّ NAVIXA<br /><strong>ينتبه معك.</strong></h1><p>Plus ليس مجرد مزايا إضافية. هو الطبقة التي تجعل NAVIXA يراقب الأشياء الصغيرة التي تستهلك انتباهك، ثم ينبهك عندما تحتاج فعلًا أن تنظر.</p><div className="plus-hero-actions"><a href="#interest" className="primary">أبلغني عند فتح Plus</a><a className="ghost" href="#included">شاهد ما الذي ستحصل عليه</a></div><div className="plus-trust"><span>✓ لا دفع حاليًا</span><span>✓ لا بطاقة</span><span>✓ خصوصية واضحة</span></div></div>
+      <div className="plus-hero-copy"><span className="plus-eyebrow">NAVIXA Plus</span><h1 id="plus-title">خلّ NAVIXA<br /><strong>ينتبه معك.</strong></h1><p>Plus ليس مجرد مزايا إضافية. هو الطبقة التي تجعل NAVIXA يراقب الأشياء الصغيرة التي تستهلك انتباهك، ثم ينبهك عندما تحتاج فعلًا أن تنظر.</p><div className="plus-hero-actions"><a href="#interest" className="primary">أبلغني عند فتح Plus</a><a className="ghost" href="#included">شاهد ما الذي ستحصل عليه</a></div><div className="plus-trust"><span>✓ السعر الحالي 0 ر.س</span><span>✓ لا بطاقة</span><span>✓ خصوصية واضحة</span></div></div>
       <aside className="plus-preview" aria-label="لمحة عن تجربة Plus"><span className="preview-badge">مثال</span><div className="preview-screen"><div className="preview-dot" /><small>اجتماعك مستمر…</small><b>تم سماع اسمك</b><p>NAVIXA انتبه لك. ارجع للاجتماع الآن.</p><span className="preview-phone">إشعار على الجوال أيضًا</span></div></aside>
     </section>
 
@@ -37,11 +37,11 @@ export default function NavixaPlusPage() {
 
     <section className="plus-confidence" aria-labelledby="confidence-title"><div className="plus-confidence-copy"><small>قبل ما تشترك</small><h2 id="confidence-title">اعرف بالضبط وش يشتغل ووش ما يشتغل.</h2><p>نبي قرار الاشتراك يكون سهل لأن القيمة واضحة، مو لأن الصفحة ضغطت عليك.</p></div><div className="plus-confidence-grid">{trust.map(([title, description]) => <article key={title}><b>{title}</b><p>{description}</p></article>)}</div></section>
 
-    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">Plus جاهز للتجهيز، والدفع ننتظر اعتماده</h2><p>نقدر الآن نسجل اهتمامك فقط. عند فتح بوابة الدفع الرسمية ستظهر الخطة والسعر ومدة الاشتراك وسياسة الإلغاء والاسترداد قبل أي تحصيل.</p></div></div><Link href="/account">إدارة حسابك →</Link></section>
+    <section className="plus-status" aria-labelledby="plus-status-title"><div><span className="plus-status-icon">i</span><div><small>الحالة الحالية</small><h2 id="plus-status-title">Plus مفتوح للتجربة المجانية الآن</h2><p>السعر الحالي 0 ر.س حتى نهاية 12 سبتمبر 2026. السعر القياسي بعد الفترة المجانية: <strong>19 ر.س لمدة شهر واحد</strong>. لا يوجد تحصيل أو طلب بطاقة الآن، ولن يُفعّل الدفع قبل اعتماد مزود الدفع الرسمي.</p></div></div><Link href="/account">إدارة حسابك ←</Link></section>
 
     <InterestForm />
 
-    <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>بياناتك ليست ثمن الاشتراك.</h2><p>لن تحفظ NAVIXA بيانات بطاقات أو محافظ. وعند إتاحة الدفع رسميًا سيكون عبر مزود معتمد وتحقيق خادمي آمن.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية →</Link></section>
+    <section className="plus-promise"><div><small>وعد NAVIXA</small><h2>بياناتك ليست ثمن الاشتراك.</h2><p>لن تحفظ NAVIXA بيانات بطاقات أو محافظ. وعند إتاحة الدفع رسميًا سيكون عبر مزود معتمد وتحقيق خادمي آمن.</p></div><Link href="/privacy">اقرأ سياسة الخصوصية ←</Link></section>
     <footer className="plus-footer"><Link href="/" className="plus-brand"><img src="/navixa-mark.webp" alt="" /><span><b dir="ltr">NAVIXA <small className="brand-sa">SA</small></b><small>يفهم يومك</small></span></Link><span><Link href="/terms">الشروط</Link> · <Link href="/privacy">الخصوصية</Link> · <Link href="/refunds">الإلغاء والاسترداد</Link> · <Link href="/support">الدعم</Link></span></footer>
   </main>;
 }
