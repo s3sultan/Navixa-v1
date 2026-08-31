@@ -1,4 +1,5 @@
 import type { NotificationMessage, NotificationResult, NotificationTarget } from "../types";
+import { normalizeSaudiPhone } from "../phone";
 
 export type WhatsAppProviderEnv = {
   NAVIXA_WHATSAPP_ENDPOINT?: string;
@@ -7,12 +8,11 @@ export type WhatsAppProviderEnv = {
 };
 
 export async function sendWhatsAppNotification(env: WhatsAppProviderEnv, target: NotificationTarget, message: NotificationMessage): Promise<NotificationResult> {
-  const phone = target.phone?.trim() || "";
+  const phone = normalizeSaudiPhone(target.phone);
   const endpoint = env.NAVIXA_WHATSAPP_ENDPOINT?.trim() || "";
   const token = env.NAVIXA_WHATSAPP_ACCESS_TOKEN?.trim() || "";
-  if (!phone || !endpoint || !token) {
-    return { channel: "whatsapp", ok: false, skipped: true, reason: "whatsapp_not_configured" };
-  }
+  if (!phone) return { channel: "whatsapp", ok: false, skipped: true, reason: "invalid_saudi_phone" };
+  if (!endpoint || !token) return { channel: "whatsapp", ok: false, skipped: true, reason: "whatsapp_not_configured" };
 
   try {
     const response = await fetch(endpoint, {
