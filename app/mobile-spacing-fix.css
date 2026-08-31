@@ -1,0 +1,6 @@
+/* Keep the compact mobile home content hugging the public footer. */
+@media(max-width:650px){
+  .nx-page{min-height:0!important;height:auto!important}
+  .nx-page>.contact{margin-bottom:0!important}
+  .nx-public-footer-shell{margin-top:18px!important}
+}
