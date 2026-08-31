@@ -1,4 +1,5 @@
 name: Deploy NAVIXA
+# Stable production deploy trigger after auth fallback hardening.
 
 on:
   push:
