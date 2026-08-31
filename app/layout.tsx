@@ -3,6 +3,7 @@ import PerformanceReporter from "./PerformanceReporter";
 import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import "./globals.css";
+import "./mobile-spacing-fix.css";
 
 const siteUrl = "https://navixasa.com";
 
