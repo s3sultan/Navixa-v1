@@ -1,0 +1,91 @@
+name: Recover NAVIXA Auth Now
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/recover-auth-now.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navixa-auth-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore last healthy auth bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          recovery_version="7a4aedd6-738b-4f57-b056-891533cc1246"
+          payload=$(node -e 'process.stdout.write(JSON.stringify({strategy:"percentage",versions:[{percentage:100,version_id:process.argv[1]}]}))' "$recovery_version")
+          response=$(curl --silent --show-error \
+            --request POST \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/navixa/deployments?force=true" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$payload")
+          printf '%s' "$response" > /tmp/recovery-response.json
+          node <<'NODE'
+          const fs=require('node:fs');
+          const j=JSON.parse(fs.readFileSync('/tmp/recovery-response.json','utf8'));
+          if(!j.success){
+            console.error('Cloudflare recovery failed:', JSON.stringify(j.errors || []));
+            process.exit(1);
+          }
+          console.log('Historical NAVIXA auth version activated.');
+          NODE
+          sleep 3
+
+      - name: Confirm restored secret names
+        run: |
+          names=$(npx --no-install wrangler secret list --name navixa)
+          printf '%s' "$names" | grep -q 'RESEND_API_KEY'
+          printf '%s' "$names" | grep -q 'NAVIXA_AUTH_FROM'
+          printf '%s' "$names" | grep -q 'NAVIXA_AUTH_CODE_PEPPER'
+          echo "OTP secrets restored."
+
+      - name: Build current NAVIXA
+        run: npm run build
+
+      - name: Preserve restored bindings in current build
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const path='dist/server/wrangler.json';
+          const c=JSON.parse(fs.readFileSync(path,'utf8'));
+          c.keep_vars=true;
+          c.observability={enabled:true,head_sampling_rate:1};
+          c.compatibility_flags=[...new Set([...(c.compatibility_flags||[]),'nodejs_compat'])];
+          c.triggers={...(c.triggers||{}),crons:['* * * * *']};
+          fs.writeFileSync(path,JSON.stringify(c,null,2)+'\n');
+          NODE
+
+      - name: Redeploy current NAVIXA immediately
+        run: npx --no-install wrangler deploy --config dist/server/wrangler.json --name navixa
+
+      - name: Confirm secrets survived current deploy
+        run: |
+          names=$(npx --no-install wrangler secret list --config dist/server/wrangler.json --name navixa)
+          printf '%s' "$names" | grep -q 'RESEND_API_KEY'
+          printf '%s' "$names" | grep -q 'NAVIXA_AUTH_FROM'
+          printf '%s' "$names" | grep -q 'NAVIXA_AUTH_CODE_PEPPER'
+          echo "Current NAVIXA deployed with restored OTP secrets."
