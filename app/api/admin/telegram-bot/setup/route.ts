@@ -4,6 +4,7 @@ import { officialTelegramBotUsername } from "../../../../../worker/telegramBot.t
 
 type Env = Record<string, string | undefined>;
 type TelegramResponse = { ok?: boolean; result?: { username?: string }; description?: string };
+const OFFICIAL_TELEGRAM_WEBHOOK_URL = "https://navixasa.com/api/telegram/webhook";
 
 async function runtimeEnv(): Promise<Env> {
   try { return (await import("cloudflare:workers") as { env?: Env }).env || {}; }
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     if (!meResponse.ok || !me.ok) return noStore({ error: "تعذر التحقق من توكن بوت Telegram" }, 502);
     if (me.result?.username?.toLowerCase() !== username.toLowerCase()) return noStore({ error: "اسم البوت لا يطابق التوكن المضاف" }, 409);
 
-    const webhookUrl = `${new URL(request.url).origin}/api/telegram/webhook`;
+    const webhookUrl = OFFICIAL_TELEGRAM_WEBHOOK_URL;
     const webhookResponse = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
