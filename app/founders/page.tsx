@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import FoundersLanding from "./FoundersLanding";
-import "./founders.css";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata={
-  title:"مؤسسو NAVIXA — سعر شخصي محدود",
-  description:"نافذة مؤسسي NAVIXA: سعر شخصي محدود لأول شهر، يظهر قبل الدفع.",
+  title:"NAVIXA Plus",
+  description:"NAVIXA مفتوح للتجربة المجانية حاليًا، وعروض الاشتراك غير معروضة للبيع خلال هذه الفترة.",
+  robots:{index:false,follow:false},
 };
 
-export default function FoundersPage(){return <FoundersLanding/>}
+export default function FoundersPage(){redirect("/plus")}
