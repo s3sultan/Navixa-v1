@@ -1,3 +1,5 @@
+import type { PremiumMessageEvent } from "./messagingPolicy";
+
 export type NotificationChannel = "email" | "telegram" | "sms" | "whatsapp";
 
 export type NotificationMessage = {
@@ -22,4 +24,6 @@ export type NotificationSendInput = {
   channel: NotificationChannel;
   message: NotificationMessage;
   target: NotificationTarget;
+  eventType?: PremiumMessageEvent;
+  subscriberId?: string;
 };
