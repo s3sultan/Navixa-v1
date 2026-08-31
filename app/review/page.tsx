@@ -18,7 +18,7 @@ export default function PublicReviewPage() {
   return <main dir="rtl" style={{maxWidth:960,margin:"0 auto",padding:"32px 20px 64px",fontFamily:"inherit",lineHeight:1.8}}>
     <header style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}>
       <Link href="/" style={{fontWeight:900,fontSize:22,textDecoration:"none"}}><span dir="ltr">NAVIXA SA</span></Link>
-      <nav style={{display:"flex",gap:14,flexWrap:"wrap"}}><Link href="/terms">الشروط</Link><Link href="/privacy">الخصوصية</Link><Link href="/refunds">الإلغاء والاسترداد</Link><Link href="/support">التواصل والدعم</Link></nav>
+      <nav style={{display:"flex",gap:14,flexWrap:"wrap"}}><Link href="/terms">الشروط</Link><Link href="/privacy">الخصوصية</Link><Link href="/refunds">الإلغاء والاسترداد</Link><Link href="/delivery">التسليم والتنفيذ</Link><Link href="/complaints">الشكاوى</Link><Link href="/support">التواصل والدعم</Link></nav>
     </header>
 
     <section style={{padding:"56px 0 30px"}}>
@@ -42,7 +42,7 @@ export default function PublicReviewPage() {
       <div style={{display:"flex",gap:14,flexWrap:"wrap"}}><Link href="/sprint">استعراض NAVIXA Sprint ←</Link><Link href="/plus">استعراض NAVIXA Plus ←</Link></div>
     </section>
 
-    <section style={{marginTop:34}} aria-labelledby="policies"><h2 id="policies">السياسات والتواصل</h2><p>يمكن مراجعة المستندات العامة دون إنشاء حساب: <Link href="/terms">الشروط والأحكام</Link>، <Link href="/privacy">سياسة الخصوصية</Link>، <Link href="/refunds">سياسة الإلغاء والاسترداد</Link>، و<Link href="/support">الدعم والتواصل</Link>.</p></section>
+    <section style={{marginTop:34}} aria-labelledby="policies"><h2 id="policies">السياسات والتواصل</h2><p>جميع المستندات التالية متاحة للعامة دون إنشاء حساب: <Link href="/terms">الشروط والأحكام</Link>، <Link href="/privacy">سياسة الخصوصية</Link>، <Link href="/refunds">سياسة الإلغاء والاسترداد</Link>، <Link href="/delivery">سياسة التسليم والتنفيذ</Link>، <Link href="/complaints">سياسة الشكاوى والمقترحات</Link>، و<Link href="/support">الدعم والتواصل</Link>.</p></section>
 
     <footer style={{marginTop:48,paddingTop:20,borderTop:"1px solid #d9e3e1"}}><p>هذه الصفحة مخصصة أيضًا لتسهيل مراجعة مزودي الدفع والجهات ذات العلاقة، ولا تمنح وصولًا إلى بيانات أو حسابات المستخدمين.</p><Link href="/">العودة إلى NAVIXA ←</Link></footer>
   </main>;
