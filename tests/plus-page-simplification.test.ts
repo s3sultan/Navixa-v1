@@ -10,8 +10,8 @@ test("صفحة Plus تعرض السعر القياسي بوضوح بدون عر�
   ]);
   assert.match(page, /Plus مفتوح للتجربة المجانية الآن/);
   assert.match(page, /السعر الحالي 0 ر\.س/);
-  assert.match(page, /19 ر\.س لمدة شهر واحد/);
-  assert.match(page, /لا يوجد تحصيل أو طلب بطاقة الآن/);
+  assert.match(page, /25 ر\.س لمدة شهر واحد/);
+  assert.match(page, /لا توجد عملية دفع أو طلب بطاقة/);
   assert.match(page, /<InterestForm \/>/);
   assert.doesNotMatch(page, /CheckoutPanel/);
   assert.doesNotMatch(page, /57 ر\.س|19 سبتمبر 2026|3 \+ 1|سعر مؤسس|عرض مؤسسي|salla\.sa/);
