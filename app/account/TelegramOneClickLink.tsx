@@ -9,8 +9,9 @@ function parseTelegramLink(value: unknown) {
   try {
     const url = new URL(value);
     const token = url.searchParams.get("start") || "";
-    if (url.protocol !== "https:" || url.hostname !== "t.me" || !/^\/[A-Za-z0-9_]{5,}\/?$/.test(url.pathname) || !/^[A-Za-z0-9_-]{32,64}$/.test(token)) return null;
-    return { link: url.toString(), token };
+    const bot = url.pathname.replace(/^\//, "").replace(/\/$/, "");
+    if (url.protocol !== "https:" || url.hostname !== "t.me" || !/^[A-Za-z0-9_]{5,}$/.test(bot) || !/^[A-Za-z0-9_-]{32,64}$/.test(token)) return null;
+    return { link: url.toString(), token, bot };
   } catch {
     return null;
   }
@@ -42,11 +43,20 @@ export default function TelegramOneClickLink() {
         const telegram = parseTelegramLink(data.link);
         if (!telegram) throw new Error("رابط Telegram غير صالح");
 
-        // Telegram Web/Desktop may sometimes open an already-started chat without
-        // surfacing the deep-link START action. Keep a short-lived fallback command
-        // on the clipboard so the same secure token can still complete the link.
-        try { await navigator.clipboard?.writeText(`/start ${telegram.token}`); } catch {}
-        button.textContent = "افتح Telegram واضغط START";
+        const fallbackCommand = `/activate ${telegram.token}`;
+        try { await navigator.clipboard?.writeText(fallbackCommand); } catch {}
+        try { sessionStorage.setItem("navixa-telegram-link-command", fallbackCommand); } catch {}
+
+        button.textContent = "Telegram جاهز للتأكيد";
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+          const appLink = `tg://resolve?domain=${encodeURIComponent(telegram.bot)}&start=${encodeURIComponent(telegram.token)}`;
+          window.location.href = appLink;
+          window.setTimeout(() => window.location.assign(telegram.link), 900);
+          return;
+        }
+
         window.location.assign(telegram.link);
       } catch (error) {
         button.disabled = false;
