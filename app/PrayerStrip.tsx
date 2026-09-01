@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {isScreenEnabled,sendTelegramAlert,getAdminMessages} from "./alertPrefs";
 
 const prayerLabels:Record<string,string>={Fajr:"الفجر",Dhuhr:"الظهر",Asr:"العصر",Maghrib:"المغرب",Isha:"العشاء"};
@@ -130,14 +131,14 @@ export default function PrayerStrip(){
     </div>}
     <button type="button" className="prayer-strip-edit" onClick={openEdit} aria-label="تعديل مواقيت الصلاة">✎</button>
 
-    {editing&&<div className="prayer-edit-back" onClick={()=>setEditing(false)}><article onClick={e=>e.stopPropagation()}>
+    {editing&&typeof document!=="undefined"&&createPortal(<div className="prayer-edit-back" onClick={()=>setEditing(false)}><article onClick={e=>e.stopPropagation()}>
       <h3>تعديل مواقيت الصلاة والإقامة</h3>
       <div className="prayer-edit-grid">{prayerOrder.map(name=><div key={name}><b>{prayerLabels[name]}</b>
         <label>أذان <input type="time" value={draft[name]||""} onChange={e=>setDraft({...draft,[name]:e.target.value})}/></label>
         <label>إقامة <input type="time" value={draft[`iqama_${name}`]||""} onChange={e=>setDraft({...draft,[`iqama_${name}`]:e.target.value})}/></label>
       </div>)}</div>
       <div className="prayer-edit-actions"><button type="button" onClick={saveEdit}>حفظ</button><button type="button" className="ghost" onClick={()=>setEditing(false)}>إلغاء</button></div>
-    </article></div>}
+    </article></div>,document.body)}
 
     {alertInfo&&<div className="adhan-alert-back" role="presentation" onClick={()=>setAlertInfo(null)}><article className={`adhan-alert-card is-${alertInfo.type}`} role="dialog" aria-modal="true" aria-labelledby="adhan-alert-title" onClick={e=>e.stopPropagation()}>
       <button type="button" className="adhan-alert-close" onClick={()=>setAlertInfo(null)} aria-label="إغلاق التنبيه">×</button>
