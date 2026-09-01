@@ -17,12 +17,13 @@ assert.match(adminReferrals, /referrer_profile_id=\?/);
 assert.doesNotMatch(adminReferrals, /referral_profile_id=\?/);
 assert.match(adminReferrals, /status='pending_credit'/);
 
-assert.match(plusPage, /أبلغني عند فتح Plus/);
+assert.match(plusPage, /أبلغني عند فتح هِمّة/);
 assert.match(plusPage, /كمبيوتر واحد وجوال واحد/);
 assert.match(plusPage, /لا توجد عملية دفع أو طلب بطاقة/);
+assert.match(plusPage, /ابدأ بعَزْم، وكمل بهِمّة|هِمّة/);
 assert.match(terms, /الإحالات والمكافآت/);
 assert.match(refunds, /الإحالات والمكافآت المرتبطة بالدفع/);
 assert.match(privacy, /الحساب وتسجيل الدخول/);
-assert.match(privacy, /Plus والدفع/);
+assert.match(privacy, /هِمّة والدفع/);
 
 console.log("Launch hardening contract: ok");
