@@ -39,8 +39,15 @@ export async function telegramRuntimeEnv(): Promise<RuntimeTelegramEnv> {
   } catch {
     runtime = (globalThis as { __NAVIXA_TELEGRAM_ENV__?: RuntimeTelegramEnv }).__NAVIXA_TELEGRAM_ENV__ || {};
   }
-  const rootSecret = runtime.ADMIN_JWT_SECRET?.trim() || "";
-  const webhookSecret = runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET?.trim() || (rootSecret ? await deriveTelegramSecret(rootSecret, "webhook") : "");
+
+  // The deployment derives the webhook secret from the exact bytes stored in
+  // ADMIN_JWT_SECRET. Do not trim those bytes before webhook derivation, or a
+  // trailing newline in the GitHub secret creates a different hash and Telegram
+  // receives 401 Unauthorized. Encryption keeps the normalized root so existing
+  // encrypted Telegram destinations remain stable.
+  const rootSecretRaw = runtime.ADMIN_JWT_SECRET || "";
+  const rootSecret = rootSecretRaw.trim();
+  const webhookSecret = runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET?.trim() || (rootSecretRaw ? await deriveTelegramSecret(rootSecretRaw, "webhook") : "");
   const encryptionSecret = runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY?.trim() || (rootSecret ? await deriveTelegramSecret(rootSecret, "encryption") : "");
   return {
     ...runtime,
