@@ -70,14 +70,107 @@ Do not declare deployment successful without checking the actual deployed enviro
 ## 10. Observability and privacy
 Use logs to diagnose problems but never log passwords, tokens, cookies, API keys, or sensitive personal data. Show users safe, understandable errors; keep technical diagnostics in protected logs. Do not expose production stack traces to end users.
 
-## 11. UI/UX and accessibility
-For user-facing changes, preserve NAVIXA's design language and test responsive behavior, loading, empty, error, success, and disabled states. Maintain keyboard navigation, focus visibility, semantic HTML, labels, contrast, and screen-reader compatibility where applicable.
+## 11. UI/UX Quality Layer
+All user-facing work must meet a high visual and interaction quality bar. Treat UI quality as part of correctness, not decoration.
+
+### Design intent before coding
+- Identify the page goal, primary user action, information hierarchy, target device sizes, and existing NAVIXA design patterns before touching layout.
+- Preserve the established product identity unless the task explicitly calls for redesign.
+- Reuse existing components, tokens, spacing, radii, typography, icon language, and interaction patterns before introducing new ones.
+- Prefer intentional visual systems over isolated styling decisions.
+
+### Hierarchy and composition
+- Make the primary action visually obvious without making every element loud.
+- Use clear hierarchy across page title, section title, body text, metadata, actions, and helper text.
+- Group related information spatially and separate unrelated information with meaningful whitespace.
+- Avoid overcrowded cards, excessive containers, decorative gradients, unnecessary glass effects, giant headlines, or repeated badges that do not carry information.
+- Avoid generic AI-generated dashboard composition when a simpler product-specific layout communicates better.
+
+### Spacing and alignment
+- Use a consistent spacing scale rather than arbitrary values.
+- Align content to a predictable grid.
+- Maintain consistent internal padding for equivalent components.
+- Use whitespace to communicate grouping and priority.
+- Do not fix layout problems by stacking random margins or absolute positioning unless the design truly requires it.
+
+### Typography
+- Keep a deliberate type scale with a small number of levels.
+- Maintain readable line lengths, line heights, and contrast.
+- Avoid excessive font weights, all-caps text, tiny helper copy, or oversized marketing typography inside product workflows.
+- Arabic and English typography must remain visually balanced and directionally correct.
+
+### Color and contrast
+- Use color semantically: primary action, success, warning, destructive, neutral, and informational states should remain distinguishable.
+- Do not introduce new colors when an existing semantic token works.
+- Meet accessible contrast expectations for text, controls, focus indicators, and important status information.
+- Never rely on color alone to communicate critical state.
+
+### Components and states
+Every interactive component must account for relevant states:
+- default
+- hover
+- focus
+- active/pressed
+- disabled
+- loading
+- success
+- error
+- empty
+
+Forms must have clear labels, validation feedback, recovery guidance, and sensible defaults. Buttons must use precise action language. Destructive actions require clear intent and suitable confirmation when consequences are significant.
+
+### Responsive design
+- Design mobile and desktop behavior intentionally; do not merely shrink the desktop layout.
+- Prevent clipped content, horizontal overflow, unusable tap targets, and crowded controls.
+- Prioritize the most important information on small screens and progressively reveal secondary details when appropriate.
+- Test representative narrow, medium, and wide widths.
+
+### Accessibility
+- Use semantic HTML before ARIA.
+- Preserve keyboard navigation, visible focus, correct labels, heading hierarchy, and screen-reader meaning.
+- Keep touch targets comfortably usable.
+- Respect reduced-motion preferences where animation exists.
+- Ensure dialogs, menus, popovers, tabs, and forms have correct focus behavior.
+
+### Motion and interaction polish
+- Motion must communicate state, hierarchy, continuity, or feedback.
+- Prefer subtle transitions over constant animation.
+- Avoid animation that delays task completion or competes with content.
+- Keep durations and easing consistent across similar interactions.
+- Loading feedback should appear quickly and avoid layout jumps where possible.
+
+### Icons and visual language
+- Prefer the project's existing icon system and vector icons over emoji used as UI icons.
+- Keep icon stroke, size, alignment, and semantic meaning consistent.
+- Do not mix unrelated icon styles within the same surface.
+
+### Content quality
+- Use concise, human, action-oriented interface copy.
+- Remove filler, generic hype, repetitive explanations, fake urgency, and robotic AI phrasing.
+- Error messages should explain what happened and what the user can do next when possible.
+- Empty states should guide the next useful action rather than merely announce emptiness.
+
+### Visual review checklist
+Before marking UI work complete, visually inspect:
+- hierarchy
+- alignment
+- spacing rhythm
+- typography
+- contrast
+- component consistency
+- RTL/LTR behavior
+- responsive layouts
+- loading/empty/error/success states
+- keyboard/focus behavior
+- unnecessary visual noise
+
+Do not accept a technically functioning interface that visibly looks unfinished, inconsistent, generic, or awkward.
 
 ## 12. Performance
 Check bundle/client weight, unnecessary client components or re-renders, image/font loading, database/API query cost, caching, and latency when relevant. Optimize based on evidence rather than speculative complexity.
 
 ## 13. Definition of Done
-A task is done only when the applicable items are true: requested behavior implemented; code is maintainable; relevant lint/type/build/tests pass; security boundaries reviewed; no secrets exposed; deployment/preview verified when applicable; rollback path known; documentation updated when behavior/setup/architecture changed.
+A task is done only when the applicable items are true: requested behavior implemented; code is maintainable; relevant lint/type/build/tests pass; security boundaries reviewed; no secrets exposed; deployment/preview verified when applicable; rollback path known; documentation updated when behavior/setup/architecture changed; user-facing work passes the UI/UX quality review above.
 
 ## 14. NAVIXA coordination and memory
 After completing work:
@@ -86,4 +179,4 @@ After completing work:
 3. Update `PROJECT_MEMORY.md` only when the user approves a durable product decision.
 
 ## Golden rule
-Do not merely produce code that runs. Produce code that is safe, clear, maintainable, testable, reversible, and production-ready.
+Do not merely produce code that runs. Produce code that is safe, clear, maintainable, testable, reversible, visually coherent, accessible, and production-ready.
