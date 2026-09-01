@@ -21,9 +21,18 @@ export const DEFAULT_PERSONAL_REMINDER_PREFS:PersonalReminderPrefs={
 };
 
 const STORAGE_KEY="navixa-personal-reminder-prefs";
+const DISMISS_KEY="navixa-personal-reminder-dismissals";
+const MAX_DISMISSALS=3;
+type DismissalState=Partial<Record<PersonalReminderKind,{count:number;muted:boolean}>>;
 
 export const getPersonalReminderPrefs=():PersonalReminderPrefs=>{
   try{return {...DEFAULT_PERSONAL_REMINDER_PREFS,...JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")} }catch{return {...DEFAULT_PERSONAL_REMINDER_PREFS}}
 };
 
 export const setPersonalReminderPrefs=(prefs:PersonalReminderPrefs)=>localStorage.setItem(STORAGE_KEY,JSON.stringify(prefs));
+
+const readDismissals=():DismissalState=>{try{return JSON.parse(localStorage.getItem(DISMISS_KEY)||"{}")}catch{return {}}};
+const writeDismissals=(value:DismissalState)=>localStorage.setItem(DISMISS_KEY,JSON.stringify(value));
+export const isPersonalReminderMuted=(kind:PersonalReminderKind)=>Boolean(readDismissals()[kind]?.muted);
+export const dismissPersonalReminder=(kind:PersonalReminderKind)=>{const state=readDismissals(),current=state[kind]||{count:0,muted:false},count=Math.min(MAX_DISMISSALS,current.count+1),muted=count>=MAX_DISMISSALS;state[kind]={count,muted};writeDismissals(state);return {count,muted,remaining:Math.max(0,MAX_DISMISSALS-count)}};
+export const resetPersonalReminderDismissals=(kind:PersonalReminderKind)=>{const state=readDismissals();delete state[kind];writeDismissals(state)};
