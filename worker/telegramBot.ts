@@ -27,7 +27,7 @@ function fromBase64Url(value: string) {
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
 
-async function deriveTelegramSecret(rootSecret: string, purpose: "webhook" | "encryption") {
+export async function deriveTelegramSecret(rootSecret: string, purpose: "webhook" | "encryption") {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`navixa:telegram:${purpose}:${rootSecret}`));
   return base64Url(new Uint8Array(digest));
 }
