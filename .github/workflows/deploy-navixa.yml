@@ -199,7 +199,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
         run: |
+          set -euo pipefail
           upload_secret() {
             name="$1"
             value="$2"
@@ -208,26 +210,56 @@ jobs:
             fi
           }
           upload_secret NAVIXA_TELEGRAM_BOT_TOKEN "$NAVIXA_TELEGRAM_BOT_TOKEN"
-          upload_secret NAVIXA_TELEGRAM_WEBHOOK_SECRET "$NAVIXA_TELEGRAM_WEBHOOK_SECRET"
           upload_secret NAVIXA_TELEGRAM_ENCRYPTION_KEY "$NAVIXA_TELEGRAM_ENCRYPTION_KEY"
 
-      - name: Restore Telegram webhook when bot token is configured
-        if: env.ADMIN_JWT_SECRET != '' && env.NAVIXA_TELEGRAM_BOT_TOKEN != ''
-        shell: bash
-        run: |
           webhook_secret="$NAVIXA_TELEGRAM_WEBHOOK_SECRET"
-          webhook_url="https://navixasa.com/api/telegram/webhook"
           if [ -z "$webhook_secret" ]; then
             webhook_secret=$(node -e "const c=require('node:crypto'); process.stdout.write(c.createHash('sha256').update('navixa:telegram:webhook:'+process.env.ADMIN_JWT_SECRET).digest('base64url'))")
           fi
+          test -n "$webhook_secret"
+          printf '%s' "$webhook_secret" | npx --no-install wrangler secret put NAVIXA_TELEGRAM_WEBHOOK_SECRET --config dist/server/wrangler.json --name navixa
+          printf '%s' "$webhook_secret" > /tmp/navixa-telegram-webhook-secret
+          chmod 600 /tmp/navixa-telegram-webhook-secret
+          echo "Telegram webhook secret synchronized with the Worker."
+
+      - name: Restore and directly verify Telegram webhook
+        if: env.ADMIN_JWT_SECRET != '' && env.NAVIXA_TELEGRAM_BOT_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          webhook_url="https://navixasa.com/api/telegram/webhook"
+          webhook_secret=$(cat /tmp/navixa-telegram-webhook-secret)
+          test -n "$webhook_secret"
+
           response=$(curl --fail-with-body --silent --show-error \
             --request POST "https://api.telegram.org/bot${NAVIXA_TELEGRAM_BOT_TOKEN}/setWebhook" \
             --data-urlencode "url=${webhook_url}" \
             --data-urlencode "secret_token=${webhook_secret}" \
             --data-urlencode 'allowed_updates=["message"]')
-          printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(!j.ok)process.exit(1);console.log('Telegram webhook ready')})"
+          printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(!j.ok)process.exit(1);console.log('Telegram webhook registered')})"
+
+          verified=0
+          for attempt in 1 2 3 4 5; do
+            status=$(curl --silent --show-error --output /tmp/navixa-telegram-probe.json --write-out '%{http_code}' \
+              --request POST "$webhook_url" \
+              --header "Content-Type: application/json" \
+              --header "X-Telegram-Bot-Api-Secret-Token: ${webhook_secret}" \
+              --data '{"update_id":0}')
+            if [ "$status" = "200" ]; then
+              verified=1
+              break
+            fi
+            echo "Telegram webhook probe returned HTTP ${status}; retrying (${attempt}/5)..."
+            sleep 2
+          done
+          rm -f /tmp/navixa-telegram-webhook-secret /tmp/navixa-telegram-probe.json
+          if [ "$verified" -ne 1 ]; then
+            echo "Telegram webhook rejected the exact secret configured for Telegram."
+            exit 1
+          fi
+
           info=$(curl --fail-with-body --silent --show-error "https://api.telegram.org/bot${NAVIXA_TELEGRAM_BOT_TOKEN}/getWebhookInfo")
-          WEBHOOK_URL="$webhook_url" printf '%s' "$info" | WEBHOOK_URL="$webhook_url" node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const r=j.result||{};if(!j.ok||r.url!==process.env.WEBHOOK_URL){console.error('Telegram webhook verification failed');process.exit(1)};if(r.last_error_message)console.warn('Telegram webhook last error:',r.last_error_message);console.log('Telegram webhook verified:',r.url)})"
+          WEBHOOK_URL="$webhook_url" printf '%s' "$info" | WEBHOOK_URL="$webhook_url" node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const r=j.result||{};if(!j.ok||r.url!==process.env.WEBHOOK_URL){console.error('Telegram webhook verification failed');process.exit(1)};console.log('Telegram webhook authenticated and verified:',r.url)})"
 
       - name: Upload Moyasar secrets when configured
         if: env.ADMIN_JWT_SECRET != ''
