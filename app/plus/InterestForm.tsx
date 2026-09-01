@@ -21,5 +21,5 @@ export default function InterestForm() {
       setBusy(false);
     }
   };
-  return <section className="plus-interest" id="interest"><div><small>التجارب القادمة</small><h2>وصلك الخبر عند إتاحة Plus</h2><p>أضف بريدك فقط لتلقي دعوة عند فتح التجارب. لا يوجد دفع أو طلب بطاقة عبر هذا النموذج.</p></div><form onSubmit={submit}><input value={email} onChange={event => setEmail(event.target.value)} placeholder="بريدك الإلكتروني" type="email" required maxLength={160} autoComplete="email" disabled={busy} /><button disabled={busy}>{busy ? "جارٍ التسجيل…" : "سجّل اهتمامك"}</button>{notice && <p role="status" aria-live="polite">{notice}</p>}</form></section>;
+  return <section className="plus-interest" id="interest"><div><small>التجارب القادمة</small><h2>وصلك الخبر عند إتاحة هِمّة</h2><p>أضف بريدك فقط لتلقي دعوة عند فتح هِمّة. لا يوجد دفع أو طلب بطاقة عبر هذا النموذج.</p></div><form onSubmit={submit}><input value={email} onChange={event => setEmail(event.target.value)} placeholder="بريدك الإلكتروني" type="email" required maxLength={160} autoComplete="email" disabled={busy} /><button disabled={busy}>{busy ? "جارٍ التسجيل…" : "سجّل اهتمامك"}</button>{notice && <p role="status" aria-live="polite">{notice}</p>}</form></section>;
 }
