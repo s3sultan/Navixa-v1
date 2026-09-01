@@ -53,10 +53,12 @@ test("أدوار العضوية لا توسع الوصول خارج الاستح
   assert.equal(portfolioRoleAllowsApp("project", "fitness", "fitness"), true);
   assert.equal(portfolioRoleAllowsApp("project", "fitness", "kids"), false);
   assert.equal(portfolioRoleAllowsApp("project", "fitness", "learning"), false);
+});
 
-  assert.equal(portfolioRoleAllowsApp("child", "kids", "kids"), true);
-  assert.equal(portfolioRoleAllowsApp("child", "kids", "fitness"), false);
-  assert.equal(portfolioRoleAllowsApp("child", "kids", "learning"), false);
+test("Kids children remain profiles rather than subscription member accounts", () => {
+  const migration = readFileSync(new URL("../migrations/0045_portfolio_memberships.sql", import.meta.url), "utf8");
+  assert.doesNotMatch(migration, /member_type[^\n]*child/);
+  assert.match(migration, /child profiles, not subscription member accounts/);
 });
 
 test("المنحة الموقعة تحمل دور العضو دون كشف البريد", async () => {
