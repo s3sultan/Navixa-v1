@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server.js";
 import { getUserAuthSettings, hashOpaqueValue, type D1Database } from "../../../../worker/userAuth.ts";
-import { encryptTelegramIdentifier, hashTelegramValue, sendOfficialTelegramMessage, telegramRuntimeEnv, validTelegramChatId, validTelegramLinkToken } from "../../../../worker/telegramBot.ts";
+import { deriveTelegramSecret, encryptTelegramIdentifier, hashTelegramValue, sendOfficialTelegramMessage, telegramRuntimeEnv, validTelegramChatId, validTelegramLinkToken } from "../../../../worker/telegramBot.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
@@ -12,7 +12,11 @@ function reply(body: Record<string, unknown>, status = 200) { return NextRespons
 export async function POST(request: Request) {
   const runtime = await telegramRuntimeEnv();
   const providedSecret = request.headers.get("x-telegram-bot-api-secret-token") || "";
-  if (!runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET || providedSecret !== runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET) return reply({ ok: false }, 401);
+  const configuredSecret = runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET || "";
+  const rawRootSecret = runtime.ADMIN_JWT_SECRET || "";
+  const deploymentDerivedSecret = rawRootSecret ? await deriveTelegramSecret(rawRootSecret, "webhook") : "";
+  const webhookAuthorized = Boolean(providedSecret) && (providedSecret === configuredSecret || providedSecret === deploymentDerivedSecret);
+  if (!webhookAuthorized) return reply({ ok: false }, 401);
   const database = await db();
   if (!database || !runtime.NAVIXA_TELEGRAM_BOT_TOKEN || !runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY) return reply({ ok: true });
   const settings = await getUserAuthSettings(database).catch(() => null);
