@@ -12,11 +12,13 @@ function reply(body: Record<string, unknown>, status = 200) { return NextRespons
 export async function POST(request: Request) {
   const runtime = await telegramRuntimeEnv();
   const providedSecret = request.headers.get("x-telegram-bot-api-secret-token") || "";
-  if (!runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET || providedSecret !== runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET) return reply({ ok: false }, 401);
+  if (!runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET) return reply({ ok: false, reason: "webhook_secret_unavailable" }, 503);
+  if (providedSecret !== runtime.NAVIXA_TELEGRAM_WEBHOOK_SECRET) return reply({ ok: false, reason: "webhook_secret_mismatch" }, 401);
   const database = await db();
-  if (!database || !runtime.NAVIXA_TELEGRAM_BOT_TOKEN || !runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY) return reply({ ok: true });
+  if (!database) return reply({ ok: false, reason: "database_unavailable" }, 503);
+  if (!runtime.NAVIXA_TELEGRAM_BOT_TOKEN || !runtime.NAVIXA_TELEGRAM_ENCRYPTION_KEY) return reply({ ok: false, reason: "telegram_runtime_incomplete" }, 503);
   const settings = await getUserAuthSettings(database).catch(() => null);
-  if (!settings?.telegramBotEnabled) return reply({ ok: true });
+  if (!settings?.telegramBotEnabled) return reply({ ok: true, ignored: "telegram_disabled" });
 
   const update = await request.json().catch(() => ({})) as TelegramUpdate;
   const message = update.message;
