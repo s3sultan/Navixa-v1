@@ -30,7 +30,7 @@ export default function ProjectsPage() {
       <Link className="projects-back" href="/">العودة إلى NAVIXA <span aria-hidden="true">←</span></Link>
       <header className="projects-hero">
         <div className="projects-orbit" aria-hidden="true"><span>✦</span></div>
-        <p>PLUS • YOUR NAVIXA</p>
+        <p>هِمّة • عالمك في NAVIXA</p>
         <h1>عالم NAVIXA</h1>
         <h2>كل مشروع له مساحته. وحسابك يجمعهم.</h2>
         <small>مشاريع إضافية مرتبطة بعضويتك، بدون تشتيت الصفحة الرئيسية أو تسجيل دخول جديد.</small>
@@ -38,7 +38,7 @@ export default function ProjectsPage() {
 
       {!loaded && <div className="projects-state">جاري تجهيز عالمك…</div>}
       {loaded && !eligible && <section className="projects-state locked">
-        <b>هذه المساحة مخصصة لعضوية Plus النشطة</b>
+        <b>هذه المساحة مخصصة لعضوية هِمّة النشطة</b>
         <span>سجّل الدخول بحساب NAVIXA المشترك أو ارجع للصفحة الرئيسية.</span>
         <Link href="/account">حساب NAVIXA</Link>
       </section>}
@@ -51,7 +51,7 @@ export default function ProjectsPage() {
         >
           <div className="project-card-top">
             <span className="project-icon" aria-hidden="true">{project.icon}</span>
-            <span className="project-status"><i /> مشمول مع Plus</span>
+            <span className="project-status"><i /> مشمول مع هِمّة</span>
           </div>
           <span className="project-number">0{index + 1} • {project.tag}</span>
           <h3>{project.name}</h3>
