@@ -23,7 +23,7 @@ export const PORTFOLIO_SSO_ENABLED = {
 
 export const PORTFOLIO_PUBLIC_JWK: JsonWebKey = { key_ops: ["verify"], ext: true, kty: "EC", x: "3t4IG1-SSwzOL6me14lxVhh4a2Oab6-xxgLURaqtHNU", y: "Fm3gm4pXJlkhso9ITBTW6B9U1SuVy5V0EKabg9KL9wk", crv: "P-256" };
 export type PortfolioApp = keyof typeof PORTFOLIO_APPS;
-export type PortfolioMemberRole = "owner" | "full" | "project" | "child";
+export type PortfolioMemberRole = "owner" | "full" | "project";
 export type PortfolioMembership = {
   userId: string;
   plan: string;
@@ -33,7 +33,7 @@ export type PortfolioMembership = {
 };
 
 const encoder = new TextEncoder();
-const portfolioRoles = new Set<PortfolioMemberRole>(["owner", "full", "project", "child"]);
+const portfolioRoles = new Set<PortfolioMemberRole>(["owner", "full", "project"]);
 
 function toBase64Url(value: Uint8Array) {
   let binary = "";
@@ -78,8 +78,7 @@ export function portfolioApp(value: string | null): PortfolioApp | null {
 
 export function portfolioRoleAllowsApp(role: PortfolioMemberRole, projectScope: string, app: PortfolioApp) {
   if (role === "owner" || role === "full") return true;
-  if (role === "project") return projectScope === app;
-  return role === "child" && projectScope === "kids" && app === "kids";
+  return role === "project" && projectScope === app;
 }
 
 function validFutureEnd(value: string) {
