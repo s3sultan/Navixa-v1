@@ -25,10 +25,7 @@ export async function POST(request: Request) {
   if (!database) return NextResponse.json({ error: "دخول NAVIXA غير متاح" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const settings = await getUserAuthSettings(database).catch(() => null), secrets = await env();
   const pepper = secrets.NAVIXA_AUTH_CODE_PEPPER;
-  if (!settings?.userAuthEnabled || !pepper) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
-  if (!settings.emailOtpEnabled) {
-    await database.prepare("INSERT INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES ('email_otp_enabled','true',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value='true',updated_at=excluded.updated_at").bind(new Date().toISOString()).run().catch(() => {});
-  }
+  if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !pepper) return NextResponse.json({ error: "دخول البريد غير متاح حاليًا" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const body = await request.json().catch(() => ({})) as { email?: unknown; code?: unknown };
   const email = normalizeUserEmail(body.email), loginCode = code(body.code);
   const ipLimit = await consumeAuthRateLimit(database, "otp-verify-ip", clientIp(request), pepper, 8, 10 * 60_000);
