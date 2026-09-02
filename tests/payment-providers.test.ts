@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { buildMoyasarCheckout, buildTelrHostedPaymentRequest, normalizeMoyasarWebhook, tamaraAdapter, telrAdapter } from "../app/billing/providers/index.ts";
 
@@ -26,6 +27,17 @@ test("Moyasar webhook normalization rejects a wrong secret and normalizes a paid
   assert.equal(event.paid, true);
   assert.equal(event.intentId, "intent_123");
   assert.equal(event.paymentId, "pay_123");
+});
+
+test("live Moyasar webhook verifies amount, currency, intent, and paid status with Moyasar before activation", async () => {
+  const route = await readFile(new URL("../app/api/billing/webhook/route.ts", import.meta.url), "utf8");
+  assert.match(route, /verifyMoyasarPayment/);
+  assert.match(route, /normalized\.amount !== intent\.amount/);
+  assert.match(route, /normalized\.currency !== intent\.currency/);
+  assert.match(route, /expectedIntentId:\s*intentId/);
+  assert.match(route, /expectedAmount:\s*intent\.amount/);
+  assert.match(route, /expectedCurrency:\s*intent\.currency/);
+  assert.match(route, /verified\.status !== "paid"/);
 });
 
 test("Tamara remains disabled unless an administrator enables it and sandbox secrets are present", () => {
