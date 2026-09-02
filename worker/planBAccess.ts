@@ -9,8 +9,12 @@ import type { EmergencyState } from "./emergencyMode.ts";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export const PLAN_B_URL = "https://navixa.s2shug.chatgpt.site";
 const MAX_GRANT_SECONDS = 15 * 60;
+const BLOCKED_FALLBACK_HOSTS = new Set([
+  "chatgpt.com",
+  "chat.openai.com",
+  "chatgpt.site",
+]);
 
 type GrantPayload = {
   v: 1;
@@ -35,6 +39,27 @@ function decodeB64url(value: string) {
 async function signingKey(secret: string, usages: KeyUsage[]) {
   if (!secret) throw new Error("missing_plan_b_signing_secret");
   return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, usages);
+}
+
+/**
+ * Plan B must be a public HTTPS endpoint controlled by NAVIXA and must not
+ * require a third-party account. Invalid or known account-gated hosts fail
+ * closed so users are never redirected to an unusable fallback.
+ */
+export function resolvePlanBUrl(configuredUrl: string | undefined) {
+  if (!configuredUrl) return null;
+  try {
+    const url = new URL(configuredUrl.trim());
+    if (url.protocol !== "https:") return null;
+    const hostname = url.hostname.toLowerCase();
+    if (!hostname || BLOCKED_FALLBACK_HOSTS.has(hostname) || hostname.endsWith(".chatgpt.site")) return null;
+    url.username = "";
+    url.password = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
 }
 
 export function planBMayOpen(state: EmergencyState) {
