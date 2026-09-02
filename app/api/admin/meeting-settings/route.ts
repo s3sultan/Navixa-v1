@@ -14,7 +14,7 @@ const isFlag=(value:unknown)=>value===true||value==="true";
 const asMb=(value:unknown)=>{const number=Number(value);return Number.isInteger(number)&&number>=25&&number<=500?String(number):""};
 
 async function db():Promise<Database|null>{try{return (await import("cloudflare:workers") as {env?:{DB?:Database}}).env?.DB||null}catch{return (globalThis as {DB?:Database}).DB||null}}
-async function allowed(request:Request){const secret=await resolveAdminJwtSecret();return Boolean(secret&&isTrustedSameOriginRequest(request)&&await verifyAdminSessionToken(readCookie(request,ADMIN_SESSION_COOKIE),secret));}
+async function allowed(request:Request,mutation=false){if(mutation&&!isTrustedSameOriginRequest(request))return false;const secret=await resolveAdminJwtSecret();return Boolean(secret&&await verifyAdminSessionToken(readCookie(request,ADMIN_SESSION_COOKIE),secret));}
 async function schema(database:Database){
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_meeting_feature_settings (setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
   const now=new Date().toISOString();
@@ -29,7 +29,7 @@ export async function GET(request:Request){
 }
 
 export async function POST(request:Request){
-  if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
+  if(!await allowed(request,true))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
   const body=await request.json().catch(()=>({})) as Record<string,unknown>;
   const database=await db();if(!database)return NextResponse.json({error:"التخزين غير مهيأ"},{status:503,headers:{"Cache-Control":"no-store"}});
   const current=await settings(database);
