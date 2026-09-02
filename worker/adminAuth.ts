@@ -1,4 +1,4 @@
-export const ADMIN_SESSION_COOKIE = "navixa_admin_session";
+export const ADMIN_SESSION_COOKIE = "__Host-navixa_admin_session";
 export const ADMIN_SESSION_AUDIENCE = "navixa-admin";
 const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
 const encoder = new TextEncoder();
