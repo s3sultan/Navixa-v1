@@ -15,7 +15,7 @@ const flag=(value:unknown)=>value===true||value==="true";
 
 async function db():Promise<D1Database|null>{try{return (await import("cloudflare:workers") as {env?:{DB?:D1Database}}).env?.DB||null}catch{return (globalThis as {DB?:D1Database}).DB||null}}
 async function env():Promise<Env>{try{return (await import("cloudflare:workers") as {env?:Env}).env||{}}catch{return globalThis as Env}}
-async function allowed(request:Request){const secret=await resolveAdminJwtSecret();return Boolean(secret&&isTrustedSameOriginRequest(request)&&await verifyAdminSessionToken(readCookie(request,ADMIN_SESSION_COOKIE),secret));}
+async function allowed(request:Request,requireSameOrigin=false){const secret=await resolveAdminJwtSecret();if(!secret)return false;if(requireSameOrigin&&!isTrustedSameOriginRequest(request))return false;return Boolean(await verifyAdminSessionToken(readCookie(request,ADMIN_SESSION_COOKIE),secret));}
 async function schema(database:D1Database){
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_billing_settings (setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_billing_events (id TEXT PRIMARY KEY,provider_event_id TEXT NOT NULL UNIQUE,subscriber_id TEXT NOT NULL DEFAULT '',event_type TEXT NOT NULL,mode TEXT NOT NULL DEFAULT 'test',payload_json TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL,processed_at TEXT NOT NULL DEFAULT '')").run();
@@ -33,7 +33,7 @@ export async function GET(request:Request){
 }
 
 export async function POST(request:Request){
-  if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
+  if(!await allowed(request,true))return NextResponse.json({error:"غير مصرح"},{status:401,headers:{"Cache-Control":"no-store"}});
   const body=await request.json().catch(()=>({})) as {provider?:unknown;mode?:unknown;publicCheckout?:unknown;testWebhookEnabled?:unknown;livePaymentsEnabled?:unknown;cardMadaEnabled?:unknown;visaEnabled?:unknown;mastercardEnabled?:unknown;applePayEnabled?:unknown;stcPayEnabled?:unknown;samsungPayEnabled?:unknown;tamaraEnabled?:unknown;tamaraSandboxEnabled?:unknown;telrEnabled?:unknown;telrSandboxEnabled?:unknown};
   const database=await db();if(!database)return NextResponse.json({error:"التخزين غير مهيأ"},{status:503,headers:{"Cache-Control":"no-store"}});
   const current=await readSettings(database),secrets=await env();

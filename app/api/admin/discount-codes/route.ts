@@ -7,7 +7,7 @@ type CodeRow={id:string;code:string;discount_type:string;discount_value:number;p
 const clean=(value:unknown,limit:number)=>typeof value==="string"?value.replace(/\s+/g," ").trim().slice(0,limit):"";
 const code=(value:unknown)=>clean(value,32).toUpperCase().replace(/[^A-Z0-9_-]/g,"");
 const db=async():Promise<D1Database|null>=>{try{return (await import("cloudflare:workers") as {env?:{DB?:D1Database}}).env?.DB||null}catch{return (globalThis as {DB?:D1Database}).DB||null}};
-async function allowed(request:Request){const secret=await resolveAdminJwtSecret();return Boolean(secret&&isTrustedSameOriginRequest(request)&&await verifyAdminSessionToken(readCookie(request,ADMIN_SESSION_COOKIE),secret));}
+async function allowed(request:Request,requireSameOrigin=false){const secret=await resolveAdminJwtSecret();if(!secret)return false;if(requireSameOrigin&&!isTrustedSameOriginRequest(request))return false;return Boolean(await verifyAdminSessionToken(readCookie(request,ADMIN_SESSION_COOKIE),secret));}
 async function schema(database:D1Database){
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_discount_codes (id TEXT PRIMARY KEY,code TEXT NOT NULL UNIQUE,discount_type TEXT NOT NULL DEFAULT 'percent',discount_value INTEGER NOT NULL DEFAULT 0,plans TEXT NOT NULL DEFAULT 'all',max_redemptions INTEGER NOT NULL DEFAULT 0,redeemed_count INTEGER NOT NULL DEFAULT 0,reserved_count INTEGER NOT NULL DEFAULT 0,valid_from TEXT NOT NULL DEFAULT '',valid_until TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)").run();
   await database.prepare("ALTER TABLE navixa_discount_codes ADD COLUMN reserved_count INTEGER NOT NULL DEFAULT 0").run().catch(()=>{});
@@ -19,7 +19,7 @@ export async function GET(request:Request){
   return NextResponse.json({codes:rows.results},{headers:{"Cache-Control":"no-store"}});
 }
 export async function POST(request:Request){
-  if(!await allowed(request))return NextResponse.json({error:"غير مصرح"},{status:401});
+  if(!await allowed(request,true))return NextResponse.json({error:"غير مصرح"},{status:401});
   const database=await db();if(!database)return NextResponse.json({error:"التخزين غير مهيأ"},{status:503});await schema(database);
   const body=await request.json().catch(()=>({})) as {action?:unknown;id?:unknown;code?:unknown;discountType?:unknown;discountValue?:unknown;plans?:unknown;maxRedemptions?:unknown;validFrom?:unknown;validUntil?:unknown;enabled?:unknown};
   const action=clean(body.action,20),now=new Date().toISOString();
