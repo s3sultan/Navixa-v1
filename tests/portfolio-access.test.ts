@@ -76,6 +76,14 @@ test("المنحة الموقعة تحمل دور العضو دون كشف ال�
   assert.equal(grant.includes("@"), false);
 });
 
+test("واجهة المنظومة تتحقق من كل مشروع ولا تعرض رابط مشروع غير مشمول", () => {
+  const portfolio = readFileSync(new URL("../app/portfolio/page.tsx", import.meta.url), "utf8");
+  assert.match(portfolio, /membership\?app=\$\{product\.key\}/);
+  assert.match(portfolio, /entitlement\?\.eligible/);
+  assert.match(portfolio, /غير مشمول بعضويتك/);
+  assert.doesNotMatch(portfolio, /fetch\("\/api\/portfolio\/membership"\s*,/);
+});
+
 test("عقد البوابة يبقي المحتوى الأساسي مجانيًا ولا يوسّع كوكي NAVIXA إلى النطاقات الفرعية", () => {
   const auth = readFileSync(new URL("../worker/userAuth.ts", import.meta.url), "utf8");
   const portfolio = readFileSync(new URL("../app/portfolio/page.tsx", import.meta.url), "utf8");
