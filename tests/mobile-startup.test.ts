@@ -11,9 +11,10 @@ test("homepage defers non-essential mobile startup tools", async () => {
   assert.doesNotMatch(page, /import FloatingAssistant from/);
 });
 
-test("direct-entry mode hides the actual welcome screen", async () => {
+test("direct-entry mode hides welcome before hydration", async () => {
   const directEntry = await readFile(new URL("app/DirectEntry.tsx", root), "utf8");
-  assert.match(directEntry, /data-navixa-direct-entry=\"true\"\]\s+\.welcome,/);
+  assert.match(directEntry, /return <style>\{`\s*\.welcome,/);
+  assert.doesNotMatch(directEntry, /data-navixa-direct-entry=\"true\"\]\s+\.welcome,/);
   assert.match(directEntry, /navixa-welcome-hidden/);
   assert.match(directEntry, /navixa-entered/);
 });
