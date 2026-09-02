@@ -41,6 +41,7 @@ export default function DirectEntry() {
   }, []);
 
   return <style>{`
+    html[data-navixa-direct-entry="true"] .welcome,
     html[data-navixa-direct-entry="true"] .welcome-screen,
     html[data-navixa-direct-entry="true"] .welcome-overlay,
     html[data-navixa-direct-entry="true"] .welcome-gate,
