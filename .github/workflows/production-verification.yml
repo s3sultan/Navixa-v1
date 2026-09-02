@@ -1,0 +1,74 @@
+name: NAVIXA Production Verification
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/production-verification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROD_URL: https://navixa.s2shug.workers.dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify repository quality
+        run: |
+          npm run lint
+          npm test
+          npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high || true
+
+      - name: Production smoke test
+        run: |
+          set -euo pipefail
+          for path in / /plus /robots.txt /sitemap.xml /api/account/session; do
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -o /tmp/body -w '%{http_code}' "$PROD_URL$path")
+            echo "$path -> $code"
+            test "$code" -lt 500
+          done
+
+      - name: Check baseline security headers
+        run: |
+          set -euo pipefail
+          headers=$(mktemp)
+          curl -sS --connect-timeout 5 --max-time 15 -D "$headers" -o /dev/null "$PROD_URL/"
+          cat "$headers"
+          grep -qi '^content-security-policy:' "$headers"
+          grep -qi '^x-content-type-options:' "$headers"
+          grep -qi '^referrer-policy:' "$headers"
+
+      - name: Bounded production load test
+        run: |
+          set -euo pipefail
+          rm -f /tmp/navixa-production-load.csv
+          seq 100 | xargs -n1 -P10 -I{} \
+            curl -sS --connect-timeout 5 --max-time 15 \
+            -o /dev/null \
+            -w '%{http_code},%{time_starttransfer},%{time_total}\n' \
+            "$PROD_URL/" >> /tmp/navixa-production-load.csv
+          total=$(wc -l < /tmp/navixa-production-load.csv)
+          errors=$(awk -F, '$1 ~ /^5/ {n++} END {print n+0}' /tmp/navixa-production-load.csv)
+          successful=$(awk -F, '$1 ~ /^2/ {n++} END {print n+0}' /tmp/navixa-production-load.csv)
+          avg=$(awk -F, '{sum+=$3} END {if(NR) printf "%.3f",sum/NR; else print "0"}' /tmp/navixa-production-load.csv)
+          p95=$(awk -F, '{print $3}' /tmp/navixa-production-load.csv | sort -n | awk -v n="$total" 'NR==int(n*0.95)+(n*0.95!=int(n*0.95)) {printf "%.3f",$1}')
+          echo "requests=$total success_2xx=$successful server_5xx=$errors average_total_seconds=$avg p95_total_seconds=$p95"
+          test "$errors" -eq 0
