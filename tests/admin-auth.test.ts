@@ -30,12 +30,16 @@ test("rejects tampered and expired JWT administration sessions", async () => {
   assert.equal(await verifyAdminSessionToken(token, secret, now + 9 * 60 * 60 * 1_000), null);
 });
 
-test("uses an HttpOnly secure cookie and reads it without trusting client storage", async () => {
+test("uses a browser-enforced host-only HttpOnly secure cookie", async () => {
   const token = await createAdminSessionToken("s2shug@gmail.com", secret);
   const cookie = makeAdminSessionCookie(token);
+  assert.equal(ADMIN_SESSION_COOKIE, "__Host-navixa_admin_session");
+  assert.match(cookie, /^__Host-navixa_admin_session=/);
+  assert.match(cookie, /Path=\//);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
   assert.match(cookie, /SameSite=Strict/);
+  assert.doesNotMatch(cookie, /Domain=/i);
   assert.equal(readCookie(new Request("https://navixa.example/admin", { headers: { cookie: `theme=dark; ${cookie.split(";")[0]}` } }), ADMIN_SESSION_COOKIE), token);
 });
 
