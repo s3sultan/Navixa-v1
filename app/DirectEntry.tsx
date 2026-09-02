@@ -41,12 +41,12 @@ export default function DirectEntry() {
   }, []);
 
   return <style>{`
-    html[data-navixa-direct-entry="true"] .welcome,
-    html[data-navixa-direct-entry="true"] .welcome-screen,
-    html[data-navixa-direct-entry="true"] .welcome-overlay,
-    html[data-navixa-direct-entry="true"] .welcome-gate,
-    html[data-navixa-direct-entry="true"] .entry-gate,
-    html[data-navixa-direct-entry="true"] .auth-gate { display:none !important; }
+    .welcome,
+    .welcome-screen,
+    .welcome-overlay,
+    .welcome-gate,
+    .entry-gate,
+    .auth-gate { display:none !important; }
 
     .mobile-admin-footer-entry { display:none; }
     @media (max-width:650px) {
