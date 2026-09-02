@@ -40,12 +40,7 @@ export async function POST(request: Request) {
   const authFrom = secrets.NAVIXA_AUTH_FROM || secrets.RESEND_FROM_EMAIL;
   const pepper = secrets.NAVIXA_AUTH_CODE_PEPPER;
   const providerReady = Boolean(secrets.RESEND_API_KEY && authFrom && pepper);
-  if (!settings?.userAuthEnabled || !providerReady) return NextResponse.json({ error: "إرسال رمز البريد غير متاح مؤقتًا. جرّب Google أو أعد المحاولة لاحقًا.", code: "EMAIL_OTP_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-
-  if (!settings.emailOtpEnabled) {
-    const now = new Date().toISOString();
-    await database.prepare("INSERT INTO navixa_user_auth_settings(setting_key,setting_value,updated_at) VALUES ('email_otp_enabled','true',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value='true',updated_at=excluded.updated_at").bind(now).run().catch(() => {});
-  }
+  if (!settings?.userAuthEnabled || !settings.emailOtpEnabled || !providerReady) return NextResponse.json({ error: "إرسال رمز البريد غير متاح مؤقتًا. جرّب Google أو أعد المحاولة لاحقًا.", code: "EMAIL_OTP_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
 
   const body = await request.json().catch(() => ({})) as { email?: unknown };
   const email = normalizeUserEmail(body.email);
