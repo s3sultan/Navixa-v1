@@ -17,8 +17,10 @@ export default function DirectEntry() {
 
     document.documentElement.dataset.navixaDirectEntry = "true";
 
+    const isMobile = () => window.matchMedia("(max-width: 650px)").matches;
+
     const mountMobileAdminEntry = () => {
-      if (!window.matchMedia("(max-width: 650px)").matches) return;
+      if (!isMobile()) return;
       const footer = document.querySelector<HTMLElement>(".nx-public-footer-shell");
       if (!footer || footer.querySelector(".mobile-admin-footer-entry")) return;
       const link = document.createElement("a");
@@ -29,13 +31,36 @@ export default function DirectEntry() {
       footer.appendChild(link);
     };
 
-    mountMobileAdminEntry();
-    const observer = new MutationObserver(mountMobileAdminEntry);
+    const guardMobileScreenSharing = () => {
+      if (!isMobile()) return;
+      const modals = document.querySelectorAll<HTMLElement>(".assistant-tool-modal");
+      modals.forEach((modal) => {
+        if (!modal.textContent?.includes("متابعة الشاشة")) return;
+        const buttons = Array.from(modal.querySelectorAll<HTMLButtonElement>("button"));
+        const shareButton = buttons.find((button) => /اختيار شاشة|إيقاف المشاركة/.test(button.textContent || ""));
+        if (shareButton) shareButton.style.display = "none";
+        if (!modal.querySelector(".mobile-screen-unavailable")) {
+          const notice = document.createElement("p");
+          notice.className = "mobile-screen-unavailable";
+          notice.textContent = "متابعة الشاشة متاحة على الكمبيوتر حاليًا";
+          modal.appendChild(notice);
+        }
+      });
+    };
+
+    const syncMobileUi = () => {
+      mountMobileAdminEntry();
+      guardMobileScreenSharing();
+    };
+
+    syncMobileUi();
+    const observer = new MutationObserver(syncMobileUi);
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
       observer.disconnect();
       document.querySelector(".mobile-admin-footer-entry")?.remove();
+      document.querySelectorAll(".mobile-screen-unavailable").forEach((item) => item.remove());
       delete document.documentElement.dataset.navixaDirectEntry;
     };
   }, []);
@@ -47,7 +72,9 @@ export default function DirectEntry() {
     html[data-navixa-direct-entry="true"] .entry-gate,
     html[data-navixa-direct-entry="true"] .auth-gate { display:none !important; }
 
-    .mobile-admin-footer-entry { display:none; }
+    .mobile-admin-footer-entry,
+    .mobile-screen-unavailable { display:none; }
+
     @media (max-width:650px) {
       .mobile-admin-footer-entry {
         width:max-content;
@@ -61,6 +88,19 @@ export default function DirectEntry() {
         text-decoration:none;
         font-size:11px;
         font-weight:600;
+      }
+
+      .mobile-screen-unavailable {
+        display:block;
+        margin:14px 0 0;
+        padding:12px 14px;
+        border:1px solid #e1e7e4;
+        border-radius:12px;
+        background:rgba(255,255,255,.72);
+        color:#60706a;
+        text-align:center;
+        font-size:13px;
+        font-weight:700;
       }
     }
   `}</style>;
