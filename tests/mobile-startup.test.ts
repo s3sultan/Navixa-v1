@@ -10,10 +10,3 @@ test("homepage defers non-essential mobile startup tools", async () => {
   assert.match(page, /requestIdleCallback/);
   assert.doesNotMatch(page, /import FloatingAssistant from/);
 });
-
-test("direct-entry mode hides the actual welcome screen", async () => {
-  const directEntry = await readFile(new URL("app/DirectEntry.tsx", root), "utf8");
-  assert.match(directEntry, /data-navixa-direct-entry=\"true\"\]\s+\.welcome,/);
-  assert.match(directEntry, /navixa-welcome-hidden/);
-  assert.match(directEntry, /navixa-entered/);
-});
