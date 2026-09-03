@@ -9,6 +9,16 @@ const ENFORCED_CSP = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.navixasa.com" }],
+        destination: "https://navixasa.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
