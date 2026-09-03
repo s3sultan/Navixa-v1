@@ -10,6 +10,7 @@ import { useEffect } from "react";
 export default function DirectEntry() {
   useEffect(() => {
     try {
+      localStorage.setItem("navixa-hide-welcome", "1");
       localStorage.setItem("navixa-welcome-hidden", "1");
       localStorage.setItem("navixa-entered", "1");
       sessionStorage.setItem("navixa-entered", "1");
@@ -66,6 +67,7 @@ export default function DirectEntry() {
   }, []);
 
   return <style>{`
+    .welcome,
     html[data-navixa-direct-entry="true"] .welcome-screen,
     html[data-navixa-direct-entry="true"] .welcome-overlay,
     html[data-navixa-direct-entry="true"] .welcome-gate,
