@@ -1,0 +1,42 @@
+.welcome,
+html[data-navixa-direct-entry="true"] .welcome-screen,
+html[data-navixa-direct-entry="true"] .welcome-overlay,
+html[data-navixa-direct-entry="true"] .welcome-gate,
+html[data-navixa-direct-entry="true"] .entry-gate,
+html[data-navixa-direct-entry="true"] .auth-gate {
+  display: none !important;
+}
+
+.mobile-admin-footer-entry,
+.mobile-screen-unavailable {
+  display: none;
+}
+
+@media (max-width: 650px) {
+  .mobile-admin-footer-entry {
+    width: max-content;
+    margin: 18px auto 4px;
+    padding: 8px 12px;
+    display: block;
+    color: #718079;
+    border: 1px solid #e1e7e4;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.72);
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .mobile-screen-unavailable {
+    display: block;
+    margin: 14px 0 0;
+    padding: 12px 14px;
+    border: 1px solid #e1e7e4;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #60706a;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+}
