@@ -75,6 +75,13 @@ test("Passkey verification serializes authentication and registration challenges
   }
 });
 
+test("Passkey registration options require an explicit same-origin mutation", async () => {
+  const route = await readFile(new URL("../app/api/account/passkeys/register/options/route.ts", import.meta.url), "utf8");
+  assert.match(route, /trustedUserMutation\(request\)/);
+  assert.match(route, /status: 403/);
+  assert.ok(route.indexOf("trustedUserMutation(request)") < route.indexOf("resolveUserSession(request, database)"));
+});
+
 test("Google login keeps a shared cross-isolate IP rate limit behind the local fast gate", async () => {
   const route = await readFile(new URL("../app/api/account/google/route.ts", import.meta.url), "utf8");
   assert.match(route, /clientIp\(request\)/);
