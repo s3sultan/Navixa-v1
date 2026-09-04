@@ -26,11 +26,11 @@ concurrency:
 jobs:
   review:
     if: >-
-      (github.event_name == 'issues' &&
-       github.event.action == 'labeled' &&
-       github.event.label.name == 'dispatch:gemini' &&
-       github.actor == github.repository_owner) ||
-      (github.event_name == 'workflow_dispatch' && inputs.approved == true)
+      github.actor == github.repository_owner &&
+      ((github.event_name == 'issues' &&
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'dispatch:gemini') ||
+       (github.event_name == 'workflow_dispatch' && inputs.approved == true))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
