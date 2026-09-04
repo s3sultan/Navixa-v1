@@ -21,11 +21,15 @@ assert.match(sitemap, /organize-your-day|meeting-summaries|smart-reminders|local
 assert.match(sitemap, /guides/);
 assert.match(worker, /Strict-Transport-Security/);
 assert.match(worker, /X-Content-Type-Options/);
+assert.match(worker, /X-Permitted-Cross-Domain-Policies/);
 assert.match(worker, /const CSP_ENFORCED = \[/);
 assert.match(worker, /base-uri 'self'/);
 assert.match(worker, /object-src 'none'/);
 assert.match(worker, /frame-ancestors 'self'/);
+assert.match(worker, /frame-src 'self' https:\/\/accounts\.google\.com/);
 assert.match(worker, /form-action 'self'/);
+assert.match(worker, /manifest-src 'self'/);
+assert.match(worker, /script-src-attr 'none'/);
 assert.match(worker, /set\("Content-Security-Policy", CSP_ENFORCED\)/);
 assert.match(worker, /Content-Security-Policy-Report-Only/);
 assert.match(worker, /report-uri \/api\/security\/csp-report/);
@@ -34,6 +38,9 @@ assert.match(worker, /fonts\.googleapis\.com/);
 assert.match(worker, /accounts\.google\.com/);
 assert.match(worker, /cdn\.jsdelivr\.net/);
 assert.doesNotMatch(worker, /set\("Content-Security-Policy", CSP_REPORT_ONLY/);
+assert.match(worker, /consumeAuthRateLimit/);
+assert.match(worker, /public-mutation:\$\{url\.pathname\}/);
+assert.match(worker, /await publicMutationGuard\(request, url, env\)/);
 for (const page of [organizer, meetings, reminders, privacy]) assert.match(page, /alternates: \{ canonical:/);
 assert.match(organizer, /href="\/guides"/);
 
