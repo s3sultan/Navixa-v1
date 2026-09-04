@@ -11,15 +11,15 @@ test("public plan badges use Himma and Azm names",async()=>{
   assert.doesNotMatch(badges,/>PLUS<\/Link>|>SPRINT<\/Link>/);
 });
 
-test("homepage hides founders promotion entry points and replaces legacy Plus badges visually",async()=>{
-  const [layout,overrides]=await Promise.all([
+test("homepage source uses Himma directly and has no founders promotion entry points",async()=>{
+  const [page,layout]=await Promise.all([
+    readFile(new URL("app/page.tsx",root),"utf8"),
     readFile(new URL("app/layout.tsx",root),"utf8"),
-    readFile(new URL("app/branding-overrides.css",root),"utf8"),
   ]);
-  assert.match(layout,/branding-overrides\.css/);
-  assert.match(overrides,/\.welcome-founders-link/);
-  assert.match(overrides,/\.topbar-actions \.topbar-plus/);
-  assert.match(overrides,/content: "هِمّة"/);
+  assert.match(page,/<em className="plus-badge">هِمّة<\/em>/);
+  assert.doesNotMatch(page,/<em className="plus-badge">Plus<\/em>/);
+  assert.doesNotMatch(page,/welcome-founders-link|>عرض المؤسسين</);
+  assert.doesNotMatch(layout,/branding-overrides\.css/);
 });
 
 test("Arabic subscription copy no longer presents Plus as the public plan name",async()=>{

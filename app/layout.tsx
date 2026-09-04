@@ -6,7 +6,6 @@ import DirectEntry from "./DirectEntry";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
 import "./direct-entry.css";
-import "./branding-overrides.css";
 
 const siteUrl = "https://navixasa.com";
 
