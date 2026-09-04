@@ -100,15 +100,22 @@ async function waitForDocument(cdp, expectedPath, attempts = 80) {
   let lastState;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      lastState = await evaluate(cdp, `(() => ({
-        readyState: document.readyState,
-        path: location.pathname,
-        htmlLength: document.documentElement?.outerHTML?.length || 0,
-        bodyLength: document.body?.innerText?.length || 0,
-        title: document.title || "",
-        inlineScripts: [...document.scripts].filter(script => !script.src).length,
-        noncedInlineScripts: [...document.scripts].filter(script => !script.src && Boolean(script.nonce)).length
-      }))()`);
+      lastState = await evaluate(cdp, `(() => {
+        const executableInlineScripts = [...document.scripts].filter(script => {
+          if (script.src) return false;
+          const type = String(script.type || "").trim().toLowerCase();
+          return type === "" || type === "module" || type === "text/javascript" || type === "application/javascript" || type === "text/ecmascript" || type === "application/ecmascript";
+        });
+        return {
+          readyState: document.readyState,
+          path: location.pathname,
+          htmlLength: document.documentElement?.outerHTML?.length || 0,
+          bodyLength: document.body?.innerText?.length || 0,
+          title: document.title || "",
+          executableInlineScripts: executableInlineScripts.length,
+          noncedExecutableInlineScripts: executableInlineScripts.filter(script => Boolean(script.nonce)).length
+        };
+      })()`);
       if (lastState?.path === expectedPath && ["interactive", "complete"].includes(lastState.readyState) && lastState.htmlLength > 500) {
         return lastState;
       }
@@ -239,7 +246,11 @@ async function main() {
         }
         throw new Error(`Nonce-based script CSP is not yet compatible with ${path}`);
       }
-      assert.equal(state.noncedInlineScripts, state.inlineScripts, `Not every inline script carried a nonce on ${path}`);
+      assert.equal(
+        state.noncedExecutableInlineScripts,
+        state.executableInlineScripts,
+        `Not every executable inline script carried a nonce on ${path}`,
+      );
     }
 
     console.log(JSON.stringify({ status: "passed", staging: STAGING_URL, rendered }, null, 2));
