@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server.js";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
+import { consumeAuthRateLimit } from "../../../../../../worker/authRateLimit.ts";
 import { getUserAuthSettings, resolveUserSession, trustedUserMutation, type D1Database } from "../../../../../../worker/userAuth.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
   try {
     const verified = await verifyRegistrationResponse({ response: response as never, expectedChallenge: active.challenge, expectedOrigin: origin, expectedRPID: rpID, requireUserVerification: true, supportedAlgorithmIDs: [-7, -257] });
     if (!verified.verified) return NextResponse.json({ error: "تعذر التحقق من Passkey" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+
+    const consumeGate = await consumeAuthRateLimit(database, "passkey-register-challenge", active.id, active.challenge, 1, 5 * 60_000);
+    if (!consumeGate.allowed) return NextResponse.json({ error: "انتهت مهلة Passkey، ابدأ من جديد" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+
     const credential = verified.registrationInfo.credential;
     await database.prepare("INSERT INTO navixa_user_passkeys(id,user_id,credential_id,public_key,counter,transports_json,device_type,backed_up,created_at,last_used_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,?, '', '')").bind(crypto.randomUUID(), session.userId, credential.id, base64Url(credential.publicKey), credential.counter, JSON.stringify(credential.transports || []), verified.registrationInfo.credentialDeviceType, verified.registrationInfo.credentialBackedUp ? 1 : 0, now).run();
     await database.prepare("UPDATE navixa_user_webauthn_challenges SET consumed_at=? WHERE id=? AND consumed_at=''").bind(now, active.id).run();
