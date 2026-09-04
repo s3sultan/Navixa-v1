@@ -1,0 +1,73 @@
+name: NAVIXA Pre-Launch Gate
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pre-launch-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build, tests, security baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Lint, tests, UI smoke and production build
+        run: npm run test:verify
+
+  secret-scan:
+    name: Secret exposure guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  gate:
+    name: Release gate
+    if: always()
+    needs: [verify, secret-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce blocking checks
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
+        run: |
+          echo "Build/tests/security baseline: $VERIFY_RESULT"
+          echo "Secret scan: $SECRET_SCAN_RESULT"
+          if [ "$VERIFY_RESULT" != "success" ] || [ "$SECRET_SCAN_RESULT" != "success" ]; then
+            echo "NAVIXA Pre-Launch Gate: BLOCK"
+            exit 1
+          fi
+          echo "NAVIXA Pre-Launch Gate: PASS"
