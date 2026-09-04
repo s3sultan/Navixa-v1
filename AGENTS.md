@@ -56,6 +56,8 @@ Review the complete diff as if it were a pull request:
 - Confirm security-sensitive paths are enforced server-side.
 - Confirm existing behavior was not unintentionally broken.
 
+For material architecture, access-control, data-flow, integration, deployment, or major UI changes, also follow `NAVIXA_VISUAL_REVIEW.md`. Use the smallest useful visual to show the relevant before state, intended change, after state, affected files, data/control path, risks, verification evidence, and rollback path. Do not create decorative diagrams for trivial edits.
+
 ## 9. Deployment and rollback
 Preferred English release flow:
 
