@@ -108,3 +108,34 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config dist/server/wrangler.json --name navixa-staging
+
+      - name: Verify deployed staging runtime and security headers
+        env:
+          STAGING_URL: https://navixa-staging.s2shug.workers.dev
+        run: |
+          set -euo pipefail
+          ready=0
+          for attempt in $(seq 1 30); do
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -D /tmp/navixa-staging-headers.txt -o /tmp/navixa-staging-body.html -w '%{http_code}' "$STAGING_URL/" || true)
+            if [ "$code" = "200" ]; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo "Staging did not become ready"; exit 1; }
+          grep -Eqi '^content-security-policy:.*script-src-attr '\''none'\''' /tmp/navixa-staging-headers.txt
+          grep -Eqi '^content-security-policy-report-only:' /tmp/navixa-staging-headers.txt
+          grep -Eqi '^x-permitted-cross-domain-policies:[[:space:]]*none' /tmp/navixa-staging-headers.txt
+          grep -Eqi '^x-content-type-options:[[:space:]]*nosniff' /tmp/navixa-staging-headers.txt
+          grep -Eqi 'NAVIXA|navixa' /tmp/navixa-staging-body.html
+
+          for path in / /today /account /admin/login /meetings; do
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' "$STAGING_URL$path")
+            case "$code" in
+              2*|3*|401|403) ;;
+              *) echo "Unexpected staging status $code for $path"; exit 1 ;;
+            esac
+          done
+
+          origin_status=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' \
+            -X POST -H 'Origin: https://attacker.example' -H 'Content-Type: application/json' \
+            --data '{}' "$STAGING_URL/api/account/passkeys/register/options")
+          test "$origin_status" = "403" || { echo "Passkey same-origin guard returned $origin_status"; exit 1; }
