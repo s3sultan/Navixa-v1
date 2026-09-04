@@ -38,6 +38,7 @@ jobs:
         if: github.ref == 'refs/heads/security/hardening-2026-09-04'
         run: |
           set -euo pipefail
+          cp tests/staging-csp-probe-middleware.ts middleware.ts
           node <<'NODE'
           const fs = require('node:fs');
           const path = 'worker/index.ts';
@@ -46,8 +47,15 @@ jobs:
           const scriptAfter = "script-src 'self' https://static.cloudflareinsights.com https://accounts.google.com https://cdn.jsdelivr.net";
           const styleBefore = "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net";
           const styleAfter = "style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net";
-          if (!source.includes(scriptBefore) || !source.includes(styleBefore)) throw new Error('Expected CSP report-only allowlist was not found');
-          source = source.replace(scriptBefore, scriptAfter).replace(styleBefore, styleAfter);
+          const reportOnlyBefore = 'response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);';
+          const reportOnlyAfter = `const existingReportOnly = response.headers.get("Content-Security-Policy-Report-Only");\n  if (!existingReportOnly?.includes("'nonce-")) response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);`;
+          if (!source.includes(scriptBefore) || !source.includes(styleBefore) || !source.includes(reportOnlyBefore)) {
+            throw new Error('Expected CSP staging patch points were not found');
+          }
+          source = source
+            .replace(scriptBefore, scriptAfter)
+            .replace(styleBefore, styleAfter)
+            .replace(reportOnlyBefore, reportOnlyAfter);
           fs.writeFileSync(path, source);
           NODE
 
@@ -163,7 +171,7 @@ jobs:
             --data '{}' "$STAGING_URL/api/account/passkeys/register/options")
           test "$origin_status" = "403" || { echo "Passkey same-origin guard returned $origin_status"; exit 1; }
 
-      - name: Probe strict CSP report-only compatibility with Chrome CDP
+      - name: Probe nonce-based script CSP compatibility with Chrome CDP
         if: github.ref == 'refs/heads/security/hardening-2026-09-04'
         env:
           STAGING_URL: https://navixa-staging.s2shug.workers.dev
