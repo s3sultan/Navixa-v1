@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server.js";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
+import { consumeAuthRateLimit } from "../../../../../../worker/authRateLimit.ts";
 import { createUserSession, getUserAuthSettings, hashOpaqueValue, isValidUserEmail, makeUserSessionCookie, normalizeUserEmail, trustedUserMutation, type D1Database } from "../../../../../../worker/userAuth.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
@@ -29,6 +30,13 @@ export async function POST(request: Request) {
   try {
     const verified = await verifyAuthenticationResponse({ response: body.response as never, expectedChallenge: active.challenge, expectedOrigin: new URL(request.url).origin, expectedRPID: new URL(request.url).hostname, requireUserVerification: true, credential: { id: passkey.credential_id, publicKey: decodeBase64Url(passkey.public_key), counter: passkey.counter, transports: JSON.parse(passkey.transports_json || "[]") as never[] } });
     if (!verified.verified) return NextResponse.json({ error: "تعذر التحقق من Passkey" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+
+    // The WebAuthn challenge is single-use across all Worker isolates. The
+    // challenge itself is already random and short-lived, so it safely peppers
+    // the opaque shared bucket without introducing another deployment secret.
+    const consumeGate = await consumeAuthRateLimit(database, "passkey-auth-challenge", active.id, active.challenge, 1, 5 * 60_000);
+    if (!consumeGate.allowed) return NextResponse.json({ error: "انتهت مهلة Passkey، ابدأ من جديد" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+
     await database.prepare("UPDATE navixa_user_webauthn_challenges SET consumed_at=? WHERE id=? AND consumed_at=''").bind(now, active.id).run();
     await database.prepare("UPDATE navixa_user_passkeys SET counter=?,last_used_at=? WHERE id=?").bind(verified.authenticationInfo.newCounter, now, passkey.id).run();
     await database.prepare("UPDATE navixa_users SET last_login_at=?,updated_at=? WHERE id=?").bind(now, now, user.id).run();
