@@ -135,8 +135,8 @@ export async function refreshUserSessionIfNeeded(request: Request, database: D1D
   // longer keep refreshing itself indefinitely. The old hash is the compare-and-
   // swap key, so only one concurrent refresh can win in production D1.
   const result = await database.prepare(
-    "UPDATE navixa_user_sessions SET token_hash=?,expires_at=?,last_seen_at=? WHERE token_hash=? AND revoked_at=''",
-  ).bind(nextHash, nextExpiresAt, nowIso, currentHash).run();
+    "UPDATE navixa_user_sessions SET expires_at=?,last_seen_at=?,token_hash=? WHERE token_hash=? AND revoked_at=''",
+  ).bind(nextExpiresAt, nowIso, nextHash, currentHash).run();
   if (mutationChanges(result) === 0) return { session, cookie: null };
 
   return { session: { ...session, expiresAt: nextExpiresAt }, cookie: makeUserSessionCookie(nextToken) };
