@@ -13,7 +13,6 @@ export const isAlertPolicy=(value:unknown):value is AlertPolicy=>value==="user"|
 
 export async function ensureAlertPolicySchema(database:AlertPolicyDatabase){
   await database.prepare("CREATE TABLE IF NOT EXISTS navixa_alert_policy (notification_type TEXT PRIMARY KEY, screen_policy TEXT NOT NULL DEFAULT 'user', telegram_policy TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL)").run();
-  try{await database.prepare("ALTER TABLE navixa_alert_policy ADD COLUMN message TEXT NOT NULL DEFAULT ''").run()}catch{/* Existing schema already has the message column. */}
 }
 
 export async function readAlertPolicy(database:AlertPolicyDatabase):Promise<AlertPolicyMap>{
