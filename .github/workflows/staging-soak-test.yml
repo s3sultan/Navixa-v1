@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       staging_url:
-        description: "Full staging Worker URL"
+        description: "NAVIXA staging Worker URL: https://navixa-staging.s2shug.workers.dev"
         required: true
         type: string
       duration_minutes:
@@ -23,6 +23,7 @@ permissions:
 
 jobs:
   soak-test:
+    if: github.actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -32,11 +33,12 @@ jobs:
           DURATION_MINUTES: ${{ inputs.duration_minutes }}
           INTERVAL_SECONDS: ${{ inputs.interval_seconds }}
         run: |
-          case "$STAGING_URL" in https://*) ;; *) echo "staging_url must use https"; exit 1;; esac
+          set -euo pipefail
+          test "$STAGING_URL" = "https://navixa-staging.s2shug.workers.dev" || { echo "staging_url must be the NAVIXA staging Worker"; exit 1; }
           test "$DURATION_MINUTES" -ge 1 -a "$DURATION_MINUTES" -le 60 || { echo "duration_minutes must be between 1 and 60"; exit 1; }
           test "$INTERVAL_SECONDS" -ge 1 -a "$INTERVAL_SECONDS" -le 60 || { echo "interval_seconds must be between 1 and 60"; exit 1; }
 
-      - name: Run 30 minute low-rate soak test
+      - name: Run bounded low-rate soak test
         env:
           STAGING_URL: ${{ inputs.staging_url }}
           DURATION_MINUTES: ${{ inputs.duration_minutes }}
