@@ -137,15 +137,24 @@ function directive(policy, name) {
 async function assertNonceProbeHeaders(url) {
   const response = await fetch(url, { redirect: "manual", headers: { "cache-control": "no-cache" } });
   assert.ok(response.status >= 200 && response.status < 500, `Unexpected probe status ${response.status} for ${url.pathname}`);
-  assert.equal(response.headers.get("x-navixa-csp-probe"), "nonce-style-elem-v1", `Nonce/style middleware did not run for ${url.pathname}`);
+  assert.equal(response.headers.get("x-navixa-csp-probe"), "nonce-style-elem-v2", `Nonce/style middleware did not run for ${url.pathname}`);
   const policy = response.headers.get("content-security-policy-report-only") || "";
   const scripts = directive(policy, "script-src");
   const styleElements = directive(policy, "style-src-elem");
   const styleAttributes = directive(policy, "style-src-attr");
   assert.match(scripts, /'nonce-[a-f0-9]{32}'/i, `Nonce is missing from script-src for ${url.pathname}`);
   assert.doesNotMatch(scripts, /'unsafe-inline'/i, `script-src still allows unsafe-inline for ${url.pathname}`);
-  assert.match(styleElements, /'nonce-[a-f0-9]{32}'/i, `Nonce is missing from style-src-elem for ${url.pathname}`);
-  assert.doesNotMatch(styleElements, /'unsafe-inline'/i, `style-src-elem still allows unsafe-inline for ${url.pathname}`);
+
+  if (url.pathname === "/admin/login") {
+    assert.equal(response.headers.get("x-navixa-csp-style-exception"), "google-identity", "Google Identity style exception was not explicitly marked");
+    assert.match(styleElements, /'unsafe-inline'/i, "Google Identity inline styles are not isolated to the documented login exception");
+    assert.match(styleElements, /https:\/\/accounts\.google\.com/i, "Google Identity stylesheet origin is missing from the login exception");
+  } else {
+    assert.equal(response.headers.get("x-navixa-csp-style-exception"), null, `Unexpected style exception on ${url.pathname}`);
+    assert.match(styleElements, /'nonce-[a-f0-9]{32}'/i, `Nonce is missing from style-src-elem for ${url.pathname}`);
+    assert.doesNotMatch(styleElements, /'unsafe-inline'/i, `style-src-elem still allows unsafe-inline for ${url.pathname}`);
+  }
+
   assert.match(styleAttributes, /'unsafe-inline'/i, `style-src-attr was tightened before its compatibility inventory for ${url.pathname}`);
 }
 
@@ -262,11 +271,13 @@ async function main() {
         state.executableInlineScripts,
         `Not every executable inline script carried a nonce on ${path}`,
       );
-      assert.equal(
-        state.noncedInlineStyles,
-        state.inlineStyles,
-        `Not every inline style element carried a nonce on ${path}`,
-      );
+      if (path !== "/admin/login") {
+        assert.equal(
+          state.noncedInlineStyles,
+          state.inlineStyles,
+          `Not every inline style element carried a nonce on ${path}`,
+        );
+      }
     }
 
     console.log(JSON.stringify({ status: "passed", staging: STAGING_URL, rendered }, null, 2));
