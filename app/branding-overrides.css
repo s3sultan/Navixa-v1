@@ -1,0 +1,33 @@
+/* NAVIXA public naming guard.
+   Keep legacy route/class names for compatibility, but never expose the retired
+   Plus/Sprint labels or the public founders promotion entry points. */
+html body .welcome-founders-link,
+html body .topbar-actions .topbar-plus {
+  display: none !important;
+}
+
+html body .nx .plus-badge {
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+}
+
+html body .nx .plus-badge::after {
+  content: "هِمّة";
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  color: inherit;
+}
+
+html body .nx .priority-feature-top .priority-feature-meta .plus-badge::after {
+  font-size: 8px;
+}
+
+@media (max-width: 650px) {
+  html body .nx .plus-badge::after {
+    font-size: 8px;
+  }
+  html body .nx .priority-feature-top .priority-feature-meta .plus-badge::after {
+    font-size: 7.5px;
+  }
+}

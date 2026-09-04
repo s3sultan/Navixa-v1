@@ -47,12 +47,12 @@ function renewalCopy(subscriber: DueSubscriber, type: "four_days" | "one_day") {
   const isTrial = subscriber.status === "trial";
   const headline = type === "one_day" ? "يتبقى يوم واحد" : "يتبقى أقل من أربعة أيام";
   const detail = isTrial
-    ? "تجربتك في NAVIXA Plus ستنتهي قريبًا. يمكنك الاستمرار في التجربة حتى موعدها أو اختيار الاشتراك مباشرة عندما تكون مستعدًا."
-    : "اشتراكك في NAVIXA Plus يقترب من الانتهاء. جدده قبل الموعد للحفاظ على مزاياك المتقدمة دون انقطاع.";
+    ? "تجربتك في NAVIXA هِمّة ستنتهي قريبًا. يمكنك الاستمرار في التجربة حتى موعدها أو اختيار الاشتراك مباشرة عندما تكون مستعدًا."
+    : "اشتراكك في NAVIXA هِمّة يقترب من الانتهاء. جدده قبل الموعد للحفاظ على مزاياك المتقدمة دون انقطاع.";
   return {
-    subject: `${headline} على ${isTrial ? "تجربة" : "اشتراك"} NAVIXA Plus`,
-    text: `أهلًا${name}\n\n${detail}\n\nموعد الانتهاء: ${ending}\n\nإدارة Plus وتجديد الاشتراك: https://navixasa.com/plus\n\nNAVIXA SA`,
-    telegram: `أهلًا${name}\n\n${headline} على ${isTrial ? "تجربة" : "اشتراك"} NAVIXA Plus.\n${detail}\n\nموعد الانتهاء: ${ending}\nإدارة Plus: https://navixasa.com/plus`,
+    subject: `${headline} على ${isTrial ? "تجربة" : "اشتراك"} NAVIXA هِمّة`,
+    text: `أهلًا${name}\n\n${detail}\n\nموعد الانتهاء: ${ending}\n\nإدارة هِمّة وتجديد الاشتراك: https://navixasa.com/plus\n\nNAVIXA SA`,
+    telegram: `أهلًا${name}\n\n${headline} على ${isTrial ? "تجربة" : "اشتراك"} NAVIXA هِمّة.\n${detail}\n\nموعد الانتهاء: ${ending}\nإدارة هِمّة: https://navixasa.com/plus`,
   };
 }
 

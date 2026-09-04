@@ -47,7 +47,7 @@ export default function FeatureAccessGate({ children, feature = "مزايا NAVI
       ? `تحتاج ${feature} إلى تجربة NAVIXA أو اشتراك فعّال. لا نفتح الميكروفون أو مشاركة الشاشة أو بياناتك قبل تفعيل حسابك.`
       : `تحتاج ${feature} إلى دخول آمن بالبريد ثم تفعيل تجربة NAVIXA أو اشتراكك. لا توجد كلمة مرور، ولا نطلب صلاحيات جهازك قبل ذلك.`;
   const href = unavailable ? "/plus" : signedIn ? "/plus" : "/account";
-  const label = unavailable ? "اعرف حالة Plus" : signedIn ? "فعّل حسابي" : "دخول أو إنشاء حساب";
+  const label = unavailable ? "اعرف حالة هِمّة" : signedIn ? "فعّل حسابي" : "دخول أو إنشاء حساب";
 
   return <section className="feature-access-gate" dir="rtl" aria-live="polite" aria-busy={!session}>
     <div className="feature-access-symbol" aria-hidden="true">⌾</div>
