@@ -9,15 +9,42 @@ export const ALERT_LABELS:Record<AlertType,string>={
   focus:"انتهاء جلسة التركيز",name:"سماع الاسم",wird:"إتمام الورد اليومي",sadaqah:"تذكير الصدقة",task:"إنجاز مهمة"
 };
 
+const USER_PREFS_KEY="navixa-alert-prefs";
+const ADMIN_POLICY_CACHE_KEY="navixa-admin-alert-policy";
+const ADMIN_MESSAGES_CACHE_KEY="navixa-admin-alert-messages";
 const defaultUserPrefs=():Record<AlertType,Channels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:true,telegram:true}])) as Record<AlertType,Channels>;
 const defaultAdminPolicy=():Record<AlertType,PolicyChannels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:"user",telegram:"user"}])) as Record<AlertType,PolicyChannels>;
 
-export const getUserPrefs=():Record<AlertType,Channels>=>{try{return {...defaultUserPrefs(),...JSON.parse(localStorage.getItem("navixa-alert-prefs")||"{}")} }catch{return defaultUserPrefs()}};
-export const setUserPrefs=(prefs:Record<AlertType,Channels>)=>localStorage.setItem("navixa-alert-prefs",JSON.stringify(prefs));
-export const getAdminPolicy=():Record<AlertType,PolicyChannels>=>{try{return {...defaultAdminPolicy(),...JSON.parse(localStorage.getItem("navixa-admin-alert-policy")||"{}")} }catch{return defaultAdminPolicy()}};
-export const setAdminPolicy=(policy:Record<AlertType,PolicyChannels>)=>localStorage.setItem("navixa-admin-alert-policy",JSON.stringify(policy));
-export const getAdminMessages=():Partial<Record<AlertType,string>>=>{try{return JSON.parse(localStorage.getItem("navixa-admin-alert-messages")||"{}")}catch{return {}}};
-export const setAdminMessages=(msgs:Partial<Record<AlertType,string>>)=>localStorage.setItem("navixa-admin-alert-messages",JSON.stringify(msgs));
+export const getUserPrefs=():Record<AlertType,Channels>=>{try{return {...defaultUserPrefs(),...JSON.parse(localStorage.getItem(USER_PREFS_KEY)||"{}")} }catch{return defaultUserPrefs()}};
+export const setUserPrefs=(prefs:Record<AlertType,Channels>)=>localStorage.setItem(USER_PREFS_KEY,JSON.stringify(prefs));
+export const getAdminPolicy=():Record<AlertType,PolicyChannels>=>{try{return {...defaultAdminPolicy(),...JSON.parse(localStorage.getItem(ADMIN_POLICY_CACHE_KEY)||"{}")} }catch{return defaultAdminPolicy()}};
+export const setAdminPolicy=(policy:Record<AlertType,PolicyChannels>)=>localStorage.setItem(ADMIN_POLICY_CACHE_KEY,JSON.stringify(policy));
+export const getAdminMessages=():Partial<Record<AlertType,string>>=>{try{return JSON.parse(localStorage.getItem(ADMIN_MESSAGES_CACHE_KEY)||"{}")}catch{return {}}};
+export const setAdminMessages=(msgs:Partial<Record<AlertType,string>>)=>localStorage.setItem(ADMIN_MESSAGES_CACHE_KEY,JSON.stringify(msgs));
+
+export const refreshAdminAlertSettings=async()=>{
+  try{
+    const response=await fetch("/api/alert-policy",{cache:"no-store"});
+    const data=await response.json().catch(()=>({})) as {policy?:Record<AlertType,PolicyChannels>;messages?:Partial<Record<AlertType,string>>};
+    if(response.ok&&data.policy)setAdminPolicy(data.policy);
+    if(response.ok&&data.messages)setAdminMessages(data.messages);
+    return response.ok;
+  }catch{return false}
+};
+
+export const refreshUserAlertSettings=async()=>{
+  try{
+    const response=await fetch("/api/account/notifications/preferences",{cache:"no-store"});
+    const data=await response.json().catch(()=>({})) as {preferences?:Record<AlertType,{screen:boolean;telegram:boolean;push?:boolean}>};
+    if(!response.ok||!data.preferences)return false;
+    const next=defaultUserPrefs();
+    ALERT_TYPES.forEach(type=>{const row=data.preferences?.[type];if(row)next[type]={screen:row.screen!==false,telegram:row.telegram!==false}});
+    setUserPrefs(next);
+    return true;
+  }catch{return false}
+};
+
+export const hydrateAlertSettings=async()=>{await Promise.all([refreshAdminAlertSettings(),refreshUserAlertSettings()]);return {user:getUserPrefs(),policy:getAdminPolicy(),messages:getAdminMessages()}};
 
 const isChannelEnabled=(type:AlertType,channel:"screen"|"telegram"):boolean=>{
   const policy=getAdminPolicy()[type]?.[channel]||"user";
