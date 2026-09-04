@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath, isProtectedAdminPath, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "./adminAuth";
+import { clientIp, consumeAuthRateLimit } from "./authRateLimit";
 import { deliverDueMatchPushes } from "./matchPush";
 import { checkDomainExpiry } from "./domainExpiryAlert";
 import { deliverDueSubscriptionRenewals } from "./subscriptionRenewals";
@@ -43,6 +44,8 @@ interface ExecutionContext {
 // dangerouslyAllowSVG: true in next.config.js and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
+// The local limiter is an immediate first layer. A second D1-backed limiter in
+// publicMutationGuard shares counters across Worker instances in production.
 const publicMutationLimiter = createMemoryRateLimiter();
 
 // Local STT model relay. It is deliberately a strict file allowlist: the relay
@@ -128,7 +131,10 @@ const CSP_ENFORCED = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'self'",
+  "frame-src 'self' https://accounts.google.com",
   "form-action 'self'",
+  "manifest-src 'self'",
+  "script-src-attr 'none'",
   "upgrade-insecure-requests",
 ].join("; ");
 
@@ -137,8 +143,11 @@ const CSP_REPORT_ONLY = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'self'",
+  "frame-src 'self' https://accounts.google.com",
   "form-action 'self'",
+  "manifest-src 'self'",
   "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://accounts.google.com https://cdn.jsdelivr.net",
+  "script-src-attr 'none'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://quran.islam-db.com",
@@ -153,10 +162,12 @@ function applyBrowserSecurityHeaders(response: Response) {
   response.headers.set("Strict-Transport-Security", "max-age=31536000");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  response.headers.set("X-Permitted-Cross-Domain-Policies", "none");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "geolocation=(), usb=(), serial=(), accelerometer=(), gyroscope=(), magnetometer=()");
-  // Enforce only low-risk navigation/embed protections at the edge. Keep the
-  // complete resource policy in report-only mode until browser compatibility is verified.
+  // Enforce navigation/embed controls plus inline event-handler blocking now.
+  // Keep framework resource allowlists report-only until staging proves that
+  // removing unsafe-inline from script/style elements will not break NAVIXA.
   response.headers.set("Content-Security-Policy", CSP_ENFORCED);
   response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return response;
@@ -176,19 +187,48 @@ const publicMutationLimits: Record<string, number> = {
   "/api/support/tickets": 5,
 };
 
-function publicMutationGuard(request: Request, url: URL) {
+function rateLimitedResponse(retryAfterSeconds: number) {
+  return new Response(JSON.stringify({ error: "تجاوزت الحد المؤقت للطلبات" }), {
+    status: 429,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "retry-after": String(retryAfterSeconds),
+    },
+  });
+}
+
+async function publicMutationGuard(request: Request, url: URL, env: Env) {
   if (!Object.hasOwn(publicMutationLimits, url.pathname) || !["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return null;
   // CSP violation reports are sent by the browser and may omit Origin. Their
   // dedicated receiver logs only a directive/source host and is rate-limited.
   if (url.pathname !== "/api/security/csp-report" && !isTrustedSameOriginRequest(request)) {
     return new Response(JSON.stringify({ error: "مصدر الطلب غير موثوق" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   }
-  const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+  const ip = clientIp(request);
   const limit = publicMutationLimits[url.pathname];
-  const result = publicMutationLimiter.consume(`${url.pathname}:${clientIp}`, limit, 60_000);
-  if (!result.allowed) {
-    return new Response(JSON.stringify({ error: "تجاوزت الحد المؤقت للطلبات" }), { status: 429, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "retry-after": String(result.retryAfterSeconds) } });
+
+  // Layer 1: immediate per-isolate protection. This also remains as an
+  // availability-safe fallback if the shared database is temporarily unavailable.
+  const local = publicMutationLimiter.consume(`${url.pathname}:${ip}`, limit, 60_000);
+  if (!local.allowed) return rateLimitedResponse(local.retryAfterSeconds);
+
+  // Layer 2: shared D1 bucket. The same counter is observed by every Worker
+  // isolate, closing the gap where an attacker could spread requests across them.
+  const pepper = await resolveAdminJwtSecret();
+  if (pepper) {
+    const shared = await consumeAuthRateLimit(
+      env.DB,
+      `public-mutation:${url.pathname}`,
+      ip,
+      pepper,
+      limit,
+      60_000,
+    );
+    if (!shared.allowed) return rateLimitedResponse(shared.retryAfterSeconds);
   }
+
   return null;
 }
 
@@ -307,7 +347,7 @@ const worker = {
     const url = new URL(request.url);
     const startedAt = Date.now();
 
-    const mutationRejection = publicMutationGuard(request, url);
+    const mutationRejection = await publicMutationGuard(request, url, env);
     if (mutationRejection) return auditResponse(request, url, mutationRejection, startedAt, "mutation");
 
     const requiresAdminSession = isProtectedAdminPath(url.pathname) || isProtectedAdminApiPath(url.pathname);
