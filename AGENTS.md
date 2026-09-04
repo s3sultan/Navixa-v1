@@ -58,14 +58,16 @@ Review the complete diff as if it were a pull request:
 
 For material architecture, access-control, data-flow, integration, deployment, or major UI changes, also follow `NAVIXA_VISUAL_REVIEW.md`. Use the smallest useful visual to show the relevant before state, intended change, after state, affected files, data/control path, risks, verification evidence, and rollback path. Do not create decorative diagrams for trivial edits.
 
+Before any production release or when deciding that a release candidate is ready, follow `NAVIXA_PRE_LAUNCH_GATE.md`. A release is not ready merely because implementation or build completed. Record evidence-backed PASS/WARN/BLOCK/N/A status for each applicable launch gate, and do not proceed with unresolved BLOCK items.
+
 ## 9. Deployment and rollback
 Preferred English release flow:
 
-Local Verify → Commit → Push → CI/Checks → Preview/Staging → Verify → Merge → Production → Post-deploy Verify
+Local Verify → Commit → Push → CI/Checks → Preview/Staging → Pre-Launch Gate → Verify → Merge → Production → Post-deploy Verify
 
 Arabic equivalent:
 
-تحقق محلي ← حفظ التغيير ← رفعه ← فحوصات آلية ← نسخة تجريبية ← تحقق ← دمج ← إنتاج ← تحقق بعد النشر
+تحقق محلي ← حفظ التغيير ← رفعه ← فحوصات آلية ← نسخة تجريبية ← بوابة ما قبل الإطلاق ← تحقق ← دمج ← إنتاج ← تحقق بعد النشر
 
 Do not declare deployment successful without checking the actual deployed environment when access is available. If production is materially broken, prefer restoring the last stable version first, then fix safely, retest, and redeploy.
 
@@ -172,7 +174,7 @@ Do not accept a technically functioning interface that visibly looks unfinished,
 Check bundle/client weight, unnecessary client components or re-renders, image/font loading, database/API query cost, caching, and latency when relevant. Optimize based on evidence rather than speculative complexity.
 
 ## 13. Definition of Done
-A task is done only when the applicable items are true: requested behavior implemented; code is maintainable; relevant lint/type/build/tests pass; security boundaries reviewed; no secrets exposed; deployment/preview verified when applicable; rollback path known; documentation updated when behavior/setup/architecture changed; user-facing work passes the UI/UX quality review above.
+A task is done only when the applicable items are true: requested behavior implemented; code is maintainable; relevant lint/type/build/tests pass; security boundaries reviewed; no secrets exposed; deployment/preview verified when applicable; applicable `NAVIXA_PRE_LAUNCH_GATE.md` gates have evidence-backed status with no unresolved BLOCK items before production release; rollback path known; documentation updated when behavior/setup/architecture changed; user-facing work passes the UI/UX quality review above.
 
 ## 14. NAVIXA coordination and memory
 After completing work:
