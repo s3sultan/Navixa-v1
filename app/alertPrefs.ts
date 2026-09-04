@@ -45,6 +45,7 @@ export const refreshUserAlertSettings=async()=>{
 };
 
 export const hydrateAlertSettings=async()=>{await Promise.all([refreshAdminAlertSettings(),refreshUserAlertSettings()]);return {user:getUserPrefs(),policy:getAdminPolicy(),messages:getAdminMessages()}};
+if(typeof window!=="undefined")void hydrateAlertSettings();
 
 const isChannelEnabled=(type:AlertType,channel:"screen"|"telegram"):boolean=>{
   const policy=getAdminPolicy()[type]?.[channel]||"user";
