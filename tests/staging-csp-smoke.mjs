@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -142,6 +143,45 @@ function isScriptCspViolation(entry) {
   return /script-src/i.test(text) && /(violat|refused|blocked)/i.test(text);
 }
 
+function violationHashes(entries) {
+  const hashes = new Set();
+  for (const entry of entries) {
+    const text = String(entry?.text || "");
+    for (const match of text.matchAll(/sha256-([^'"\s)]+)/g)) hashes.add(match[1]);
+  }
+  return hashes;
+}
+
+function sha256Base64(value) {
+  return createHash("sha256").update(value, "utf8").digest("base64");
+}
+
+async function inlineScriptDiagnostics(cdp, violations) {
+  const scripts = await evaluate(cdp, `(() => [...document.scripts]
+    .map((script, index) => ({
+      index,
+      src: script.src || "",
+      type: script.type || "",
+      nonce: script.nonce || "",
+      text: script.src ? "" : (script.textContent || "")
+    }))
+    .filter(script => !script.src))()`);
+  const offendingHashes = violationHashes(violations);
+  return (Array.isArray(scripts) ? scripts : []).map(script => {
+    const hash = sha256Base64(script.text || "");
+    return {
+      index: script.index,
+      type: script.type,
+      hasNonce: Boolean(script.nonce),
+      noncePrefix: script.nonce ? `${String(script.nonce).slice(0, 8)}…` : "",
+      bytes: Buffer.byteLength(script.text || "", "utf8"),
+      sha256: hash,
+      matchesViolation: offendingHashes.has(hash),
+      prefix: String(script.text || "").replace(/\s+/g, " ").trim().slice(0, 180),
+    };
+  });
+}
+
 async function main() {
   const profileDir = await mkdtemp(join(tmpdir(), "navixa-staging-csp-"));
   const chrome = start(process.env.CHROME_BIN || "google-chrome", [
@@ -188,10 +228,15 @@ async function main() {
       await sleep(2_000);
       const routeEntries = logEntries.slice(before);
       const violations = routeEntries.filter(isScriptCspViolation);
+      const scriptDiagnostics = await inlineScriptDiagnostics(cdp, violations);
       rendered.push({ path, ...state, scriptCspViolations: violations.length });
       if (violations.length) {
         console.error(`CSP script violations on ${path}:`);
         for (const entry of violations.slice(0, 30)) console.error(`[${entry.source}] ${entry.text}`);
+        console.error("Inline script diagnosis:");
+        for (const script of scriptDiagnostics.filter(item => item.matchesViolation || !item.hasNonce).slice(0, 30)) {
+          console.error(JSON.stringify(script));
+        }
         throw new Error(`Nonce-based script CSP is not yet compatible with ${path}`);
       }
       assert.equal(state.noncedInlineScripts, state.inlineScripts, `Not every inline script carried a nonce on ${path}`);
