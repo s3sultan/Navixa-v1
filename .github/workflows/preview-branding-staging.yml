@@ -1,0 +1,109 @@
+name: Preview NAVIXA Branding on Staging
+
+on:
+  push:
+    branches: [preview-branding-himma-azm-2026-09-04]
+    paths-ignore:
+      - "**/*.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navixa-branding-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify preview source
+        env:
+          CHROME_BIN: google-chrome
+        run: npm run test:verify
+
+      - name: Resolve staging D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing=$(npx --no-install wrangler d1 list)
+          database_id=$(printf '%s\n' "$existing" | grep 'navixa-staging' | grep -Eo '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' | head -n 1 || true)
+          test -n "$database_id" || { echo "navixa-staging D1 is missing"; exit 1; }
+          echo "STAGING_D1_DATABASE_ID=$database_id" >> "$GITHUB_ENV"
+
+      - name: Configure staging Worker
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'dist/server/wrangler.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          config.name = 'navixa-staging';
+          config.observability = { enabled: true, head_sampling_rate: 1 };
+          config.compatibility_flags = [...new Set([...(config.compatibility_flags || []), 'nodejs_compat'])];
+          config.keep_vars = true;
+          if (Array.isArray(config.d1_databases)) {
+            for (const binding of config.d1_databases) {
+              binding.database_id = process.env.STAGING_D1_DATABASE_ID;
+              binding.database_name = 'navixa-staging';
+            }
+          }
+          fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
+          NODE
+
+      - name: Deploy preview to navixa-staging
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config dist/server/wrangler.json --name navixa-staging
+
+      - name: Preserve staging admin JWT secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET_STAGING }}
+        run: |
+          set -euo pipefail
+          test "${#ADMIN_JWT_SECRET}" -ge 32
+          printf '%s' "$ADMIN_JWT_SECRET" | npx --no-install wrangler secret put ADMIN_JWT_SECRET --config dist/server/wrangler.json --name navixa-staging
+
+      - name: Verify staging runtime
+        env:
+          STAGING_URL: https://navixa-staging.s2shug.workers.dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=0
+          for attempt in $(seq 1 30); do
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -o /tmp/navixa-preview.html -w '%{http_code}' "$STAGING_URL/?branding_preview=${GITHUB_SHA}" || true)
+            if [ "$code" = "200" ]; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo "Staging did not become ready"; exit 1; }
+          grep -Eqi 'NAVIXA|navixa' /tmp/navixa-preview.html
+          for path in / /today /account /meetings /plus /sprint; do
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' "$STAGING_URL$path?branding_preview=${GITHUB_SHA}")
+            case "$code" in
+              2*|3*|401|403) ;;
+              *) echo "Unexpected staging status $code for $path"; exit 1 ;;
+            esac
+          done
