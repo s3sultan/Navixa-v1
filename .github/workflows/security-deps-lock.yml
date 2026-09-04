@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: navixa-security-deps-lock
+  group: navixa-security-deps-lock-v2
   cancel-in-progress: false
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
           cache: npm
 
       - name: Regenerate npm lock only
-        run: npm install --package-lock-only --ignore-scripts
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Commit generated lock if changed
         shell: bash
