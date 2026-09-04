@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [referrals, adminReferrals, plusPage, projectsPage, terms, refunds, privacy] = await Promise.all([
+const [referrals, adminReferrals, plusPage, projectsPage, terms, refunds, privacy, productionDeploy] = await Promise.all([
   readFile(new URL("../app/referrals.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/api/admin/referrals/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/plus/page.tsx", import.meta.url), "utf8"),
@@ -9,6 +9,7 @@ const [referrals, adminReferrals, plusPage, projectsPage, terms, refunds, privac
   readFile(new URL("../app/terms/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/refunds/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/privacy/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../.github/workflows/deploy-navixa.yml", import.meta.url), "utf8"),
 ]);
 
 assert.match(referrals, /referred_contact=\? AND \(status='rewarded' OR \(status='pending' AND expires_at>\?\)\)/);
@@ -30,5 +31,13 @@ assert.match(terms, /الإحالات والمكافآت/);
 assert.match(refunds, /الإحالات والمكافآت المرتبطة بالدفع/);
 assert.match(privacy, /الحساب وتسجيل الدخول/);
 assert.match(privacy, /هِمّة والدفع/);
+
+// Production must not deploy just because code was pushed to master. A human
+// must dispatch the workflow from master and explicitly confirm production.
+assert.match(productionDeploy, /workflow_dispatch:/);
+assert.match(productionDeploy, /confirm_production:/);
+assert.match(productionDeploy, /github\.ref == 'refs\/heads\/master'/);
+assert.match(productionDeploy, /inputs\.confirm_production == true/);
+assert.doesNotMatch(productionDeploy, /^\s+push:\s*$/m);
 
 console.log("Launch hardening contract: ok");
