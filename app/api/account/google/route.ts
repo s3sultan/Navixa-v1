@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server.js";
 import { verifyGoogleCredential } from "../../auth/googleIdentity.ts";
+import { resolveAdminJwtSecret } from "../../../../worker/adminAuth.ts";
+import { clientIp, consumeAuthRateLimit } from "../../../../worker/authRateLimit.ts";
 import { createOpaqueToken, createUserSession, getUserAuthSettings, hashOpaqueValue, isValidUserEmail, makeUserSessionCookie, normalizeUserEmail, trustedUserMutation, type D1Database } from "../../../../worker/userAuth.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
@@ -19,6 +21,10 @@ function consume(key: string) {
   return bucket.count <= 8;
 }
 
+function rateLimitResponse(retryAfter = 600) {
+  return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } });
+}
+
 /** Google credential يتحقق خادميًا؛ لا يقبل بريدًا أو user id من المتصفح. */
 export async function POST(request: Request) {
   if (!trustedUserMutation(request)) return NextResponse.json({ error: "طلب غير مسموح" }, { status: 403, headers: { "Cache-Control": "no-store" } });
@@ -26,8 +32,14 @@ export async function POST(request: Request) {
   if (!database) return NextResponse.json({ error: "دخول NAVIXA غير متاح" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const settings = await getUserAuthSettings(database).catch(() => null);
   if (!settings?.userAuthEnabled) return NextResponse.json({ error: "دخول NAVIXA غير مفتوح بعد" }, { status: 404, headers: { "Cache-Control": "no-store" } });
-  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "anonymous";
-  if (!consume(`google:${ip}`)) return NextResponse.json({ error: "عدد محاولات كبير، حاول بعد 10 دقائق" }, { status: 429, headers: { "Retry-After": "600", "Cache-Control": "no-store" } });
+
+  const ip = clientIp(request);
+  if (!consume(`google:${ip}`)) return rateLimitResponse();
+  const pepper = await resolveAdminJwtSecret();
+  if (pepper) {
+    const shared = await consumeAuthRateLimit(database, "google-auth-ip", ip, pepper, 8, 10 * 60_000);
+    if (!shared.allowed) return rateLimitResponse(shared.retryAfterSeconds);
+  }
 
   const body = await request.json().catch(() => ({})) as { credential?: unknown };
   const verified = await verifyGoogleCredential(typeof body.credential === "string" ? body.credential : "");

@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout pull request
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Use Node.js 22
         uses: actions/setup-node@v6

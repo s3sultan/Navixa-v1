@@ -13,12 +13,14 @@ permissions:
 
 jobs:
   setup-push:
-    if: inputs.confirm == 'SETUP_NAVIXA_PUSH'
+    if: github.actor == github.repository_owner && github.ref == 'refs/heads/master' && inputs.confirm == 'SETUP_NAVIXA_PUSH'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Read official source
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Use Node.js 22
         uses: actions/setup-node@v6
@@ -55,9 +57,9 @@ jobs:
           private_key="$(printf '%s\n' "$keys" | awk '/^Private Key:/{getline; print; exit}')"
           test -n "$public_key"
           test -n "$private_key"
-          printf '%s' "$public_key" | npx --no-install wrangler secret put VAPID_PUBLIC_KEY --config dist/server/wrangler.json
-          printf '%s' "$private_key" | npx --no-install wrangler secret put VAPID_PRIVATE_KEY --config dist/server/wrangler.json
-          printf '%s' 'mailto:s2shug@gmail.com' | npx --no-install wrangler secret put VAPID_SUBJECT --config dist/server/wrangler.json
+          printf '%s' "$public_key" | npx --no-install wrangler secret put VAPID_PUBLIC_KEY --config dist/server/wrangler.json --name navixa
+          printf '%s' "$private_key" | npx --no-install wrangler secret put VAPID_PRIVATE_KEY --config dist/server/wrangler.json --name navixa
+          printf '%s' 'https://navixasa.com' | npx --no-install wrangler secret put VAPID_SUBJECT --config dist/server/wrangler.json --name navixa
 
       - name: Verify Push activation without exposing secrets
         run: |

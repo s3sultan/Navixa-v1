@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { clientIp, consumeAuthRateLimit } from "../worker/authRateLimit.ts";
 
@@ -50,4 +51,51 @@ test("auth rate limit persists attempts in the shared database bucket", async ()
   assert.equal(results[3].allowed, false);
   assert.equal(results[3].attempts, 4);
   assert.equal(db.rows.size, 1);
+});
+
+test("OTP verification serializes successful code consumption across Worker isolates", async () => {
+  const route = await readFile(new URL("../app/api/account/code/verify/route.ts", import.meta.url), "utf8");
+  assert.match(route, /"otp-code-consume"/);
+  assert.match(route, /activeCode\.id, pepper, 1, 10 \* 60_000/);
+  assert.match(route, /if \(!consumeGate\.allowed\)/);
+  assert.ok(route.indexOf("otp-code-consume") < route.indexOf("SET consumed_at=?"));
+});
+
+test("Passkey verification serializes authentication and registration challenges", async () => {
+  const [authRoute, registerRoute] = await Promise.all([
+    readFile(new URL("../app/api/account/passkeys/auth/verify/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/account/passkeys/register/verify/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(authRoute, /"passkey-auth-challenge"/);
+  assert.match(registerRoute, /"passkey-register-challenge"/);
+  for (const route of [authRoute, registerRoute]) {
+    assert.match(route, /active\.id, active\.challenge, 1, 5 \* 60_000/);
+    assert.match(route, /if \(!consumeGate\.allowed\)/);
+    assert.ok(route.indexOf("consumeAuthRateLimit") < route.lastIndexOf("SET consumed_at=?"));
+  }
+});
+
+test("Passkey registration options require an explicit same-origin mutation", async () => {
+  const route = await readFile(new URL("../app/api/account/passkeys/register/options/route.ts", import.meta.url), "utf8");
+  assert.match(route, /trustedUserMutation\(request\)/);
+  assert.match(route, /status: 403/);
+  assert.ok(route.indexOf("trustedUserMutation(request)") < route.indexOf("resolveUserSession(request, database)"));
+});
+
+test("Google login keeps a shared cross-isolate IP rate limit behind the local fast gate", async () => {
+  const route = await readFile(new URL("../app/api/account/google/route.ts", import.meta.url), "utf8");
+  assert.match(route, /clientIp\(request\)/);
+  assert.match(route, /resolveAdminJwtSecret\(\)/);
+  assert.match(route, /"google-auth-ip"/);
+  assert.match(route, /ip, pepper, 8, 10 \* 60_000/);
+  assert.match(route, /if \(!shared\.allowed\)/);
+});
+
+test("billing checkout keeps a shared cross-isolate IP gate behind the local fast limiter", async () => {
+  const route = await readFile(new URL("../app/api/billing/checkout/route.ts", import.meta.url), "utf8");
+  assert.match(route, /clientIp\(request\)/);
+  assert.match(route, /resolveAdminJwtSecret\(\)/);
+  assert.match(route, /"billing-checkout-ip"/);
+  assert.match(route, /clientIp\(request\),pepper,5,10\*60_000/);
+  assert.match(route, /if\(!shared\.allowed\)return rateLimitResponse\(shared\.retryAfterSeconds\)/);
 });

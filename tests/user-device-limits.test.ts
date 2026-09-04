@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createUserSession, resolveUserDeviceClass } from "../worker/userAuth.ts";
+import { createUserSession, hashOpaqueValue, refreshUserSessionIfNeeded, resolveUserDeviceClass, USER_SESSION_COOKIE } from "../worker/userAuth.ts";
 
 type Recorded = { sql: string; values: unknown[] };
 
@@ -36,4 +36,26 @@ test("creating a session revokes only the previous active session in the same de
   assert.deepEqual(records[0].values.slice(1), ["user-1", "mobile"]);
   assert.match(records[1].sql, /INSERT INTO navixa_user_sessions/);
   assert.equal(records[1].values.at(-1), "mobile");
+});
+
+test("sliding session refresh rotates the bearer token instead of extending the old token", async () => {
+  const records: Recorded[] = [];
+  const db = database(records);
+  const oldToken = "old-session-token-that-is-long-enough-for-navixa";
+  const request = new Request("https://navixa.example/api/account/session", { headers: { cookie: `${USER_SESSION_COOKIE}=${oldToken}` } });
+  const refreshed = await refreshUserSessionIfNeeded(request, db, {
+    userId: "user-1",
+    email: "person@example.com",
+    status: "active",
+    expiresAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+  });
+
+  assert.equal(records.length, 1);
+  assert.match(records[0].sql, /SET expires_at=\?,last_seen_at=\?,token_hash=\?/);
+  assert.equal(records[0].values[3], await hashOpaqueValue(oldToken));
+  assert.ok(refreshed.cookie);
+  const nextToken = refreshed.cookie!.match(new RegExp(`${USER_SESSION_COOKIE}=([^;]+)`))?.[1] || "";
+  assert.ok(nextToken.length >= 30);
+  assert.notEqual(nextToken, oldToken);
+  assert.equal(records[0].values[2], await hashOpaqueValue(nextToken));
 });

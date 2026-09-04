@@ -42,6 +42,13 @@ export async function POST(request: Request) {
     if (activeCode) await database.prepare("UPDATE navixa_user_login_codes SET attempts=attempts+1 WHERE id=?").bind(activeCode.id).run();
     return NextResponse.json({ error: "الرمز غير صحيح أو انتهت صلاحيته" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
+
+  // A correct OTP gets one shared consume slot before any account/session work.
+  // This closes the narrow race where the same code could be submitted in two
+  // simultaneous requests handled by different Worker isolates.
+  const consumeGate = await consumeAuthRateLimit(database, "otp-code-consume", activeCode.id, pepper, 1, 10 * 60_000);
+  if (!consumeGate.allowed) return NextResponse.json({ error: "الرمز غير صحيح أو انتهت صلاحيته" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+
   await database.prepare("UPDATE navixa_user_login_codes SET consumed_at=? WHERE id=? AND consumed_at=''").bind(now, activeCode.id).run();
   const existing = await database.prepare("SELECT id,status FROM navixa_users WHERE email_hash=? LIMIT 1").bind(emailHash).all<{ id: string; status: "pending" | "active" | "suspended" }>();
   let userId = existing.results[0]?.id || crypto.randomUUID();
