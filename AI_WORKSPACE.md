@@ -1,13 +1,13 @@
 # NAVIXA — مساحة العمل المشتركة
 
-آخر تحديث: 2026-09-01
+آخر تحديث: 2026-09-04
 
 ## حالة العمل
 
-- الوكيل النشط: ChatGPT
-- المهمة الحالية: تنفيذ طبقة العضويات المركزية والاستحقاقات للمشاريع التابعة بأمان وعلى فرع منفصل
-- الحالة: يعمل
-- الملفات المحجوزة: `worker/portfolioAccess.ts`, `tests/portfolio-access.test.ts`, `migrations/*portfolio*`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الوكيل النشط: Codex
+- المهمة الحالية: صقل جاهزية الإطلاق: إصلاح Hydration، تبسيط الرئيسية، والتحقق من توحيد الإنتاج
+- الحالة: يعمل على فرع `codex/launch-readiness-polish`
+- الملفات المحجوزة: `app/page.tsx`, `app/PrayerStrip.tsx`, `app/navixa.css`, `tests/*hydration*`, `tests/mobile-home-simplification.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
