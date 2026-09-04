@@ -27,7 +27,7 @@ export async function POST(request:Request){
   const row=subscription.results[0];if(!row)return NextResponse.json({error:"فعّل Push لهذا الجهاز أولًا"},{status:400,headers:{"Cache-Control":"no-store"}});
   try{
     webpush.setVapidDetails(secrets.VAPID_SUBJECT,secrets.VAPID_PUBLIC_KEY,secrets.VAPID_PRIVATE_KEY);
-    await webpush.sendNotification({endpoint:row.endpoint,keys:{p256dh:row.p256dh,auth:row.auth}},JSON.stringify({title:"NAVIXA · اختبار تنبيه",body:"تم تفعيل تنبيهات مبارياتك بنجاح.",tag:"navixa-push-test",data:{url:"/"}}),{TTL:120,urgency:"high",topic:"navixa-test"});
+    await webpush.sendNotification({endpoint:row.endpoint,keys:{p256dh:row.p256dh,auth:row.auth}},JSON.stringify({title:"NAVIXA · اختبار تنبيه",body:"تم تفعيل Push على هذا الجهاز بنجاح.",tag:"navixa-push-test",data:{url:"/"}}),{TTL:120,urgency:"high",topic:"navixa-test"});
     await database.prepare("INSERT INTO navixa_push_test_deliveries (endpoint,sent_at) VALUES (?,?) ON CONFLICT(endpoint) DO UPDATE SET sent_at=excluded.sent_at").bind(endpoint,new Date().toISOString()).run();
     return NextResponse.json({ok:true},{headers:{"Cache-Control":"no-store"}});
   }catch(error){const status=error instanceof webpush.WebPushError?error.statusCode:0;if(status===404||status===410)await database.prepare("DELETE FROM navixa_push_subscriptions WHERE endpoint=?").bind(endpoint).run();return NextResponse.json({error:"تعذر إرسال اختبار Push؛ فعّل الاشتراك من جديد"},{status:502,headers:{"Cache-Control":"no-store"}})}
