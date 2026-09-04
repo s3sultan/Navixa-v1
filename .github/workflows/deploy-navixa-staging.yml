@@ -133,7 +133,7 @@ jobs:
           set -euo pipefail
           ready=0
           for attempt in $(seq 1 30); do
-            code=$(curl -sS --connect-timeout 5 --max-time 15 -D /tmp/navixa-staging-headers.txt -o /tmp/navixa-staging-body.html -w '%{http_code}' "$STAGING_URL/" || true)
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -D /tmp/navixa-staging-headers.txt -o /tmp/navixa-staging-body.html -w '%{http_code}' "$STAGING_URL/?runtime_probe=${GITHUB_SHA}" || true)
             if [ "$code" = "200" ]; then ready=1; break; fi
             sleep 2
           done
@@ -151,7 +151,7 @@ jobs:
           fi
 
           for path in / /today /account /admin/login /meetings; do
-            code=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' "$STAGING_URL$path")
+            code=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' "$STAGING_URL$path?runtime_probe=${GITHUB_SHA}")
             case "$code" in
               2*|3*|401|403) ;;
               *) echo "Unexpected staging status $code for $path"; exit 1 ;;
@@ -163,29 +163,9 @@ jobs:
             --data '{}' "$STAGING_URL/api/account/passkeys/register/options")
           test "$origin_status" = "403" || { echo "Passkey same-origin guard returned $origin_status"; exit 1; }
 
-      - name: Probe strict CSP report-only compatibility in Chrome
+      - name: Probe strict CSP report-only compatibility with Chrome CDP
         if: github.ref == 'refs/heads/security/hardening-2026-09-04'
         env:
           STAGING_URL: https://navixa-staging.s2shug.workers.dev
-        run: |
-          set -euo pipefail
-          google-chrome --version
-          : > /tmp/navixa-csp-browser.log
-          for path in / /today /account /admin/login /meetings; do
-            profile=$(mktemp -d)
-            timeout 25s google-chrome \
-              --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
-              --no-first-run --no-default-browser-check --enable-logging=stderr --v=0 \
-              --user-data-dir="$profile" --dump-dom "$STAGING_URL$path" \
-              >/tmp/navixa-csp-dom.html 2>>/tmp/navixa-csp-browser.log || true
-            rm -rf "$profile"
-            grep -Eqi 'NAVIXA|navixa|<html' /tmp/navixa-csp-dom.html || { echo "Chrome did not render $path"; exit 1; }
-          done
-
-          if grep -Eqi "(violat[^\n]*(script-src|style-src)|(script-src|style-src)[^\n]*violat|Refused to execute inline script|Refused to apply inline style)" /tmp/navixa-csp-browser.log; then
-            echo "Strict CSP report-only detected script/style compatibility violations:"
-            grep -Ei "Content Security Policy|script-src|style-src|Refused to execute inline script|Refused to apply inline style" /tmp/navixa-csp-browser.log | head -n 80 || true
-            exit 1
-          fi
-
-          echo "Strict CSP report-only showed no script/style violations on the critical staging routes."
+          CHROME_BIN: google-chrome
+        run: node tests/staging-csp-smoke.mjs
