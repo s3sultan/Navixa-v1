@@ -14,6 +14,8 @@ function probePolicy(nonce: string) {
     `script-src 'self' 'nonce-${nonce}' https://static.cloudflareinsights.com https://accounts.google.com https://cdn.jsdelivr.net`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+    `style-src-elem 'self' 'nonce-${nonce}' https://fonts.googleapis.com https://cdn.jsdelivr.net`,
+    "style-src-attr 'unsafe-inline'",
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://quran.islam-db.com",
     "media-src 'self' blob:",
@@ -30,7 +32,7 @@ export function middleware(request: NextRequest) {
 
   const nonce = crypto.randomUUID().replaceAll("-", "");
   response.headers.set("Content-Security-Policy-Report-Only", probePolicy(nonce));
-  response.headers.set("X-NAVIXA-CSP-Probe", "nonce-v1");
+  response.headers.set("X-NAVIXA-CSP-Probe", "nonce-style-elem-v1");
   return response;
 }
 
