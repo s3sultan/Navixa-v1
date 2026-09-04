@@ -46,6 +46,11 @@ function base64Url(bytes: Uint8Array) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function mutationChanges(result: unknown) {
+  const changes = (result as { meta?: { changes?: unknown } } | null)?.meta?.changes;
+  return typeof changes === "number" ? changes : null;
+}
+
 export function normalizeUserEmail(value: unknown) {
   return typeof value === "string" ? value.replace(/\s+/g, "").trim().toLowerCase().slice(0, 160) : "";
 }
@@ -119,9 +124,22 @@ export async function refreshUserSessionIfNeeded(request: Request, database: D1D
   if (!Number.isFinite(expiresAt) || expiresAt - Date.now() > USER_SESSION_REFRESH_WINDOW_SECONDS * 1000) return { session, cookie: null };
   const token = readUserSessionToken(request);
   if (!token || token.length < 30) return { session, cookie: null };
+
+  const nowIso = new Date().toISOString();
   const nextExpiresAt = new Date(Date.now() + USER_SESSION_TTL_SECONDS * 1000).toISOString();
-  await database.prepare("UPDATE navixa_user_sessions SET expires_at=?,last_seen_at=? WHERE token_hash=? AND revoked_at=''").bind(nextExpiresAt, new Date().toISOString(), await hashOpaqueValue(token)).run();
-  return { session: { ...session, expiresAt: nextExpiresAt }, cookie: makeUserSessionCookie(token) };
+  const nextToken = createOpaqueToken();
+  const currentHash = await hashOpaqueValue(token);
+  const nextHash = await hashOpaqueValue(nextToken);
+
+  // Rotate the bearer token when extending a session. A stolen old token can no
+  // longer keep refreshing itself indefinitely. The old hash is the compare-and-
+  // swap key, so only one concurrent refresh can win in production D1.
+  const result = await database.prepare(
+    "UPDATE navixa_user_sessions SET token_hash=?,expires_at=?,last_seen_at=? WHERE token_hash=? AND revoked_at=''",
+  ).bind(nextHash, nextExpiresAt, nowIso, currentHash).run();
+  if (mutationChanges(result) === 0) return { session, cookie: null };
+
+  return { session: { ...session, expiresAt: nextExpiresAt }, cookie: makeUserSessionCookie(nextToken) };
 }
 
 export async function revokeUserSession(request: Request, database: D1Database) {
