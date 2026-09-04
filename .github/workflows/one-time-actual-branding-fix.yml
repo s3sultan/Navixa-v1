@@ -1,0 +1,80 @@
+name: One-time actual NAVIXA branding source fix
+
+on:
+  push:
+    branches: [fix/actual-home-branding-2026-09-04]
+    paths:
+      - ".github/workflows/one-time-actual-branding-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-source:
+    if: github.actor == github.repository_owner && !contains(github.event.head_commit.message, '[skip-branding-fix]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact fix branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: fix/actual-home-branding-2026-09-04
+          persist-credentials: true
+
+      - name: Replace legacy public source directly
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          page_path = Path('app/page.tsx')
+          page = page_path.read_text(encoding='utf-8')
+
+          welcome = '<a className="welcome-founders-link" href="/founders"><span>✦</span><b>عرض مؤسسي NAVIXA</b><small>سعر مؤسس محدود يظهر قبل الدفع</small></a>'
+          topbar = '<a href="/founders" className="topbar-plus">✦ <span>عرض المؤسسين</span></a>'
+          legacy_badge = '<em className="plus-badge">Plus</em>'
+          himma_badge = '<em className="plus-badge">هِمّة</em>'
+
+          assert welcome in page, 'expected welcome founders entry not found'
+          assert topbar in page, 'expected topbar founders entry not found'
+          badge_count = page.count(legacy_badge)
+          assert badge_count >= 3, f'expected legacy Plus badges, found {badge_count}'
+
+          page = page.replace(welcome, '')
+          page = page.replace(topbar, '')
+          page = page.replace(legacy_badge, himma_badge)
+
+          assert 'welcome-founders-link' not in page
+          assert '>عرض المؤسسين<' not in page
+          assert '<em className="plus-badge">Plus</em>' not in page
+          assert page.count(himma_badge) == badge_count
+          page_path.write_text(page, encoding='utf-8')
+
+          layout_path = Path('app/layout.tsx')
+          layout = layout_path.read_text(encoding='utf-8')
+          layout = layout.replace('import "./branding-overrides.css";\n', '')
+          assert 'branding-overrides.css' not in layout
+          layout_path.write_text(layout, encoding='utf-8')
+
+          overrides = Path('app/branding-overrides.css')
+          if overrides.exists():
+              overrides.unlink()
+
+          test_path = Path('tests/public-branding.test.ts')
+          test_path.write_text('''import assert from "node:assert/strict";\nimport {readFile} from "node:fs/promises";\nimport test from "node:test";\n\nconst root=new URL("../",import.meta.url);\n\ntest("public plan badges use Himma and Azm names",async()=>{\n  const badges=await readFile(new URL("app/PlanBadges.tsx",root),"utf8");\n  assert.match(badges,/>هِمّة<\\/Link>/);\n  assert.match(badges,/>عَزْم<\\/Link>/);\n  assert.doesNotMatch(badges,/>PLUS<\\/Link>|>SPRINT<\\/Link>/);\n});\n\ntest("homepage source uses Himma directly and has no founders promotion entry points",async()=>{\n  const [page,layout]=await Promise.all([\n    readFile(new URL("app/page.tsx",root),"utf8"),\n    readFile(new URL("app/layout.tsx",root),"utf8"),\n  ]);\n  assert.match(page,/<em className="plus-badge">هِمّة<\\/em>/);\n  assert.doesNotMatch(page,/<em className="plus-badge">Plus<\\/em>/);\n  assert.doesNotMatch(page,/welcome-founders-link|>عرض المؤسسين</);\n  assert.doesNotMatch(layout,/branding-overrides\\.css/);\n});\n\ntest("Arabic subscription copy no longer presents Plus as the public plan name",async()=>{\n  const copy=await readFile(new URL("app/content/ar.ts",root),"utf8");\n  assert.match(copy,/NAVIXA هِمّة/);\n  assert.match(copy,/هِمّة أو عَزْم/);\n  assert.doesNotMatch(copy,/NAVIXA PLUS|مزايا Plus|يضيف Plus/);\n});\n''', encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff -- app/page.tsx app/layout.tsx app/branding-overrides.css tests/public-branding.test.ts
+
+      - name: Commit actual source fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "NAVIXA source fix"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/page.tsx app/layout.tsx tests/public-branding.test.ts
+          git add -u app/branding-overrides.css
+          git commit -m "fix: replace legacy branding in actual homepage source"
+          git push origin HEAD:fix/actual-home-branding-2026-09-04
