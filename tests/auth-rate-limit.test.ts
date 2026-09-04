@@ -90,3 +90,12 @@ test("Google login keeps a shared cross-isolate IP rate limit behind the local f
   assert.match(route, /ip, pepper, 8, 10 \* 60_000/);
   assert.match(route, /if \(!shared\.allowed\)/);
 });
+
+test("billing checkout keeps a shared cross-isolate IP gate behind the local fast limiter", async () => {
+  const route = await readFile(new URL("../app/api/billing/checkout/route.ts", import.meta.url), "utf8");
+  assert.match(route, /clientIp\(request\)/);
+  assert.match(route, /resolveAdminJwtSecret\(\)/);
+  assert.match(route, /"billing-checkout-ip"/);
+  assert.match(route, /clientIp\(request\),pepper,5,10\*60_000/);
+  assert.match(route, /if\(!shared\.allowed\)return rateLimitResponse\(shared\.retryAfterSeconds\)/);
+});
