@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server.js";
 import { generateRegistrationOptions } from "@simplewebauthn/server";
-import { getUserAuthSettings, resolveUserSession, type D1Database } from "../../../../../../worker/userAuth.ts";
+import { getUserAuthSettings, resolveUserSession, trustedUserMutation, type D1Database } from "../../../../../../worker/userAuth.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
@@ -9,6 +9,7 @@ async function db(): Promise<Database | null> { try { return (await import("clou
 function bytes(value: string) { return new TextEncoder().encode(value); }
 
 export async function POST(request: Request) {
+  if (!trustedUserMutation(request)) return NextResponse.json({ error: "طلب غير مسموح" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   const database = await db();
   if (!database) return NextResponse.json({ error: "Passkeys غير متاحة الآن" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const settings = await getUserAuthSettings(database).catch(() => null), session = await resolveUserSession(request, database);
