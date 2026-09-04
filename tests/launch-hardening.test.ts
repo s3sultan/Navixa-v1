@@ -33,11 +33,16 @@ assert.match(privacy, /الحساب وتسجيل الدخول/);
 assert.match(privacy, /هِمّة والدفع/);
 
 // Production must not deploy just because code was pushed to master. A human
-// must dispatch the workflow from master and explicitly confirm production.
+// must dispatch from master, type the explicit confirmation phrase, and the
+// selected master commit must be associated with a merged pull request.
 assert.match(productionDeploy, /workflow_dispatch:/);
 assert.match(productionDeploy, /confirm_production:/);
 assert.match(productionDeploy, /github\.ref == 'refs\/heads\/master'/);
-assert.match(productionDeploy, /inputs\.confirm_production == true/);
+assert.match(productionDeploy, /DEPLOY_NAVIXA_PRODUCTION/);
+assert.match(productionDeploy, /pull-requests: read/);
+assert.match(productionDeploy, /Require merged pull request provenance/);
+assert.match(productionDeploy, /commits\/\$\{GITHUB_SHA\}\/pulls/);
+assert.match(productionDeploy, /merged_at != null/);
 assert.doesNotMatch(productionDeploy, /^\s+push:\s*$/m);
 
 console.log("Launch hardening contract: ok");
