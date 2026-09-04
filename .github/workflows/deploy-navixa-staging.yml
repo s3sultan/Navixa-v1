@@ -34,6 +34,23 @@ jobs:
       - name: Install dependencies without deployment secrets
         run: npm ci
 
+      - name: Stage stricter CSP report-only experiment
+        if: github.ref == 'refs/heads/security/hardening-2026-09-04'
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'worker/index.ts';
+          let source = fs.readFileSync(path, 'utf8');
+          const scriptBefore = "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://accounts.google.com https://cdn.jsdelivr.net";
+          const scriptAfter = "script-src 'self' https://static.cloudflareinsights.com https://accounts.google.com https://cdn.jsdelivr.net";
+          const styleBefore = "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net";
+          const styleAfter = "style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net";
+          if (!source.includes(scriptBefore) || !source.includes(styleBefore)) throw new Error('Expected CSP report-only allowlist was not found');
+          source = source.replace(scriptBefore, scriptAfter).replace(styleBefore, styleAfter);
+          fs.writeFileSync(path, source);
+          NODE
+
       - name: Build NAVIXA without deployment secrets
         run: npm run build
 
@@ -127,6 +144,12 @@ jobs:
           grep -Eqi '^x-content-type-options:[[:space:]]*nosniff' /tmp/navixa-staging-headers.txt
           grep -Eqi 'NAVIXA|navixa' /tmp/navixa-staging-body.html
 
+          report_only=$(grep -Ei '^content-security-policy-report-only:' /tmp/navixa-staging-headers.txt | tr -d '\r')
+          if printf '%s' "$report_only" | grep -qi "unsafe-inline"; then
+            echo "Strict staging CSP experiment was not applied"
+            exit 1
+          fi
+
           for path in / /today /account /admin/login /meetings; do
             code=$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' "$STAGING_URL$path")
             case "$code" in
@@ -139,3 +162,30 @@ jobs:
             -X POST -H 'Origin: https://attacker.example' -H 'Content-Type: application/json' \
             --data '{}' "$STAGING_URL/api/account/passkeys/register/options")
           test "$origin_status" = "403" || { echo "Passkey same-origin guard returned $origin_status"; exit 1; }
+
+      - name: Probe strict CSP report-only compatibility in Chrome
+        if: github.ref == 'refs/heads/security/hardening-2026-09-04'
+        env:
+          STAGING_URL: https://navixa-staging.s2shug.workers.dev
+        run: |
+          set -euo pipefail
+          google-chrome --version
+          : > /tmp/navixa-csp-browser.log
+          for path in / /today /account /admin/login /meetings; do
+            profile=$(mktemp -d)
+            timeout 25s google-chrome \
+              --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
+              --no-first-run --no-default-browser-check --enable-logging=stderr --v=0 \
+              --user-data-dir="$profile" --dump-dom "$STAGING_URL$path" \
+              >/tmp/navixa-csp-dom.html 2>>/tmp/navixa-csp-browser.log || true
+            rm -rf "$profile"
+            grep -Eqi 'NAVIXA|navixa|<html' /tmp/navixa-csp-dom.html || { echo "Chrome did not render $path"; exit 1; }
+          done
+
+          if grep -Eqi "(violat[^\n]*(script-src|style-src)|(script-src|style-src)[^\n]*violat|Refused to execute inline script|Refused to apply inline style)" /tmp/navixa-csp-browser.log; then
+            echo "Strict CSP report-only detected script/style compatibility violations:"
+            grep -Ei "Content Security Policy|script-src|style-src|Refused to execute inline script|Refused to apply inline style" /tmp/navixa-csp-browser.log | head -n 80 || true
+            exit 1
+          fi
+
+          echo "Strict CSP report-only showed no script/style violations on the critical staging routes."
