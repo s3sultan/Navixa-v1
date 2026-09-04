@@ -1,12 +1,14 @@
 name: Deploy NAVIXA
-# Stable production deploy trigger after auth fallback hardening.
+# Production is manual-only. PR verification and staging should complete first.
 
 on:
-  push:
-    branches: [master]
-    paths-ignore:
-      - "**/*.md"
   workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Confirm production deployment after review and verification"
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: navixa-production
@@ -17,6 +19,7 @@ permissions:
 
 jobs:
   build-and-deploy:
+    if: ${{ github.ref == 'refs/heads/master' && inputs.confirm_production == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
