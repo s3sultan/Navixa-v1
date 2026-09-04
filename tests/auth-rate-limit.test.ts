@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { clientIp, consumeAuthRateLimit } from "../worker/authRateLimit.ts";
 
@@ -50,4 +51,12 @@ test("auth rate limit persists attempts in the shared database bucket", async ()
   assert.equal(results[3].allowed, false);
   assert.equal(results[3].attempts, 4);
   assert.equal(db.rows.size, 1);
+});
+
+test("OTP verification serializes successful code consumption across Worker isolates", async () => {
+  const route = await readFile(new URL("../app/api/account/code/verify/route.ts", import.meta.url), "utf8");
+  assert.match(route, /"otp-code-consume"/);
+  assert.match(route, /activeCode\.id, pepper, 1, 10 \* 60_000/);
+  assert.match(route, /if \(!consumeGate\.allowed\)/);
+  assert.ok(route.indexOf("otp-code-consume") < route.indexOf("SET consumed_at=?"));
 });
