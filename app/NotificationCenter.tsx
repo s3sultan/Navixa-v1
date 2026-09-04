@@ -10,7 +10,7 @@ type Props={onPreviewReminder:(message:string)=>void};
 const REMINDER_STREAMS=[
   {icon:"◷",title:"دراستك ومواعيدك",detail:"اختبارات، كويزات، اجتماعات ومهام من صفحة يومي.",href:"/today"},
   {icon:"◎",title:"تركيزك وصحتك",detail:"الماء، الحركة، راحة العين وجلسات التركيز.",href:"/#focus"},
-  {icon:"⌾",title:"حسابك وتجديدك",detail:"تذكير تجربة أو اشتراك Plus قبل الانتهاء.",href:"/account"},
+  {icon:"⌾",title:"حسابك وتجديدك",detail:"تذكير تجربة أو اشتراك هِمّة قبل الانتهاء.",href:"/account"},
   {icon:"◌",title:"منظومة NAVIXA",detail:"صلاحية Fitness وKids وLearning مرتبطة بحالة عضويتك.",href:"/portfolio"},
 ] as const;
 
