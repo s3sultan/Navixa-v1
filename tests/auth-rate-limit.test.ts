@@ -74,3 +74,12 @@ test("Passkey verification serializes authentication and registration challenges
     assert.ok(route.indexOf("consumeAuthRateLimit") < route.lastIndexOf("SET consumed_at=?"));
   }
 });
+
+test("Google login keeps a shared cross-isolate IP rate limit behind the local fast gate", async () => {
+  const route = await readFile(new URL("../app/api/account/google/route.ts", import.meta.url), "utf8");
+  assert.match(route, /clientIp\(request\)/);
+  assert.match(route, /resolveAdminJwtSecret\(\)/);
+  assert.match(route, /"google-auth-ip"/);
+  assert.match(route, /ip, pepper, 8, 10 \* 60_000/);
+  assert.match(route, /if \(!shared\.allowed\)/);
+});
