@@ -8,6 +8,7 @@ const STAGING_URL = process.env.STAGING_URL || "https://navixa-staging.s2shug.wo
 const EXPECTED_STAGING_URL = "https://navixa-staging.s2shug.workers.dev";
 const DEBUG_PORT = Number(process.env.NAVIXA_CDP_PORT || 9335);
 const DEBUG_URL = `http://127.0.0.1:${DEBUG_PORT}`;
+const PROBE_PARAM = "csp_nonce_probe";
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 if (STAGING_URL !== EXPECTED_STAGING_URL) {
@@ -103,7 +104,9 @@ async function waitForDocument(cdp, expectedPath, attempts = 80) {
         path: location.pathname,
         htmlLength: document.documentElement?.outerHTML?.length || 0,
         bodyLength: document.body?.innerText?.length || 0,
-        title: document.title || ""
+        title: document.title || "",
+        inlineScripts: [...document.scripts].filter(script => !script.src).length,
+        noncedInlineScripts: [...document.scripts].filter(script => !script.src && Boolean(script.nonce)).length
       }))()`);
       if (lastState?.path === expectedPath && ["interactive", "complete"].includes(lastState.readyState) && lastState.htmlLength > 500) {
         return lastState;
@@ -116,11 +119,27 @@ async function waitForDocument(cdp, expectedPath, attempts = 80) {
   throw new Error(`Chrome did not render ${expectedPath}; last state=${JSON.stringify(lastState)}`);
 }
 
-function isScriptOrStyleCspViolation(entry) {
+function directive(policy, name) {
+  return policy.split(";").map(value => value.trim()).find(value => value === name || value.startsWith(`${name} `)) || "";
+}
+
+async function assertNonceProbeHeaders(url) {
+  const response = await fetch(url, { redirect: "manual", headers: { "cache-control": "no-cache" } });
+  assert.ok(response.status >= 200 && response.status < 500, `Unexpected probe status ${response.status} for ${url.pathname}`);
+  assert.equal(response.headers.get("x-navixa-csp-probe"), "nonce-v1", `Nonce middleware did not run for ${url.pathname}`);
+  const policy = response.headers.get("content-security-policy-report-only") || "";
+  const scripts = directive(policy, "script-src");
+  const styles = directive(policy, "style-src");
+  assert.match(scripts, /'nonce-[a-f0-9]{32}'/i, `Nonce is missing from script-src for ${url.pathname}`);
+  assert.doesNotMatch(scripts, /'unsafe-inline'/i, `script-src still allows unsafe-inline for ${url.pathname}`);
+  assert.match(styles, /'unsafe-inline'/i, `Style hardening moved ahead of the staged plan for ${url.pathname}`);
+}
+
+function isScriptCspViolation(entry) {
   const source = String(entry?.source || "").toLowerCase();
   const text = String(entry?.text || "");
   if (source !== "security" && !/content security policy/i.test(text)) return false;
-  return /(script-src|style-src)/i.test(text) && /(violat|refused|blocked)/i.test(text);
+  return /script-src/i.test(text) && /(violat|refused|blocked)/i.test(text);
 }
 
 async function main() {
@@ -162,18 +181,20 @@ async function main() {
     for (const path of routes) {
       const before = logEntries.length;
       const url = new URL(path, STAGING_URL);
-      url.searchParams.set("csp_probe", `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      url.searchParams.set(PROBE_PARAM, `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      await assertNonceProbeHeaders(url);
       await cdp.call("Page.navigate", { url: url.toString() });
       const state = await waitForDocument(cdp, path);
       await sleep(2_000);
       const routeEntries = logEntries.slice(before);
-      const violations = routeEntries.filter(isScriptOrStyleCspViolation);
-      rendered.push({ path, ...state, cspViolations: violations.length });
+      const violations = routeEntries.filter(isScriptCspViolation);
+      rendered.push({ path, ...state, scriptCspViolations: violations.length });
       if (violations.length) {
-        console.error(`CSP script/style violations on ${path}:`);
+        console.error(`CSP script violations on ${path}:`);
         for (const entry of violations.slice(0, 30)) console.error(`[${entry.source}] ${entry.text}`);
-        throw new Error(`Strict CSP report-only is not yet compatible with ${path}`);
+        throw new Error(`Nonce-based script CSP is not yet compatible with ${path}`);
       }
+      assert.equal(state.noncedInlineScripts, state.inlineScripts, `Not every inline script carried a nonce on ${path}`);
     }
 
     console.log(JSON.stringify({ status: "passed", staging: STAGING_URL, rendered }, null, 2));
