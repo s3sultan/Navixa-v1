@@ -6,45 +6,112 @@ import {isScreenEnabled,sendTelegramAlert,getAdminMessages} from "./alertPrefs";
 const prayerLabels:Record<string,string>={Fajr:"الفجر",Dhuhr:"الظهر",Asr:"العصر",Maghrib:"المغرب",Isha:"العشاء"};
 const prayerOrder=["Fajr","Dhuhr","Asr","Maghrib","Isha"];
 const defaultOffset:Record<string,number>={Fajr:20,Dhuhr:15,Asr:15,Maghrib:10,Isha:15};
-const RIYADH={lat:24.7136,lng:46.6753};
-const today=()=>new Date().toISOString().slice(0,10);
+const RIYADH={lat:24.7136,lng:46.6753,source:"default" as const};
+const METHOD_OPTIONS=[
+  {value:4,label:"أم القرى - مكة (الموصى به داخل السعودية)"},
+  {value:3,label:"رابطة العالم الإسلامي"},
+  {value:8,label:"منطقة الخليج"},
+  {value:9,label:"الكويت"},
+  {value:10,label:"قطر"},
+] as const;
+const LOCATION_KEY="navixa-prayer-location";
+const METHOD_KEY="navixa-prayer-method";
+const CALIBRATION_KEY="navixa-prayer-calibration-v2";
+const LEGACY_PRAYER_KEY="navixa-prayer-manual";
+const LEGACY_IQAMA_KEY="navixa-iqama-manual";
+
+type PrayerLocation={lat:number;lng:number;source:"device"|"default"};
+type PrayerCalibration={version:2;adhanOffsets:Record<string,number>;iqamaDelays:Record<string,number>;anchorDate:string};
+
 const cleanTime=(value?:string)=>value?value.split(" ")[0]:"";
+const dateKey=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+const apiDate=(date:Date)=>`${String(date.getDate()).padStart(2,"0")}-${String(date.getMonth()+1).padStart(2,"0")}-${date.getFullYear()}`;
+const today=()=>dateKey(new Date());
 const parseToday=(hhmm:string)=>{const [h,m]=cleanTime(hhmm).split(":").map(Number);const d=new Date();if(Number.isFinite(h)&&Number.isFinite(m))d.setHours(h,m,0,0);return d};
 const addMinutes=(date:Date,minutes:number)=>new Date(date.getTime()+minutes*60000);
 const to24=(date:Date)=>`${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
 const fmt12=(hhmm:string)=>{const d=parseToday(hhmm);return d.toLocaleTimeString("ar",{hour:"2-digit",minute:"2-digit",hour12:true})};
+const minuteValue=(hhmm:string)=>{const [h,m]=cleanTime(hhmm).split(":").map(Number);return Number.isFinite(h)&&Number.isFinite(m)?h*60+m:null};
+const shiftClock=(hhmm:string,minutes:number)=>{const value=minuteValue(hhmm);if(value===null)return cleanTime(hhmm);const shifted=(value+minutes+1440*2)%1440;return `${String(Math.floor(shifted/60)).padStart(2,"0")}:${String(shifted%60).padStart(2,"0")}`};
+const clockDifference=(target:string,base:string)=>{const targetMinutes=minuteValue(target),baseMinutes=minuteValue(base);if(targetMinutes===null||baseMinutes===null)return 0;let diff=targetMinutes-baseMinutes;if(diff>720)diff-=1440;if(diff<-720)diff+=1440;return Math.max(-180,Math.min(180,diff))};
+const iqamaDelay=(adhan:string,iqama:string,fallback:number)=>{const adhanMinutes=minuteValue(adhan),iqamaMinutes=minuteValue(iqama);if(adhanMinutes===null||iqamaMinutes===null)return fallback;const diff=(iqamaMinutes-adhanMinutes+1440)%1440;return diff>=0&&diff<=180?diff:fallback};
+const readJson=<T,>(key:string):T|null=>{try{return JSON.parse(localStorage.getItem(key)||"null") as T|null}catch{return null}};
+const validLocation=(value:unknown):value is PrayerLocation=>Boolean(value&&typeof value==="object"&&Number.isFinite((value as PrayerLocation).lat)&&Number.isFinite((value as PrayerLocation).lng)&&Math.abs((value as PrayerLocation).lat)<=90&&Math.abs((value as PrayerLocation).lng)<=180);
+const applyCalibration=(base:Record<string,string>,calibration:PrayerCalibration|null)=>Object.fromEntries(Object.entries(base).map(([name,value])=>[name,prayerOrder.includes(name)?shiftClock(value,calibration?.adhanOffsets?.[name]||0):value])) as Record<string,string>;
+const deriveCalibration=(base:Record<string,string>,manual:Record<string,string>,legacyIqama:Record<string,string>|null):PrayerCalibration=>{
+  const adhanOffsets:Record<string,number>={},iqamaDelays:Record<string,number>={};
+  prayerOrder.forEach(name=>{
+    const manualAdhan=cleanTime(manual[name])||cleanTime(base[name]);
+    adhanOffsets[name]=clockDifference(manualAdhan,base[name]);
+    const effectiveAdhan=shiftClock(base[name],adhanOffsets[name]);
+    iqamaDelays[name]=legacyIqama?.[name]?iqamaDelay(effectiveAdhan,legacyIqama[name],defaultOffset[name]):defaultOffset[name];
+  });
+  return {version:2,adhanOffsets,iqamaDelays,anchorDate:today()};
+};
 
 export default function PrayerStrip(){
   const [timings,setTimings]=useState<Record<string,string>|null>(null);
-  const [iqamaManual,setIqamaManual]=useState<Record<string,string>|null>(null);
+  const [baseTimings,setBaseTimings]=useState<Record<string,string>|null>(null);
+  const [calibration,setCalibration]=useState<PrayerCalibration|null>(null);
+  const [location,setLocation]=useState<PrayerLocation|null>(null);
+  const [method,setMethod]=useState(4);
+  const [locationStatus,setLocationStatus]=useState("");
+  const [locationBusy,setLocationBusy]=useState(false);
   const [editing,setEditing]=useState(false);
   const [expanded,setExpanded]=useState(false);
   const [draft,setDraft]=useState<Record<string,string>>({});
   const [alertInfo,setAlertInfo]=useState<{type:"adhan"|"iqama";name:string}|null>(null);
   const [now,setNow]=useState(new Date());
   const audioRef=useRef<AudioContext|null>(null);
+  const currentDay=dateKey(now);
 
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(t)},[]);
   useEffect(()=>{if(!expanded)return;const t=setTimeout(()=>setExpanded(false),7000);return()=>clearTimeout(t)},[expanded]);
-
   useEffect(()=>{
-    const manual=JSON.parse(localStorage.getItem("navixa-prayer-manual")||"null");
-    setIqamaManual(JSON.parse(localStorage.getItem("navixa-iqama-manual")||"null"));
-    if(manual){setTimings(manual);return}
-    const cacheKey=`navixa-prayer-cache-${today()}`;
-    const cached=JSON.parse(localStorage.getItem(cacheKey)||"null");
-    if(cached){setTimings(cached);return}
-    let loc=JSON.parse(localStorage.getItem("navixa-prayer-location")||"null");
-    if(!loc){loc=RIYADH;localStorage.setItem("navixa-prayer-location",JSON.stringify(loc))}
-    fetch(`/api/prayer-times?lat=${loc.lat}&lng=${loc.lng}`).then(r=>r.json()).then(d=>{
-      if(d?.data?.timings){setTimings(d.data.timings);localStorage.setItem(cacheKey,JSON.stringify(d.data.timings))}
-    }).catch(()=>{});
+    const savedLocation=readJson<PrayerLocation>(LOCATION_KEY);
+    const savedMethod=Number(localStorage.getItem(METHOD_KEY)||4);
+    const savedCalibration=readJson<PrayerCalibration>(CALIBRATION_KEY);
+    setLocation(validLocation(savedLocation)?savedLocation:RIYADH);
+    setMethod(METHOD_OPTIONS.some(option=>option.value===savedMethod)?savedMethod:4);
+    if(savedCalibration?.version===2)setCalibration(savedCalibration);
   },[]);
 
+  useEffect(()=>{
+    if(!location)return;
+    let cancelled=false;
+    const load=async()=>{
+      const cacheKey=`navixa-prayer-cache-v2-${currentDay}-${location.lat.toFixed(4)}-${location.lng.toFixed(4)}-${method}`;
+      let base=readJson<Record<string,string>>(cacheKey);
+      if(!base){
+        try{
+          const response=await fetch(`/api/prayer-times?lat=${encodeURIComponent(String(location.lat))}&lng=${encodeURIComponent(String(location.lng))}&method=${method}&date=${apiDate(now)}`,{cache:"no-store"});
+          const data=await response.json().catch(()=>({}));
+          if(!response.ok||!data?.data?.timings)throw new Error("fetch");
+          base=data.data.timings as Record<string,string>;
+          localStorage.setItem(cacheKey,JSON.stringify(base));
+        }catch{if(!cancelled)setLocationStatus("تعذر تحديث مواقيت اليوم الآن؛ سنحاول عند فتح NAVIXA مجددًا.");return}
+      }
+      if(cancelled||!base)return;
+      let activeCalibration=readJson<PrayerCalibration>(CALIBRATION_KEY);
+      const legacyManual=readJson<Record<string,string>>(LEGACY_PRAYER_KEY);
+      if(!activeCalibration&&legacyManual){
+        activeCalibration=deriveCalibration(base,legacyManual,readJson<Record<string,string>>(LEGACY_IQAMA_KEY));
+        localStorage.setItem(CALIBRATION_KEY,JSON.stringify(activeCalibration));
+        localStorage.removeItem(LEGACY_PRAYER_KEY);localStorage.removeItem(LEGACY_IQAMA_KEY);
+        setCalibration(activeCalibration);
+        setLocationStatus("تم تحويل المواقيت اليدوية القديمة إلى ضبط يتقدم تلقائيًا كل يوم.");
+      }
+      setBaseTimings(base);
+      setTimings(applyCalibration(base,activeCalibration));
+    };
+    void load();
+    return()=>{cancelled=true};
+  },[location?.lat,location?.lng,method,currentDay]);
+
   const iqamaTime=(name:string)=>{
-    if(iqamaManual?.[name])return iqamaManual[name];
     if(!timings)return "";
-    return to24(addMinutes(parseToday(timings[name]),defaultOffset[name]));
+    const delay=calibration?.iqamaDelays?.[name]??defaultOffset[name];
+    return to24(addMinutes(parseToday(timings[name]),delay));
   };
 
   const playChime=()=>{
@@ -77,20 +144,42 @@ export default function PrayerStrip(){
     };
     const timer=setInterval(check,10000);
     return()=>clearInterval(timer);
-  },[timings,iqamaManual]);
+  },[timings,calibration]);
 
   const openEdit=()=>{
     const next:Record<string,string>={};
     prayerOrder.forEach(name=>{next[name]=cleanTime(timings?.[name])||"";next[`iqama_${name}`]=iqamaTime(name)});
-    setDraft(next);setEditing(true);
+    setDraft(next);setEditing(true);setLocationStatus("");
   };
   const saveEdit=()=>{
-    const manualTimings:Record<string,string>={},manualIqama:Record<string,string>={};
-    prayerOrder.forEach(name=>{if(draft[name])manualTimings[name]=draft[name];if(draft[`iqama_${name}`])manualIqama[name]=draft[`iqama_${name}`]});
-    localStorage.setItem("navixa-prayer-manual",JSON.stringify(manualTimings));
-    localStorage.setItem("navixa-iqama-manual",JSON.stringify(manualIqama));
-    setTimings(manualTimings);setIqamaManual(manualIqama);setEditing(false);
+    if(!baseTimings){setLocationStatus("انتظر تحديث تقويم اليوم ثم احفظ التعديل.");return}
+    const adhanOffsets:Record<string,number>={},iqamaDelays:Record<string,number>={};
+    prayerOrder.forEach(name=>{
+      const requestedAdhan=cleanTime(draft[name])||cleanTime(baseTimings[name]);
+      adhanOffsets[name]=clockDifference(requestedAdhan,baseTimings[name]);
+      const effectiveAdhan=shiftClock(baseTimings[name],adhanOffsets[name]);
+      iqamaDelays[name]=iqamaDelay(effectiveAdhan,draft[`iqama_${name}`]||"",defaultOffset[name]);
+    });
+    const next:PrayerCalibration={version:2,adhanOffsets,iqamaDelays,anchorDate:currentDay};
+    localStorage.setItem(CALIBRATION_KEY,JSON.stringify(next));
+    localStorage.removeItem(LEGACY_PRAYER_KEY);localStorage.removeItem(LEGACY_IQAMA_KEY);
+    setCalibration(next);setTimings(applyCalibration(baseTimings,next));setEditing(false);
+    setLocationStatus("تم الحفظ كفروق على التقويم؛ ستتقدم المواقيت تلقائيًا مع تغيّر الأيام.");
   };
+  const resetManual=()=>{
+    localStorage.removeItem(CALIBRATION_KEY);localStorage.removeItem(LEGACY_PRAYER_KEY);localStorage.removeItem(LEGACY_IQAMA_KEY);
+    setCalibration(null);if(baseTimings)setTimings(baseTimings);setLocationStatus("تم الرجوع إلى التقويم التلقائي بدون تعديل يدوي.");
+  };
+  const useDeviceLocation=()=>{
+    if(!("geolocation" in navigator)){setLocationStatus("هذا المتصفح لا يدعم تحديد الموقع.");return}
+    setLocationBusy(true);setLocationStatus("جاري طلب موقع الجهاز…");
+    navigator.geolocation.getCurrentPosition(position=>{
+      const next:PrayerLocation={lat:position.coords.latitude,lng:position.coords.longitude,source:"device"};
+      localStorage.setItem(LOCATION_KEY,JSON.stringify(next));setLocation(next);setLocationBusy(false);setLocationStatus("تم اعتماد موقع جهازك للمواقيت. سيُحدّث NAVIXA الأوقات يوميًا.");
+    },()=>{setLocationBusy(false);setLocationStatus("لم نتمكن من قراءة الموقع. اسمح للموقع من إعدادات المتصفح ثم أعد المحاولة.")},{enableHighAccuracy:false,timeout:10000,maximumAge:6*60*60*1000});
+  };
+  const useRiyadh=()=>{localStorage.setItem(LOCATION_KEY,JSON.stringify(RIYADH));setLocation(RIYADH);setLocationStatus("تم اعتماد الرياض كموقع افتراضي.")};
+  const changeMethod=(value:number)=>{setMethod(value);localStorage.setItem(METHOD_KEY,String(value));setLocationStatus("تم تغيير طريقة الحساب وسيتم تحديث مواقيت اليوم.")};
 
   const formatRemain=(ms:number)=>{
     const totalSec=Math.floor(ms/1000);
@@ -132,12 +221,19 @@ export default function PrayerStrip(){
     <button type="button" className="prayer-strip-edit" onClick={openEdit} aria-label="تعديل مواقيت الصلاة">✎</button>
 
     {editing&&typeof document!=="undefined"&&createPortal(<div className="prayer-edit-back" onClick={()=>setEditing(false)}><article onClick={e=>e.stopPropagation()}>
-      <h3>تعديل مواقيت الصلاة والإقامة</h3>
+      <h3>مواقيت الصلاة والموقع</h3>
+      <div className="prayer-location-tools">
+        <p><b>الموقع:</b> {location?.source==="device"?"موقع جهازك":"الرياض افتراضيًا"}. لا يتم حفظ الإحداثيات في حسابك؛ تبقى على هذا الجهاز وتُستخدم لجلب المواقيت.</p>
+        <div className="prayer-edit-actions"><button type="button" onClick={useDeviceLocation} disabled={locationBusy}>{locationBusy?"جاري تحديد الموقع…":"استخدام موقعي الحالي"}</button><button type="button" className="ghost" onClick={useRiyadh}>استخدام الرياض</button></div>
+        <label>طريقة الحساب <select value={method} onChange={e=>changeMethod(Number(e.target.value))}>{METHOD_OPTIONS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        {locationStatus&&<p role="status">{locationStatus}</p>}
+      </div>
+      <p>أي وقت تعدله يدويًا يُحفظ الآن كفرق دقائق فوق التقويم، وليس كساعة ثابتة. لذلك يتغير تلقائيًا من يوم لليوم.</p>
       <div className="prayer-edit-grid">{prayerOrder.map(name=><div key={name}><b>{prayerLabels[name]}</b>
         <label>أذان <input type="time" value={draft[name]||""} onChange={e=>setDraft({...draft,[name]:e.target.value})}/></label>
         <label>إقامة <input type="time" value={draft[`iqama_${name}`]||""} onChange={e=>setDraft({...draft,[`iqama_${name}`]:e.target.value})}/></label>
       </div>)}</div>
-      <div className="prayer-edit-actions"><button type="button" onClick={saveEdit}>حفظ</button><button type="button" className="ghost" onClick={()=>setEditing(false)}>إلغاء</button></div>
+      <div className="prayer-edit-actions"><button type="button" onClick={saveEdit}>حفظ ذكي</button><button type="button" className="ghost" onClick={resetManual}>الرجوع للتلقائي</button><button type="button" className="ghost" onClick={()=>setEditing(false)}>إلغاء</button></div>
     </article></div>,document.body)}
 
     {alertInfo&&<div className="adhan-alert-back" role="presentation" onClick={()=>setAlertInfo(null)}><article className={`adhan-alert-card is-${alertInfo.type}`} role="dialog" aria-modal="true" aria-labelledby="adhan-alert-title" onClick={e=>e.stopPropagation()}>
