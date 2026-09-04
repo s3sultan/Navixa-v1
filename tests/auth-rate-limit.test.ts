@@ -60,3 +60,17 @@ test("OTP verification serializes successful code consumption across Worker isol
   assert.match(route, /if \(!consumeGate\.allowed\)/);
   assert.ok(route.indexOf("otp-code-consume") < route.indexOf("SET consumed_at=?"));
 });
+
+test("Passkey verification serializes authentication and registration challenges", async () => {
+  const [authRoute, registerRoute] = await Promise.all([
+    readFile(new URL("../app/api/account/passkeys/auth/verify/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/account/passkeys/register/verify/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(authRoute, /"passkey-auth-challenge"/);
+  assert.match(registerRoute, /"passkey-register-challenge"/);
+  for (const route of [authRoute, registerRoute]) {
+    assert.match(route, /active\.id, active\.challenge, 1, 5 \* 60_000/);
+    assert.match(route, /if \(!consumeGate\.allowed\)/);
+    assert.ok(route.indexOf("consumeAuthRateLimit") < route.lastIndexOf("SET consumed_at=?"));
+  }
+});
