@@ -5,6 +5,7 @@ import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
+import "./direct-entry.css";
 
 const siteUrl = "https://navixasa.com";
 
