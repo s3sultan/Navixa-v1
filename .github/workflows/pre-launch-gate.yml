@@ -38,6 +38,28 @@ jobs:
       - name: Lint, tests, UI smoke and production build
         run: npm run test:verify
 
+  actions-security:
+    name: GitHub Actions security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      ZIZMOR_VERSION: '1.30.0'
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Audit GitHub Actions with zizmor
+        run: uvx "zizmor@${ZIZMOR_VERSION}" --strict-collection --min-severity=medium --format=github .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   secret-scan:
     name: Secret exposure guard
     runs-on: ubuntu-latest
@@ -47,6 +69,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Scan repository for committed secrets
         uses: gitleaks/gitleaks-action@v2
@@ -56,17 +79,19 @@ jobs:
   gate:
     name: Release gate
     if: always()
-    needs: [verify, secret-scan]
+    needs: [verify, actions-security, secret-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce blocking checks
         env:
           VERIFY_RESULT: ${{ needs.verify.result }}
+          ACTIONS_SECURITY_RESULT: ${{ needs.actions-security.result }}
           SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
         run: |
           echo "Build/tests/security baseline: $VERIFY_RESULT"
+          echo "GitHub Actions security: $ACTIONS_SECURITY_RESULT"
           echo "Secret scan: $SECRET_SCAN_RESULT"
-          if [ "$VERIFY_RESULT" != "success" ] || [ "$SECRET_SCAN_RESULT" != "success" ]; then
+          if [ "$VERIFY_RESULT" != "success" ] || [ "$ACTIONS_SECURITY_RESULT" != "success" ] || [ "$SECRET_SCAN_RESULT" != "success" ]; then
             echo "NAVIXA Pre-Launch Gate: BLOCK"
             exit 1
           fi
