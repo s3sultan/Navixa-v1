@@ -3,6 +3,7 @@ export type AlertPolicyType=typeof ALERT_POLICY_TYPES[number];
 export type AlertPolicy="user"|"on"|"off";
 export type AlertPolicyChannels={screen:AlertPolicy;telegram:AlertPolicy};
 export type AlertPolicyMap=Record<AlertPolicyType,AlertPolicyChannels>;
+export type AlertMessageMap=Partial<Record<AlertPolicyType,string>>;
 
 type D1Statement={bind:(...values:unknown[])=>D1Statement;run:()=>Promise<unknown>;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>};
 export type AlertPolicyDatabase={prepare:(sql:string)=>D1Statement};
@@ -11,7 +12,8 @@ export const defaultAlertPolicy=():AlertPolicyMap=>Object.fromEntries(ALERT_POLI
 export const isAlertPolicy=(value:unknown):value is AlertPolicy=>value==="user"||value==="on"||value==="off";
 
 export async function ensureAlertPolicySchema(database:AlertPolicyDatabase){
-  await database.prepare("CREATE TABLE IF NOT EXISTS navixa_alert_policy (notification_type TEXT PRIMARY KEY, screen_policy TEXT NOT NULL DEFAULT 'user', telegram_policy TEXT NOT NULL DEFAULT 'user', updated_at TEXT NOT NULL)").run();
+  await database.prepare("CREATE TABLE IF NOT EXISTS navixa_alert_policy (notification_type TEXT PRIMARY KEY, screen_policy TEXT NOT NULL DEFAULT 'user', telegram_policy TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL)").run();
+  try{await database.prepare("ALTER TABLE navixa_alert_policy ADD COLUMN message TEXT NOT NULL DEFAULT ''").run()}catch{/* Existing schema already has the message column. */}
 }
 
 export async function readAlertPolicy(database:AlertPolicyDatabase):Promise<AlertPolicyMap>{
@@ -26,10 +28,19 @@ export async function readAlertPolicy(database:AlertPolicyDatabase):Promise<Aler
   return policy;
 }
 
-export async function writeAlertPolicy(database:AlertPolicyDatabase,policy:AlertPolicyMap){
+export async function readAlertMessages(database:AlertPolicyDatabase):Promise<AlertMessageMap>{
+  await ensureAlertPolicySchema(database);
+  const rows=await database.prepare("SELECT notification_type,message FROM navixa_alert_policy").all<{notification_type:string;message:string}>();
+  const messages:AlertMessageMap={};
+  for(const row of rows.results){if(ALERT_POLICY_TYPES.includes(row.notification_type as AlertPolicyType)&&row.message.trim())messages[row.notification_type as AlertPolicyType]=row.message.trim().slice(0,240)}
+  return messages;
+}
+
+export async function writeAlertPolicy(database:AlertPolicyDatabase,policy:AlertPolicyMap,messages:AlertMessageMap={}){
   await ensureAlertPolicySchema(database);
   const now=new Date().toISOString();
   for(const type of ALERT_POLICY_TYPES){
-    await database.prepare("INSERT INTO navixa_alert_policy(notification_type,screen_policy,telegram_policy,updated_at) VALUES(?,?,?,?) ON CONFLICT(notification_type) DO UPDATE SET screen_policy=excluded.screen_policy,telegram_policy=excluded.telegram_policy,updated_at=excluded.updated_at").bind(type,policy[type].screen,policy[type].telegram,now).run();
+    const message=(messages[type]||"").trim().slice(0,240);
+    await database.prepare("INSERT INTO navixa_alert_policy(notification_type,screen_policy,telegram_policy,message,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(notification_type) DO UPDATE SET screen_policy=excluded.screen_policy,telegram_policy=excluded.telegram_policy,message=excluded.message,updated_at=excluded.updated_at").bind(type,policy[type].screen,policy[type].telegram,message,now).run();
   }
 }
