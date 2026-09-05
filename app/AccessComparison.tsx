@@ -1,0 +1,3 @@
+import {ACCESS_FEATURE_MATRIX} from "./accessFeatureMatrix";
+function value(v:boolean|"limited"){return v===true?"✓":v==="limited"?"محدود":"—";}
+export default function AccessComparison(){return <div style={{overflowX:"auto",marginTop:22}}><table aria-label="مقارنة باقات NAVIXA" style={{width:"100%",borderCollapse:"collapse",minWidth:620,background:"#fff"}}><thead><tr><th>الميزة</th><th>مجاني</th><th>التجربة</th><th>عَزْم</th><th>هِمّة</th></tr></thead><tbody>{ACCESS_FEATURE_MATRIX.map(row=><tr key={row.feature}><th style={{textAlign:"right"}}>{row.feature}</th><td>{value(row.free)}</td><td>{value(row.trial)}</td><td>{value(row.azm)}</td><td>{value(row.himma)}</td></tr>)}</tbody></table></div>}
