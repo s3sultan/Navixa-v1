@@ -15,7 +15,7 @@ export default function PublicPricingStrip(){
   if(pathname!=="/")return null;
   return <section className="public-pricing" aria-labelledby="public-pricing-title">
     <div className="public-pricing-head"><div><small>أسعار NAVIXA المعلنة</small><h2 id="public-pricing-title">اختر المدة المناسبة لك</h2><p>السعر المعروض هنا هو السعر الأساسي الذي يعتمد عليه نظام الدفع قبل أي خصم صالح.</p></div><Link href="/pricing">كل تفاصيل الأسعار ←</Link></div>
-    <div className="public-pricing-grid">{plans.map(plan=><article key={plan.id} className={`public-price-card ${plan.id}`}><div><span className="public-plan-name">{plan.name}</span><small>{plan.periodLabel}</small></div><p><strong>{riyals(plan.amount)}</strong><span>ريال</span></p><Link href={plan.id==="monthly"?"/plus":"/sprint"}>تفاصيل {plan.name} ←</Link></article>)}</div>
-    <p className="public-pricing-note">الأسعار بالريال السعودي. يظهر المبلغ النهائي بوضوح قبل إتمام الدفع.</p>
+    <div className="public-pricing-grid">{plans.map(plan=>{const href=plan.id==="monthly"?"/plus":"/sprint";return <article key={plan.id} className={`public-price-card ${plan.id}`}><div><Link href={href} className="public-plan-name" aria-label={`عرض سعر ومميزات ${plan.name}`}>{plan.name}</Link><small>{plan.periodLabel}</small></div><p><strong>{riyals(plan.amount)}</strong><span>ريال</span></p><Link href={href}>تفاصيل {plan.name} والمميزات ←</Link></article>})}</div>
+    <p className="public-pricing-note">اضغط على اسم هِمّة أو عَزْم لعرض السعر ومميزات الباقة. الأسعار بالريال السعودي، ويظهر المبلغ النهائي بوضوح قبل إتمام الدفع.</p>
   </section>;
 }
