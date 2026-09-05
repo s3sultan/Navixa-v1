@@ -1,0 +1,26 @@
+{
+  "name": "NAVIXA SA — يفهم يومك",
+  "short_name": "NAVIXA SA",
+  "description": "مساعد ذكي يرتب يومك ويساعدك على التركيز والصحة والمهام والأتمتة مع خصوصية محلية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/navixa-mark.webp",
+      "sizes": "any",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}
