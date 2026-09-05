@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import PerformanceReporter from "./PerformanceReporter";
 import NavixaSplash from "./NavixaSplash";
@@ -9,11 +9,24 @@ import "./direct-entry.css";
 
 const siteUrl = "https://navixasa.com";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: "NAVIXA SA — يفهم يومك", template: "%s — NAVIXA SA" },
   description: "NAVIXA SA مساعد ذكي يرتب يومك، يساعدك على التركيز والصحة والمهام والأتمتة مع خصوصية محلية.",
   applicationName: "NAVIXA SA",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "NAVIXA SA",
+    statusBarStyle: "default",
+  },
   keywords: ["NAVIXA SA", "NAVIXA", "مساعد ذكي", "تنظيم المهام", "التركيز", "الصحة", "الأتمتة", "مساعد عربي"],
   authors: [{ name: "NAVIXA SA" }], creator: "NAVIXA SA", publisher: "NAVIXA SA", category: "productivity",
   alternates: { canonical: "/" },
