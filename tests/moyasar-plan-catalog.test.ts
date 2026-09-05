@@ -37,11 +37,20 @@ test("plan pages use the canonical public price component instead of stale numbe
   assert.doesNotMatch(sprint,/12 ر\.س/);
 });
 
+test("public Himma and Azm names link to their dedicated price and feature pages",()=>{
+  const strip=read("app/PublicPricingStrip.tsx");
+  const pricingPage=read("app/pricing/page.tsx");
+  assert.match(strip,/href=\{plan\.id==="monthly"\?"\/plus":"\/sprint"\} className="public-plan-name"/);
+  assert.match(pricingPage,/href=\{plan\.id==="monthly"\?"\/plus":"\/sprint"\} className="public-plan-name"/);
+  assert.match(read("app/plus/page.tsx"),/plus-feature-grid/);
+  assert.match(read("app/sprint/page.tsx"),/plus-feature-grid/);
+});
+
 test("Sprint activates for five days in verify and webhook paths",()=>{
   const verify=read("app/api/billing/verify/route.ts");
   const webhook=read("app/api/billing/webhook/route.ts");
-  assert.match(verify,/intent\.plan==="sprint"\?5:30/);
-  assert.match(webhook,/plan==="sprint"\?5:30/);
-  assert.match(verify,/\['monthly','sprint'\]/);
-  assert.match(webhook,/\['monthly','sprint'\]/);
+  assert.match(verify,/intent\.plan\s*===\s*["']sprint["']\s*\?\s*5\s*:\s*30/);
+  assert.match(webhook,/plan\s*===\s*["']sprint["']\s*\?\s*5\s*:\s*30/);
+  assert.match(verify,/\[["']monthly["'],\s*["']sprint["']\]/);
+  assert.match(webhook,/\[["']monthly["'],\s*["']sprint["']\]/);
 });
