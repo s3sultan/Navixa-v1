@@ -1,0 +1,107 @@
+name: NAVIXA Pre-Launch Gate
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pre-launch-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build, tests, security baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Report development and build-tool vulnerabilities
+        continue-on-error: true
+        run: |
+          npm audit --audit-level=high || {
+            echo "::warning::Development/build-tool vulnerabilities remain and require a dedicated compatibility-tested dependency hardening change. Production dependencies passed the blocking audit above."
+          }
+
+      - name: Lint, tests, UI smoke and production build
+        run: npm run test:verify
+
+  actions-security:
+    name: GitHub Actions security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      ZIZMOR_VERSION: '1.30.0'
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+
+      - name: Audit GitHub Actions with zizmor
+        run: uvx "zizmor@${ZIZMOR_VERSION}" --strict-collection --min-severity=medium --format=github .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  secret-scan:
+    name: Secret exposure guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan repository for committed secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  gate:
+    name: Release gate
+    if: always()
+    needs: [verify, actions-security, secret-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce blocking checks
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          ACTIONS_SECURITY_RESULT: ${{ needs.actions-security.result }}
+          SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
+        run: |
+          echo "Build/tests/security baseline: $VERIFY_RESULT"
+          echo "GitHub Actions security: $ACTIONS_SECURITY_RESULT"
+          echo "Secret scan: $SECRET_SCAN_RESULT"
+          if [ "$VERIFY_RESULT" != "success" ] || [ "$ACTIONS_SECURITY_RESULT" != "success" ] || [ "$SECRET_SCAN_RESULT" != "success" ]; then
+            echo "NAVIXA Pre-Launch Gate: BLOCK"
+            exit 1
+          fi
+          echo "NAVIXA Pre-Launch Gate: PASS"

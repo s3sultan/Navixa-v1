@@ -5,9 +5,9 @@
 ## 2026-09-05 — Codex
 
 - أصلح اختلاف Hydration في التحية، وبسّط الصفحة الرئيسية على سطح المكتب مع إبقاء الأدوات المساندة قابلة للوصول والمحافظة على تجربة الجوال المختصرة.
-- ثبّت سلسلة التطوير وUI smoke على Windows، وحدّث رابط الإنتاج الرسمي إلى `https://navixasa.com` واستثناءات ESLint للملفات المولدة.
-- التحقق: نجح `npm run test:verify` (lint + 108 اختبارات + UI smoke + build)، ونجحت المراجعة البصرية للجوال وسطح المكتب دون أخطاء Console.
-- الملفات: `app/page.tsx`, `app/navixa.css`, `tests/mobile-home-simplification.test.ts`, `tests/ui-smoke.mjs`, `package.json`, `eslint.config.mjs`, `AI_ONBOARDING.md`, `PROJECT_MEMORY.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+- ثبّت سلسلة التطوير وUI smoke على Windows، وحدّث رابط الإنتاج الرسمي إلى `https://navixasa.com` ووثّق بوابة الإصدار ومسار النشر التلقائي المحكوم.
+- التحقق: نجح `npm run test:verify` بعد دمج أحدث `master` (lint + 115 اختبارًا + UI smoke + build)، ووجد تدقيق اعتماديات الإنتاج 0 ثغرات؛ ونجحت المراجعة البصرية للجوال وسطح المكتب دون أخطاء Console.
+- الملفات: `app/page.tsx`, `app/navixa.css`, `tests/mobile-home-simplification.test.ts`, `tests/ui-smoke.mjs`, `package.json`, `eslint.config.mjs`, `AI_ONBOARDING.md`, `PROJECT_MEMORY.md`, `NAVIXA_RELEASE_EVIDENCE.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
 
 ## 2026-08-31 — ChatGPT
 

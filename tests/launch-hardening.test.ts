@@ -44,9 +44,10 @@ assert.match(adminReferrals, /referrer_profile_id=\?/);
 assert.doesNotMatch(adminReferrals, /referral_profile_id=\?/);
 assert.match(adminReferrals, /status='pending_credit'/);
 
-assert.match(plusPage, /أبلغني عند فتح هِمّة/);
+assert.match(plusPage, /شاهد السعر الرسمي/);
 assert.match(plusPage, /كمبيوتر واحد وجوال واحد/);
-assert.match(plusPage, /لا توجد عملية دفع أو طلب بطاقة/);
+assert.match(plusPage, /السعر الأساسي الحالي/);
+assert.match(plusPage, /PlanPriceInline plan="monthly"/);
 assert.match(plusPage, /ابدأ بعَزْم، وكمل بهِمّة|هِمّة/);
 assert.match(projectsPage, /عضوية هِمّة النشطة/);
 assert.match(projectsPage, /مشمول مع هِمّة/);
@@ -72,9 +73,6 @@ assert.match(productionDeploy, /merged_at != null/);
 assert.doesNotMatch(productionDeploy, /^\s+push:\s*$/m);
 assert.match(productionDeploy, /persist-credentials: false/);
 
-// Deployment credentials and provider secrets must not exist at job scope,
-// where npm install/build steps could inherit them. They are injected only into
-// the exact deployment/secret-upload steps that need them.
 const productionJobPrefix = productionDeploy.slice(0, productionDeploy.indexOf("    steps:"));
 assert.doesNotMatch(productionJobPrefix, /ADMIN_JWT_SECRET|CLOUDFLARE_API_TOKEN|MOYASAR_|NAVIXA_TELEGRAM_|RESEND_API_KEY/);
 assert.match(productionDeploy, /Install dependencies without deployment secrets/);
@@ -87,8 +85,6 @@ assert.match(stagingDeploy, /persist-credentials: false/);
 assert.match(stagingDeploy, /Install dependencies without deployment secrets/);
 assert.match(stagingDeploy, /ADMIN_JWT_SECRET_STAGING must be at least 32 characters/);
 
-// Production maintenance helpers are owner-only, master-only, and never leave
-// the checkout token persisted in local git configuration.
 for (const workflow of [setupPush, resetCounters]) {
   assert.match(workflow, /github\.actor == github\.repository_owner/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/master'/);
@@ -97,15 +93,11 @@ for (const workflow of [setupPush, resetCounters]) {
 assert.match(setupPush, /--name navixa/);
 assert.match(setupPush, /https:\/\/navixasa\.com/);
 
-// External AI bridges may expose bounded repository context, so even manual
-// dispatch is reserved for the repository owner.
 for (const workflow of [geminiBridge, manusBridge]) {
   assert.match(workflow, /github\.actor == github\.repository_owner/);
   assert.match(workflow, /persist-credentials: false/);
 }
 
-// Load/soak helpers cannot be repurposed as generic traffic generators against
-// arbitrary HTTPS hosts.
 for (const workflow of [stagingLoad, stagingSoak]) {
   assert.match(workflow, /github\.actor == github\.repository_owner/);
   assert.match(workflow, /https:\/\/navixa-staging\.s2shug\.workers\.dev/);
