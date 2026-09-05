@@ -5,21 +5,22 @@ import { useEffect, useState } from "react";
 type Usage = { summary: { accounts: number; logins: number; minutes: number }; visitors?: { todayEntrances: number; todayPageviews: number; topPages: { path: string; views: number }[]; timezone: string }; features: { path: string; uses: number; seconds: number }[] };
 type Performance = { current: { path: string; samples: number; avg_load_ms: number; p95_load_ms: number; avg_lcp_ms: number }[]; evidence: { minimumSamples: number } };
 type Health = { reports: { status: string; week_start: string }[] };
+type RuntimeFeatures = { features?: Record<string, boolean> };
 type Props = { onNavigate: (name: string, id: string) => void };
 const labels: Record<string, string> = { "/": "الرئيسية", "/pricing": "الأسعار", "/today": "يومي", "/worship": "الورد", "/health": "الصحة", "/meetings": "الاجتماعات", "/plus": "هِمّة", "/sprint": "عَزْم" };
 const fetchJson = async <T,>(url: string): Promise<T | null> => { const response = await fetch(url, { cache: "no-store" }); return response.ok ? response.json() as Promise<T> : null; };
 
 export default function AdminOverview({ onNavigate }: Props) {
-  const [usage, setUsage] = useState<Usage | null>(null); const [performance, setPerformance] = useState<Performance | null>(null); const [health, setHealth] = useState<Health | null>(null); const [loading, setLoading] = useState(true);
-  const load = async () => { setLoading(true); const [u,p,h] = await Promise.all([fetchJson<Usage>("/api/admin/usage-analytics"), fetchJson<Performance>("/api/admin/performance"), fetchJson<Health>("/api/admin/site-health")]); setUsage(u); setPerformance(p); setHealth(h); setLoading(false); };
+  const [usage, setUsage] = useState<Usage | null>(null); const [performance, setPerformance] = useState<Performance | null>(null); const [health, setHealth] = useState<Health | null>(null); const [runtime, setRuntime] = useState<RuntimeFeatures | null>(null); const [loading, setLoading] = useState(true);
+  const load = async () => { setLoading(true); const [u,p,h,r] = await Promise.all([fetchJson<Usage>("/api/admin/usage-analytics"), fetchJson<Performance>("/api/admin/performance"), fetchJson<Health>("/api/admin/site-health"), fetchJson<RuntimeFeatures>("/api/admin/runtime-features")]); setUsage(u); setPerformance(p); setHealth(h); setRuntime(r); setLoading(false); };
   useEffect(() => { void load(); }, []);
   const mainPerformance = performance?.current.find(item => item.path === "/"); const adequateSample = Boolean(mainPerformance && performance && mainPerformance.samples >= performance.evidence.minimumSamples); const healthValue = health?.reports[0]?.status === "healthy" ? "سليم" : health?.reports.length ? "مراجعة" : "بانتظار";
-  const topPages = usage?.visitors?.topPages || []; const maxViews = Math.max(1, ...topPages.map(item => item.views));
+  const topPages = usage?.visitors?.topPages || []; const maxViews = Math.max(1, ...topPages.map(item => item.views)); const enabledFeatures = runtime?.features ? Object.values(runtime.features).filter(Boolean).length : null;
   const cards = [
     { label: "زيارات اليوم", value: usage?.visitors ? String(usage.visitors.todayEntrances) : "—", detail: "دخول الصفحة الرئيسية · توقيت الرياض", target: "activity" },
     { label: "مشاهدات الصفحات", value: usage?.visitors ? String(usage.visitors.todayPageviews) : "—", detail: "اليوم حتى الآن", target: "activity" },
     { label: "الحسابات", value: usage ? String(usage.summary.accounts) : "—", detail: "حسابات مسجلة", target: "activity" },
-    { label: "صحة الموقع", value: healthValue, detail: "آخر فحص دفاعي", target: "site-health" },
+    { label: "صحة الموقع", value: healthValue, detail: enabledFeatures === null ? "آخر فحص دفاعي" : `${enabledFeatures} مفاتيح تشغيل مفعلة`, target: "site-health" },
   ];
   return <section className="admin-overview" aria-label="نظرة عامة تشغيلية">
     <div className="admin-overview-heading"><div><small>اليوم</small><h2>نبض NAVIXA بعد الإطلاق</h2><p>الأهم أمامك مباشرة. التفاصيل والإعدادات الأقل استخدامًا تبقى داخل أقسامها.</p></div><button type="button" onClick={() => void load()} disabled={loading}>{loading ? "جارٍ التحديث…" : "تحديث البيانات"}</button></div>
