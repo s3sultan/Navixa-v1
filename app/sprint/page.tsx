@@ -5,7 +5,7 @@ import PlanPriceInline from "../PlanPriceInline";
 import "../plus/plus.css";
 import "../plus/plus-simple.css";
 
-export const metadata: Metadata={title:"NAVIXA عَزْم — خمسة أيام مركزة",description:"NAVIXA عَزْم لمدة خمسة أيام: المزايا المجانية مع سماع الاسم ومراقبة الشاشة لهدف قصير ومركز."};
+export const metadata: Metadata={title:"عَزْم | باقة NAVIXA لمدة 5 أيام",description:"باقة NAVIXA عَزْم لمدة خمسة أيام: المزايا المجانية مع سماع الاسم ومراقبة الشاشة لهدف قصير ومركز، بدون خدمات الذكاء الاصطناعي الثقيلة.",alternates:{canonical:"/sprint"},robots:{index:true,follow:true},openGraph:{type:"website",url:"/sprint",title:"عَزْم | NAVIXA",description:"خمسة أيام من المزايا الأساسية مع سماع الاسم ومراقبة الشاشة."}};
 
 const included=[
   ["◉","سماع الاسم والكلمات المهمة","تنبيه اختياري عندما يسمع NAVIXA اسمك أو كلمة تختارها أثناء الدورة أو الاجتماع."],
