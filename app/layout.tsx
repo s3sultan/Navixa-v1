@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import PerformanceReporter from "./PerformanceReporter";
+import VisitorReporter from "./VisitorReporter";
+import VisitorCounter from "./VisitorCounter";
 import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import PricingHeaderShortcut from "./PricingHeaderShortcut";
@@ -10,6 +12,7 @@ import "./direct-entry.css";
 import "./public-pricing.css";
 import "./pricing-header-shortcut.css";
 import "./worship-smart.css";
+import "./visitor-counter.css";
 
 const siteUrl = "https://navixasa.com";
 
@@ -30,5 +33,5 @@ export const metadata: Metadata = {
 const structuredData={"@context":"https://schema.org","@type":"WebApplication",name:"NAVIXA SA",url:siteUrl,description:"مساعد ذكي يرتب يومك ويساعدك على التركيز والصحة والمهام والأتمتة.",applicationCategory:"ProductivityApplication",operatingSystem:"Web",inLanguage:"ar",image:`${siteUrl}/navixa-share.png`};
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter />{children}<PricingHeaderShortcut /></body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter /><VisitorReporter />{children}<VisitorCounter /><PricingHeaderShortcut /></body></html>;
 }

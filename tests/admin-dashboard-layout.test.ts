@@ -18,7 +18,8 @@ test("لوحة الإدارة الجديدة تستخدم بطاقات تشغي�
   assert.match(overview, /api\/admin\/performance/);
   assert.match(overview, /api\/admin\/site-health/);
   assert.match(overview, /api\/admin\/runtime-features/);
-  assert.match(overview, /عند عدم توفر عينة تعرض حالة انتظار بدل رقم تقديري/);
+  assert.match(overview, /لا تعرض أرقامًا تقديرية/);
+  assert.match(overview, /بانتظار عينة كافية قبل عرض قراءة أداء موثوقة/);
   assert.match(styles, /\.admin-shell\.dashboard-v2/);
   assert.match(styles, /@media\(max-width:620px\)/);
 });
