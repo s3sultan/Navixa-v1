@@ -48,6 +48,34 @@ test("public Himma and Azm names link to their dedicated price and feature pages
   assert.match(read("app/sprint/page.tsx"),/plus-feature-grid/);
 });
 
+test("homepage plan badges clearly show Azm and Himma and link to both plan pages",()=>{
+  const linker=read("app/PlanBadgeLinker.tsx");
+  const layout=read("app/layout.tsx");
+  assert.match(linker,/متاح في/);
+  assert.match(linker,/azm\.href="\/sprint"/);
+  assert.match(linker,/himma\.href="\/plus"/);
+  assert.match(linker,/MutationObserver/);
+  assert.match(layout,/<PlanBadgeLinker \/>/);
+});
+
+test("pricing page compares free Azm and Himma including ecosystem access",()=>{
+  const pricingPage=read("app/pricing/page.tsx");
+  const plus=read("app/plus/page.tsx");
+  const sprint=read("app/sprint/page.tsx");
+  assert.match(pricingPage,/الأسعار والمقارنة/);
+  assert.match(pricingPage,/سماع نداء الاسم والكلمات المهمة/);
+  assert.match(pricingPage,/NAVIXA English Learning/);
+  assert.match(pricingPage,/NAVIXA Kids/);
+  assert.match(pricingPage,/NAVIXA Fitness/);
+  assert.match(pricingPage,/المجانية/);
+  assert.match(pricingPage,/عَزْم/);
+  assert.match(pricingPage,/هِمّة/);
+  assert.match(plus,/English Learning/);
+  assert.match(plus,/NAVIXA Kids/);
+  assert.match(plus,/NAVIXA Fitness/);
+  assert.match(sprint,/ليست ضمن عَزْم/);
+});
+
 test("Sprint activates for five days in verify and webhook paths",()=>{
   const verify=read("app/api/billing/verify/route.ts");
   const webhook=read("app/api/billing/webhook/route.ts");
