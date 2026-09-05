@@ -5,7 +5,7 @@
 - المشروع الوحيد: NAVIXA.
 - المصدر الرسمي: `https://github.com/s3sultan/Navixa-v1`.
 - الفرع الرسمي: `master`.
-- رابط الإنتاج الرسمي: `https://navixa.s2shug.workers.dev`.
+- رابط الإنتاج الرسمي: `https://navixasa.com`.
 - رابط Zite وروابط المعاينة ليست روابط إنتاج معتمدة.
 
 ## قبل كل مهمة

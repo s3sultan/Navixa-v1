@@ -13,6 +13,16 @@ test("واجهة الجوال تعرض الأساسيات فقط وتبقي ال
   assert.match(page, /متابعة الشاشة/);
   assert.match(page, /تلخيص اجتماع/);
   assert.match(page, /عرض كل الأدوات والتفاصيل/);
+  assert.match(page, /className="more-dashboard-toggle launch-tools-toggle"/);
+  assert.match(page, /aria-expanded=\{showMore\}/);
+  assert.match(page, /showMore&&<div className="launch-secondary-tools"/);
   assert.match(styles, /\.mobile-home-hub\{display:grid/);
-  assert.match(styles, /\.priority-feature-grid,.privacy-promise,.member-platform-ribbon,.matches-ribbon,.secondary-paths,.secondary-footer-tools\{display:none!important\}/);
+  assert.match(styles, /\.priority-feature-grid,.privacy-promise,.member-platform-ribbon,.matches-ribbon,.launch-tools-toggle,.launch-secondary-tools,.secondary-paths,.secondary-footer-tools\{display:none!important\}/);
+});
+
+test("التحية الديناميكية لا تختلف بين تصيير الخادم والمتصفح", async () => {
+  const page = await readFile(pagePath, "utf8");
+  assert.match(page, /useState\("أهلًا"\)/);
+  assert.match(page, /setGreeting\(greetingForHour\(new Date\(\)\.getHours\(\)\)\)/);
+  assert.doesNotMatch(page, /const hour=new Date\(\)\.getHours\(\);const greeting=/);
 });
