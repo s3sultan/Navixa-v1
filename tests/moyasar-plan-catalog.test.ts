@@ -40,8 +40,10 @@ test("plan pages use the canonical public price component instead of stale numbe
 test("public Himma and Azm names link to their dedicated price and feature pages",()=>{
   const strip=read("app/PublicPricingStrip.tsx");
   const pricingPage=read("app/pricing/page.tsx");
-  assert.match(strip,/href=\{plan\.id==="monthly"\?"\/plus":"\/sprint"\} className="public-plan-name"/);
-  assert.match(pricingPage,/href=\{plan\.id==="monthly"\?"\/plus":"\/sprint"\} className="public-plan-name"/);
+  assert.match(strip,/const href=plan\.id==="monthly"\?"\/plus":"\/sprint"/);
+  assert.match(pricingPage,/const href=plan\.id==="monthly"\?"\/plus":"\/sprint"/);
+  assert.match(strip,/className="public-plan-name"/);
+  assert.match(pricingPage,/className="public-plan-name"/);
   assert.match(read("app/plus/page.tsx"),/plus-feature-grid/);
   assert.match(read("app/sprint/page.tsx"),/plus-feature-grid/);
 });
