@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 export default function LegalPolicyNav({current}:{current:"terms"|"privacy"|"refunds"|"support"}){
