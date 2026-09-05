@@ -1,0 +1,3 @@
+.navixa-visitor-counter{width:max-content;max-width:calc(100% - 28px);margin:18px auto 24px;padding:8px 13px;border:1px solid rgba(38,117,83,.14);border-radius:999px;background:rgba(255,255,255,.78);display:flex;align-items:center;gap:8px;color:#718078;font-size:11px;line-height:1;box-shadow:0 4px 16px rgba(23,35,29,.04)}
+.navixa-visitor-counter strong{color:#267553;font-size:12px;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.navixa-visitor-counter{margin-bottom:78px}}
