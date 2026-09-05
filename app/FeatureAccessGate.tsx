@@ -3,10 +3,9 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { isFeatureAccessActive, type FeatureAccessSession } from "./featureAccess";
+import { isLaunchTrialActive } from "./launchTrial";
 import UsageTracker from "./UsageTracker";
 import "./feature-access.css";
-
-const PUBLIC_FREE_ACCESS_UNTIL = Date.parse("2026-09-13T00:00:00+03:00");
 
 type AccountSession = FeatureAccessSession & {
   user?: { email?: string } | null;
@@ -18,7 +17,7 @@ type Props = {
 };
 
 export default function FeatureAccessGate({ children, feature = "مزايا NAVIXA" }: Props) {
-  const publicFreeAccess = Date.now() < PUBLIC_FREE_ACCESS_UNTIL;
+  const publicFreeAccess = isLaunchTrialActive();
   const [session, setSession] = useState<AccountSession | null>(null);
 
   useEffect(() => {
@@ -31,21 +30,17 @@ export default function FeatureAccessGate({ children, feature = "مزايا NAVI
     return () => { active = false; };
   }, [publicFreeAccess]);
 
-  if (publicFreeAccess) return <>{children}</>;
+  if (publicFreeAccess) return <><UsageTracker />{children}</>;
   if (session && isFeatureAccessActive(session)) return <><UsageTracker />{children}</>;
 
   const signedIn = session?.signedIn === true;
   const unavailable = session?.enabled === false;
-  const title = unavailable
-    ? "الحسابات غير متاحة مؤقتًا"
-    : signedIn
-      ? "فعّل وصولك أولًا"
-      : "سجّل دخولك لتبدأ";
+  const title = unavailable ? "الحسابات غير متاحة مؤقتًا" : signedIn ? "فعّل وصولك أولًا" : "سجّل دخولك لتبدأ";
   const description = unavailable
     ? "نجهّز الدخول الآمن الآن. تبقى الصفحات التعريفية متاحة، بينما المزايا الشخصية تنتظر حتى يكتمل إعداد الحساب."
     : signedIn
-      ? `تحتاج ${feature} إلى تجربة NAVIXA أو اشتراك فعّال. لا نفتح الميكروفون أو مشاركة الشاشة أو بياناتك قبل تفعيل حسابك.`
-      : `تحتاج ${feature} إلى دخول آمن بالبريد ثم تفعيل تجربة NAVIXA أو اشتراكك. لا توجد كلمة مرور، ولا نطلب صلاحيات جهازك قبل ذلك.`;
+      ? `تحتاج ${feature} إلى اشتراك فعّال بعد انتهاء تجربة الإطلاق. لا نفتح الميكروفون أو مشاركة الشاشة أو بياناتك قبل تفعيل حسابك.`
+      : `تحتاج ${feature} إلى دخول آمن بالبريد واشتراك فعّال بعد انتهاء تجربة الإطلاق. لا توجد كلمة مرور، ولا نطلب صلاحيات جهازك قبل ذلك.`;
   const href = unavailable ? "/plus" : signedIn ? "/plus" : "/account";
   const label = unavailable ? "اعرف حالة هِمّة" : signedIn ? "فعّل حسابي" : "دخول أو إنشاء حساب";
 
