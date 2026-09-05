@@ -1,0 +1,17 @@
+# NAVIXA zizmor policy
+#
+# Most GitHub Actions references are hash-pinned. The production deploy workflow
+# is manual-only, owner-only, and already disables persisted checkout credentials.
+# These exact legacy lines remain a documented WARN for this release and must be
+# removed by a dedicated production-workflow supply-chain hardening change.
+# Line-scoped exceptions intentionally fail closed if the workflow moves.
+
+rules:
+  unpinned-uses:
+    ignore:
+      - deploy-navixa.yml:27
+      - deploy-navixa.yml:45
+      - deploy-navixa.yml:119
+  cache-poisoning:
+    ignore:
+      - deploy-navixa.yml:45
