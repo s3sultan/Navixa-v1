@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "NAVIXA SA — يفهم يومك", description: "مساعد ذكي لحياة أكثر ترتيبًا مع خصوصية محلية.", images: ["/navixa-share.png"] },
 };
 
-const structuredData={"@context":"https://schema.org","@type":"WebApplication",name:"NAVIXA SA",url:siteUrl,description:"مساعد ذكي يرتب يومك ويساعدك على التركيز والصحة والمهام والأتمتة.",applicationCategory:"ProductivityApplication",operatingSystem:"Web",inLanguage:"ar",image:`${siteUrl}/navixa-share.png`,offers:[{"@type":"Offer",name:"NAVIXA هِمّة",price:"29",priceCurrency:"SAR",url:`${siteUrl}/pricing`},{"@type":"Offer",name:"NAVIXA عَزْم",price:"11",priceCurrency:"SAR",url:`${siteUrl}/pricing`}]} ;
+const structuredData={"@context":"https://schema.org","@type":"WebApplication",name:"NAVIXA SA",url:siteUrl,description:"مساعد ذكي يرتب يومك ويساعدك على التركيز والصحة والمهام والأتمتة.",applicationCategory:"ProductivityApplication",operatingSystem:"Web",inLanguage:"ar",image:`${siteUrl}/navixa-share.png`};
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter />{children}<PublicPricingStrip /></body></html>;
