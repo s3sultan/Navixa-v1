@@ -24,5 +24,5 @@ test("reminder is mounted globally and points to both plans",()=>{
   assert.match(layout,/LaunchTrialNotice/);
   assert.match(notice,/href="\/plus"/);
   assert.match(notice,/href="\/sprint"/);
-  assert.match(notice,/launchTrialPhase/);
+  assert.match(notice,/\/api\/access\/trial/);
 });
