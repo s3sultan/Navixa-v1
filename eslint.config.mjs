@@ -26,6 +26,7 @@ const eslintConfig = defineConfig([
     "dist/**",
     "public/**",
     ".wrangler/**",
+    ".sites-stage-*/**",
     "next-env.d.ts",
     "reports/**",
     "scripts/**",

@@ -152,10 +152,12 @@ jobs:
           grep -Eqi '^x-content-type-options:[[:space:]]*nosniff' /tmp/navixa-staging-headers.txt
           grep -Eqi 'NAVIXA|navixa' /tmp/navixa-staging-body.html
 
-          report_only=$(grep -Ei '^content-security-policy-report-only:' /tmp/navixa-staging-headers.txt | tr -d '\r')
-          if printf '%s' "$report_only" | grep -qi "unsafe-inline"; then
-            echo "Strict staging CSP experiment was not applied"
-            exit 1
+          if [ "${GITHUB_REF}" = "refs/heads/security/hardening-2026-09-04" ]; then
+            report_only=$(grep -Ei '^content-security-policy-report-only:' /tmp/navixa-staging-headers.txt | tr -d '\r')
+            if printf '%s' "$report_only" | grep -qi "unsafe-inline"; then
+              echo "Strict staging CSP experiment was not applied"
+              exit 1
+            fi
           fi
 
           for path in / /today /account /admin/login /meetings; do

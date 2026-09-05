@@ -2,6 +2,15 @@
 
 لا تُعدّل السجلات السابقة. أضف السجل الأحدث في الأعلى تحت هذا السطر.
 
+## 2026-09-05 — Codex
+
+- أصلح اختلاف Hydration في التحية، وبسّط الصفحة الرئيسية على سطح المكتب مع إبقاء الأدوات المساندة قابلة للوصول والمحافظة على تجربة الجوال المختصرة.
+- ثبّت سلسلة التطوير وUI smoke على Windows، وحدّث رابط الإنتاج الرسمي إلى `https://navixasa.com` ووثّق بوابة الإصدار ومسار النشر التلقائي المحكوم.
+- صحح تحقق staging بحيث لا يطلب تجربة CSP الخاصة بفرع `security/hardening-2026-09-04` من فروع الإصدار العادية، وأضاف تغطية انحدار للعقد.
+- التحقق المنشور: نجح staging رقم `33978081612` وفحوص PR وبوابة الإصدار، ونجحت المراجعة البصرية المنشورة للجوال وسطح المكتب دون أخطاء Console.
+- التحقق: نجح `npm run test:verify` بعد دمج أحدث `master` (lint + 115 اختبارًا + UI smoke + build)، ووجد تدقيق اعتماديات الإنتاج 0 ثغرات؛ ونجحت المراجعة البصرية للجوال وسطح المكتب دون أخطاء Console.
+- الملفات: `app/page.tsx`, `app/navixa.css`, `.github/workflows/deploy-navixa-staging.yml`, `tests/mobile-home-simplification.test.ts`, `tests/ui-smoke.mjs`, `tests/launch-hardening.test.ts`, `package.json`, `eslint.config.mjs`, `AI_ONBOARDING.md`, `PROJECT_MEMORY.md`, `NAVIXA_RELEASE_EVIDENCE.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
 ## 2026-08-31 — ChatGPT
 
 - جهّز صفحات المراجعة العامة لمتطلبات مزودي الدفع: عرض حالة التجربة المجانية وسعرها الحالي 0 ر.س، توضيح Sprint وPlus، وإظهار روابط الشروط والخصوصية والاسترداد والتسليم والشكاوى والدعم.

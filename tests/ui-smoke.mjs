@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +9,20 @@ const APP_PORT = 4174;
 const DEBUG_PORT = 9333;
 const BASE_URL = `http://[::1]:${APP_PORT}`;
 const DEBUG_URL = `http://127.0.0.1:${DEBUG_PORT}`;
+const vinextCli = join(process.cwd(), "node_modules", "vinext", "dist", "cli.js");
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+function browserCommand() {
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+  if (process.platform !== "win32") return "chromium";
+  const candidates = [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+  ];
+  return candidates.find(existsSync) || "chromium";
+}
 
 async function waitForUrl(url, label, attempts = 180) {
   let lastError;
@@ -23,15 +37,56 @@ async function waitForUrl(url, label, attempts = 180) {
 }
 
 function start(command, args, env = {}) {
-  return spawn(command, args, { detached: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...env } });
+  return spawn(command, args, {
+    detached: true,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, ...env },
+  });
 }
 
-async function stop(processHandle) {
+async function windowsListenerPid(port) {
+  if (process.platform !== "win32") return null;
+  return new Promise(resolve => {
+    const finder = spawn("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `(Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess)`,
+    ], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    let output = "";
+    finder.stdout.on("data", chunk => { output += chunk.toString(); });
+    finder.once("close", () => {
+      const pid = Number.parseInt(output.trim(), 10);
+      resolve(Number.isInteger(pid) && pid > 0 ? pid : null);
+    });
+    finder.once("error", () => resolve(null));
+  });
+}
+
+async function stop(processHandle, listenerPid = null) {
+  if (process.platform === "win32") {
+    const activeParentPid = processHandle?.exitCode === null ? processHandle.pid : null;
+    const targets = [...new Set([activeParentPid, listenerPid].filter(pid => Number.isInteger(pid) && pid > 0))];
+    await Promise.all(targets.map(pid => new Promise(resolve => {
+      const killer = spawn("powershell.exe", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue`,
+      ], { stdio: "ignore", windowsHide: true });
+      killer.once("exit", resolve);
+      killer.once("error", resolve);
+    })));
+    return;
+  }
   if (!processHandle?.pid || processHandle.exitCode !== null) return;
   await new Promise(resolve => {
     const timer = setTimeout(resolve, 1_500);
     processHandle.once("exit", () => { clearTimeout(timer); resolve(); });
-    try { process.kill(-processHandle.pid, "SIGTERM"); } catch { resolve(); }
+    try {
+      process.kill(-processHandle.pid, "SIGTERM");
+    } catch { resolve(); }
   });
 }
 
@@ -71,26 +126,50 @@ async function evaluate(cdp, expression) {
 
 async function navigate(cdp, url) {
   await cdp.call("Page.navigate", { url });
-  await sleep(1_200);
+  await sleep(250);
+  const readiness = await evaluate(cdp, `new Promise(resolve => {
+    const deadline = performance.now() + 15_000;
+    const inspect = () => {
+      if (document.readyState !== "loading" && document.body) return resolve({ ready: true, state: document.readyState });
+      if (performance.now() >= deadline) return resolve({ ready: false, state: document.readyState });
+      setTimeout(inspect, 100);
+    };
+    inspect();
+  })`);
+  assert.equal(readiness.ready, true, `لم تجهز الصفحة ${url}: ${JSON.stringify(readiness)}`);
 }
 
 async function main() {
   const profileDir = await mkdtemp(join(tmpdir(), "navixa-ui-profile-"));
-  const dev = start("npm", ["run", "dev", "--", "--host", "::1", "--port", String(APP_PORT)]);
+  const dev = start(process.execPath, [vinextCli, "dev", "--host", "::1", "--port", String(APP_PORT)]);
   let chrome;
   let cdp;
+  let devListenerPid = null;
+  let browserListenerPid = null;
   const logs = [];
+  dev.stdout.on("data", chunk => logs.push(chunk.toString()));
   dev.stderr.on("data", chunk => logs.push(chunk.toString()));
+  dev.on("error", error => logs.push(`\n${error.message}\n`));
 
   try {
-    await waitForUrl(`${BASE_URL}/`, "خادم NAVIXA المحلي");
-    chrome = start(process.env.CHROME_BIN || "chromium", [
+    await waitForUrl(`${BASE_URL}/`, "خادم NAVIXA المحلي").catch(error => {
+      throw new Error(`${error instanceof Error ? error.message : error}\n${logs.join("").slice(-4000)}`);
+    });
+    devListenerPid = await windowsListenerPid(APP_PORT);
+    chrome = start(browserCommand(), [
       "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
       "--no-first-run", "--no-default-browser-check", "--remote-allow-origins=*",
       `--remote-debugging-port=${DEBUG_PORT}`, "--remote-debugging-address=127.0.0.1",
       `--user-data-dir=${profileDir}`, "about:blank",
     ]);
-    await waitForUrl(`${DEBUG_URL}/json/list`, "متصفح الاختبار", 100);
+    const browserLogs = [];
+    chrome.stdout.on("data", chunk => browserLogs.push(chunk.toString()));
+    chrome.stderr.on("data", chunk => browserLogs.push(chunk.toString()));
+    chrome.on("error", error => browserLogs.push(`\n${error.message}\n`));
+    await waitForUrl(`${DEBUG_URL}/json/list`, "متصفح الاختبار", 100).catch(error => {
+      throw new Error(`${error instanceof Error ? error.message : error}\n${browserLogs.join("").slice(-4000)}`);
+    });
+    browserListenerPid = await windowsListenerPid(DEBUG_PORT);
     cdp = await connectCdp();
     await cdp.call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 
@@ -99,14 +178,14 @@ async function main() {
       const deadline = performance.now() + 2_500;
       const inspect = () => {
         const welcome = document.querySelector(".welcome-enter");
-        if (welcome) { welcome.click(); return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100); }
+        if (welcome) { welcome.click(); return performance.now() >= deadline ? resolve({ found: false, url: location.href, readyState: document.readyState, title: document.title, body: document.body?.innerText.slice(0, 500) || "" }) : setTimeout(inspect, 100); }
         const hub = document.querySelector(".mobile-home-hub");
-        if (!hub) return performance.now() >= deadline ? resolve({ found: false }) : setTimeout(inspect, 100);
+        if (!hub) return performance.now() >= deadline ? resolve({ found: false, url: location.href, readyState: document.readyState, title: document.title, body: document.body?.innerText.slice(0, 500) || "" }) : setTimeout(inspect, 100);
         resolve({ found: true, visible: getComputedStyle(hub).display !== "none", gateHidden: !document.querySelector(".feature-access-gate") });
       };
       inspect();
     })`);
-    assert.equal(accessGate.found, true, "يجب أن يدخل الزائر إلى NAVIXA خلال الفترة المجانية");
+    assert.equal(accessGate.found, true, `يجب أن يدخل الزائر إلى NAVIXA خلال الفترة المجانية: ${JSON.stringify(accessGate)}`);
     assert.equal(accessGate.visible, true, "يجب أن تظهر الواجهة الرئيسية على الجوال");
     assert.equal(accessGate.gateHidden, true, "يجب ألا تظهر بوابة الحساب خلال الفترة المجانية");
 
@@ -168,8 +247,8 @@ async function main() {
     }, null, 2));
   } finally {
     cdp?.close();
-    await stop(chrome);
-    await stop(dev);
+    await stop(chrome, browserListenerPid);
+    await stop(dev, devListenerPid);
     await rm(profileDir, { recursive: true, force: true }).catch(() => {});
   }
 }
