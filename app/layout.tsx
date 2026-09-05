@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   applicationName: "NAVIXA",
   keywords: ["NAVIXA", "نافيكسا", "مساعد ذكي عربي", "تنظيم اليوم", "متابعة المحاضرات", "تنبيه عند ذكر الاسم", "مراقبة الشاشة", "تذكيرات ذكية", "تلخيص المحاضرات", "تلخيص الاجتماعات", "تنظيم المهام", "التركيز", "الإنتاجية"],
   authors: [{ name: "NAVIXA" }], creator: "NAVIXA", publisher: "NAVIXA", category: "productivity",
-  alternates: { canonical: "/", languages: { "ar-SA": "/" } },
+  alternates: { languages: { "ar-SA": "/" } },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
   icons: { icon: "/navixa-sa-icon.svg", apple: "/apple-touch-icon.png", shortcut: "/navixa-sa-icon.svg" },
   openGraph: { type: "website", locale: "ar_SA", url: siteUrl, siteName: "NAVIXA", title: "NAVIXA | يفهم يومك", description: "مساعد ذكي عربي لتنظيم يومك ومتابعة المحاضرات والاجتماعات والتنبيهات الذكية مع اهتمام بالخصوصية.", images: [{ url: "/navixa-share.png", width: 1200, height: 630, alt: "NAVIXA يفهم يومك" }] },

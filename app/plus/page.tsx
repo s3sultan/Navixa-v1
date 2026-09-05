@@ -8,8 +8,11 @@ import InterestForm from "./InterestForm";
 import ReferralCapture from "./ReferralCapture";
 
 export const metadata: Metadata = {
-  title: "NAVIXA هِمّة — شهر كامل للاستمرار",
-  description: "NAVIXA هِمّة لمدة شهر: أدوات الاستماع والتنبيه ومراقبة الشاشة والملخصات والاستمرارية بين الكمبيوتر والجوال.",
+  title: "هِمّة | اشتراك NAVIXA لمدة 30 يومًا",
+  description: "باقة NAVIXA هِمّة لمدة 30 يومًا تشمل أدوات الاستماع والتنبيه ومراقبة الشاشة والملخصات والخدمات الذكية المتاحة ضمن الباقة.",
+  alternates: { canonical: "/plus" },
+  robots: { index: true, follow: true },
+  openGraph: { type: "website", url: "/plus", title: "هِمّة | NAVIXA", description: "باقة NAVIXA الكاملة لمدة 30 يومًا للاستماع والتنبيه ومراقبة الشاشة والخدمات الذكية." },
 };
 
 const included = [
