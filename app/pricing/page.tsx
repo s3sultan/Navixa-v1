@@ -6,21 +6,21 @@ import "../public-pricing.css";
 import "./pricing-comparison.css";
 
 type Plan={id:"monthly"|"sprint";name:string;days:number;periodLabel:string;amount:number};
+type Cell="yes"|"no"|string;
+type CompareRow={feature:string;free:Cell;azm:Cell;himma:Cell};
 const fallback:Plan[]=[{id:"monthly",name:"هِمّة",days:30,periodLabel:"شهر واحد",amount:2900},{id:"sprint",name:"عَزْم",days:5,periodLabel:"خمسة أيام",amount:1100}];
 const riyals=(amount:number)=>(amount/100).toLocaleString("ar-SA",{maximumFractionDigits:2});
-const yes=<span className="pricing-yes" aria-label="متاح">✓</span>;
-const no=<span className="pricing-no" aria-label="غير متاح">—</span>;
-
-const rows=[
-  ["سماع نداء الاسم والكلمات المهمة",no,yes,yes],
-  ["مراقبة جزء من الشاشة والتنبيه عند التغيّر",no,yes,yes],
-  ["تلخيص الجلسات واستخراج المهام والمواعيد",no,yes,yes],
-  ["التقاط المواعيد والمهام المهمة أثناء الجلسة",no,yes,yes],
-  ["NAVIXA English Learning",no,no,yes],
-  ["NAVIXA Kids",no,no,yes],
-  ["NAVIXA Fitness",no,no,yes],
-  ["المدة",<span className="pricing-text">أساسيات مجانية</span>,<span className="pricing-text">5 أيام</span>,<span className="pricing-text">شهر كامل</span>],
+const rows:CompareRow[]=[
+  {feature:"سماع نداء الاسم والكلمات المهمة",free:"no",azm:"yes",himma:"yes"},
+  {feature:"مراقبة جزء من الشاشة والتنبيه عند التغيّر",free:"no",azm:"yes",himma:"yes"},
+  {feature:"تلخيص الجلسات واستخراج المهام والمواعيد",free:"no",azm:"yes",himma:"yes"},
+  {feature:"التقاط المواعيد والمهام المهمة أثناء الجلسة",free:"no",azm:"yes",himma:"yes"},
+  {feature:"NAVIXA English Learning",free:"no",azm:"no",himma:"yes"},
+  {feature:"NAVIXA Kids",free:"no",azm:"no",himma:"yes"},
+  {feature:"NAVIXA Fitness",free:"no",azm:"no",himma:"yes"},
+  {feature:"المدة",free:"أساسيات مجانية",azm:"5 أيام",himma:"شهر كامل"},
 ];
+const CellValue=({value}:{value:Cell})=>value==="yes"?<span className="pricing-yes" aria-label="متاح">✓</span>:value==="no"?<span className="pricing-no" aria-label="غير متاح">—</span>:<span className="pricing-text">{value}</span>;
 
 export default function PricingPage(){
   const [plans,setPlans]=useState<Plan[]>(fallback);
@@ -34,7 +34,7 @@ export default function PricingPage(){
 
       <section className="pricing-compare" aria-labelledby="compare-title">
         <header className="pricing-compare-head"><div><small>مقارنة مباشرة</small><h2 id="compare-title">وش يفتح لك كل خيار؟</h2><p>✓ تعني أن الميزة مشمولة. علامة — تعني أنها غير مشمولة في هذه الخطة.</p></div><span className="pricing-recommendation">هِمّة هي الخطة الأشمل</span></header>
-        <div className="pricing-table-wrap"><table className="pricing-table"><thead><tr><th>الميزة</th><th className="free"><div className="pricing-plan-head"><strong>المجانية</strong><small>0 ريال</small></div></th><th className="azm"><div className="pricing-plan-head"><Link href="/sprint">عَزْم</Link><small>{riyals(azm.amount)} ريال · 5 أيام</small></div></th><th className="himma"><div className="pricing-plan-head"><Link href="/plus">هِمّة</Link><small>{riyals(himma.amount)} ريال · شهر</small></div></th></tr></thead><tbody>{rows.map(([feature,free,azmValue,himmaValue])=><tr key={String(feature)}><td>{feature}</td><td>{free}</td><td>{azmValue}</td><td>{himmaValue}</td></tr>)}</tbody></table></div>
+        <div className="pricing-table-wrap"><table className="pricing-table"><thead><tr><th>الميزة</th><th className="free"><div className="pricing-plan-head"><strong>المجانية</strong><small>0 ريال</small></div></th><th className="azm"><div className="pricing-plan-head"><Link href="/sprint">عَزْم</Link><small>{riyals(azm.amount)} ريال · 5 أيام</small></div></th><th className="himma"><div className="pricing-plan-head"><Link href="/plus">هِمّة</Link><small>{riyals(himma.amount)} ريال · شهر</small></div></th></tr></thead><tbody>{rows.map(row=><tr key={row.feature}><td>{row.feature}</td><td><CellValue value={row.free}/></td><td><CellValue value={row.azm}/></td><td><CellValue value={row.himma}/></td></tr>)}</tbody></table></div>
         <div className="pricing-clarity"><article><b>المجانية</b><p>للأساسيات والتعرّف على NAVIXA بدون أدوات الجلسة المدفوعة.</p></article><article className="short"><b>عَزْم</b><p>مناسب لدورة، اختبار، مؤتمر أو فترة قصيرة تحتاج فيها أدوات الاستماع والمتابعة والتلخيص.</p></article><article className="best"><b>هِمّة</b><p>الأشمل: أدوات NAVIXA المدفوعة لمدة شهر، ومعها English Learning وKids وFitness.</p></article></div>
       </section>
 
