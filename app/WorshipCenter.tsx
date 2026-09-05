@@ -5,155 +5,54 @@ import TasbihCounter from "./TasbihCounter";
 import AzkarList from "./AzkarList";
 import QuranReader,{dayPage} from "./QuranReader";
 import {sendTelegramAlert} from "./alertPrefs";
+import {RIYADH,addMinutes,applyAdjustments,defaultIqamaOffset,parseTime,prayerApiUrl,prayerLabels,prayerOrder,readAdjustments,type Timings} from "./prayerTimeModel";
 
-type Timings=Record<string,string>;
 type AzkarItem={ID:number;ARABIC_TEXT:string;REPEAT:number};
-
-const prayerLabels:Record<string,string>={Fajr:"الفجر",Dhuhr:"الظهر",Asr:"العصر",Maghrib:"المغرب",Isha:"العشاء"};
-const prayerOrder=["Fajr","Dhuhr","Asr","Maghrib","Isha"];
-const iqamaOffsets:Record<string,number>={Fajr:20,Dhuhr:15,Asr:15,Maghrib:10,Isha:15};
+type LocStatus="idle"|"loading"|"denied"|"unavailable"|"timeout"|"error"|"ready";
 const today=()=>new Date().toISOString().slice(0,10);
-const tips=["الله يتقبل منك، استمر ✨","الثبات على القليل خير من كثير منقطع","ورد اليوم إنجاز يستحق الاحتفاء به","خطوة يومية بسيطة تبني عادة تدوم بإذن الله","أحسنت! استمراريتك اليوم تصنع فرقًا بكرة"];
-const cleanTime=(value?:string)=>value?value.split(" ")[0]:"";
-const parseToday=(hhmm:string)=>{const [h,m]=cleanTime(hhmm).split(":").map(Number);const d=new Date();if(Number.isFinite(h)&&Number.isFinite(m))d.setHours(h,m,0,0);return d};
-const addMinutes=(date:Date,minutes:number)=>new Date(date.getTime()+minutes*60000);
-const fmt=(date:Date)=>date.toLocaleTimeString("ar",{hour:"2-digit",minute:"2-digit"});
+const fmt=(date:Date)=>date.toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit",hour12:true});
 
 export default function WorshipCenter(){
-  const [locStatus,setLocStatus]=useState<"idle"|"loading"|"error"|"ready">("idle");
+  const [locStatus,setLocStatus]=useState<LocStatus>("idle");
+  const [locationLabel,setLocationLabel]=useState("لم يُحدد الموقع بعد");
   const [manualCity,setManualCity]=useState("");
-  const [manualCountry,setManualCountry]=useState("");
+  const [manualCountry,setManualCountry]=useState("Saudi Arabia");
   const [timings,setTimings]=useState<Timings|null>(null);
   const [now,setNow]=useState(new Date());
   const [azkarList,setAzkarList]=useState<AzkarItem[]|null>(null);
   const [afterPrayerList,setAfterPrayerList]=useState<AzkarItem[]|null>(null);
-  const [wirdDone,setWirdDone]=useState(false);
-  const [azkarDone,setAzkarDone]=useState(false);
-  const [tasbihDone,setTasbihDone]=useState(false);
-  const [wirdStreak,setWirdStreak]=useState(0);
-  const [showSadaqah,setShowSadaqah]=useState(false);
-  const [tipText,setTipText]=useState("");
-  const [ehsanThanks,setEhsanThanks]=useState(false);
-  const [donationReason,setDonationReason]=useState("وردك اليومي");
+  const [wirdDone,setWirdDone]=useState(false),[azkarDone,setAzkarDone]=useState(false),[tasbihDone,setTasbihDone]=useState(false);
+  const [wirdStreak,setWirdStreak]=useState(0),[showSadaqah,setShowSadaqah]=useState(false),[tipText,setTipText]=useState(""),[ehsanThanks,setEhsanThanks]=useState(false),[donationReason,setDonationReason]=useState("وردك اليومي");
 
   useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[]);
-  useEffect(()=>{const day=today();setWirdDone(localStorage.getItem(`navixa-wird-${day}`)==="1");setAzkarDone(localStorage.getItem(`navixa-azkar-${day}`)==="1");setTasbihDone(localStorage.getItem(`navixa-tasbih-${day}`)==="1");setWirdStreak(Number(localStorage.getItem("navixa-wird-streak")||0))},[]);
-  useEffect(()=>{
-    fetch("/api/azkar?category=27").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAzkarList(d.items)}).catch(()=>{});
-    fetch("/api/azkar?category=25").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAfterPrayerList(d.items)}).catch(()=>{});
-  },[]);
+  useEffect(()=>{const day=today();setWirdDone(localStorage.getItem(`navixa-wird-${day}`)==="1");setAzkarDone(localStorage.getItem(`navixa-azkar-${day}`)==="1");setTasbihDone(localStorage.getItem(`navixa-tasbih-${day}`)==="1");setWirdStreak(Number(localStorage.getItem("navixa-wird-streak")||0));try{const saved=JSON.parse(localStorage.getItem("navixa-prayer-location-v2")||"null");if(saved?.lat&&saved?.lng){setLocationLabel(saved.source==="device"?"موقع الجهاز المحفوظ":"الرياض افتراضيًا");void fetchTimings({lat:saved.lat,lng:saved.lng})}}catch{}},[]);
+  useEffect(()=>{fetch("/api/azkar?category=27").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAzkarList(d.items)}).catch(()=>{});fetch("/api/azkar?category=25").then(r=>r.json()).then(d=>{if(Array.isArray(d.items))setAfterPrayerList(d.items)}).catch(()=>{})},[]);
 
-  const applyTimings=(data:any)=>{if(data?.data?.timings){setTimings(data.data.timings);setLocStatus("ready")}else setLocStatus("error")};
-  const requestLocation=()=>{
-    if(!navigator.geolocation){setLocStatus("error");return}
-    setLocStatus("loading");
-    navigator.geolocation.getCurrentPosition(
-      pos=>fetch(`/api/prayer-times?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`).then(r=>r.json()).then(applyTimings).catch(()=>setLocStatus("error")),
-      ()=>setLocStatus("error"),
-      {timeout:10000}
-    );
-  };
-  const submitCity=(e:React.FormEvent)=>{
-    e.preventDefault();if(!manualCity||!manualCountry)return;
-    setLocStatus("loading");
-    fetch(`/api/prayer-times?city=${encodeURIComponent(manualCity)}&country=${encodeURIComponent(manualCountry)}`).then(r=>r.json()).then(applyTimings).catch(()=>setLocStatus("error"));
-  };
+  const applyTimings=(data:any)=>{if(data?.data?.timings){setTimings(applyAdjustments(data.data.timings,readAdjustments()));setLocStatus("ready")}else setLocStatus("error")};
+  const fetchTimings=async(input:{lat?:number;lng?:number;city?:string;country?:string})=>{setLocStatus("loading");try{const r=await fetch(prayerApiUrl(input),{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error();applyTimings(d)}catch{setLocStatus("error")}};
+  const requestLocation=()=>{if(!navigator.geolocation){setLocStatus("unavailable");return}setLocStatus("loading");navigator.geolocation.getCurrentPosition(pos=>{const saved={lat:pos.coords.latitude,lng:pos.coords.longitude,source:"device"};localStorage.setItem("navixa-prayer-location-v2",JSON.stringify(saved));setLocationLabel("موقع جهازك");void fetchTimings(saved)},error=>{if(error.code===1)setLocStatus("denied");else if(error.code===2)setLocStatus("unavailable");else if(error.code===3)setLocStatus("timeout");else setLocStatus("error")},{enableHighAccuracy:true,timeout:12000,maximumAge:0})};
+  const useRiyadhFallback=()=>{const saved={...RIYADH,source:"fallback"};localStorage.setItem("navixa-prayer-location-v2",JSON.stringify(saved));setLocationLabel("الرياض افتراضيًا");void fetchTimings(saved)};
+  const submitCity=(e:React.FormEvent)=>{e.preventDefault();if(!manualCity||!manualCountry)return;setLocationLabel(`${manualCity}، ${manualCountry}`);void fetchTimings({city:manualCity,country:manualCountry})};
 
-  const hour=now.getHours()+now.getMinutes()/60;
-  const azkarPeriod=hour>=3&&hour<12?"sabah":hour>=12&&hour<22?"masaa":null;
+  const hour=now.getHours()+now.getMinutes()/60,azkarPeriod=hour>=3&&hour<12?"sabah":hour>=12&&hour<22?"masaa":null;
+  let afterPrayerName:keyof typeof prayerLabels|null=null;if(timings){for(let i=0;i<prayerOrder.length;i++){const name=prayerOrder[i],adhan=parseTime(timings[name]),windowStart=addMinutes(adhan,55),nextAdhan=i<prayerOrder.length-1?parseTime(timings[prayerOrder[i+1]]):addMinutes(parseTime(timings.Fajr),1440);if(now>=windowStart&&now<nextAdhan){afterPrayerName=name;break}}}
+  let nextPrayer:{name:keyof typeof prayerLabels;time:Date}|null=null;if(timings){for(const name of prayerOrder){const time=parseTime(timings[name]);if(time>now){nextPrayer={name,time};break}}if(!nextPrayer)nextPrayer={name:"Fajr",time:addMinutes(parseTime(timings.Fajr),1440)}};
 
-  let afterPrayerName:string|null=null;
-  if(timings){
-    for(let i=0;i<prayerOrder.length;i++){
-      const name=prayerOrder[i];
-      const adhan=parseToday(timings[name]);
-      const windowStart=addMinutes(adhan,55);
-      const nextAdhan=i<prayerOrder.length-1?parseToday(timings[prayerOrder[i+1]]):addMinutes(parseToday(timings.Fajr),24*60);
-      if(now>=windowStart&&now<nextAdhan){afterPrayerName=name;break}
-    }
-  }
-
-  let nextPrayer:{name:string;time:Date}|null=null;
-  if(timings){
-    for(const name of prayerOrder){const time=parseToday(timings[name]);if(time>now){nextPrayer={name,time};break}}
-    if(!nextPrayer)nextPrayer={name:"Fajr",time:addMinutes(parseToday(timings.Fajr),24*60)};
-  }
-
-  const showDonation=(reason:string)=>{setDonationReason(reason);setTipText("أحسنت، تقبّل الله وردك — صدقة يسيرة قد تفتح باب خير كبير.");setShowSadaqah(true);sendTelegramAlert("sadaqah",`🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام ${reason}`)};
-  const completeWird=()=>{
-    localStorage.setItem(`navixa-wird-${today()}`,"1");
-    const streak=Number(localStorage.getItem("navixa-wird-streak")||0)+1;
-    localStorage.setItem("navixa-wird-streak",String(streak));
-    setWirdStreak(streak);setWirdDone(true);showDonation("ورد القرآن");
-    sendTelegramAlert("wird",`📖 تذكير NAVIXA: أنجز ورد اليوم (صفحة ${dayPage()}) — سلسلة ${streak} يوم`);
-    sendTelegramAlert("sadaqah","🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام الورد");
-  };
-  const clickEhsan=()=>{
-    const next=Number(localStorage.getItem("navixa-ehsan-clicks")||1200)+1;
-    localStorage.setItem("navixa-ehsan-clicks",String(next));
-    const stored=localStorage.getItem("navixa-stats-visitor-key");const visitorKey=stored||((crypto as any).randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);if(!stored)localStorage.setItem("navixa-stats-visitor-key",visitorKey);
-    fetch("/api/stats",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({event:"ehsan",visitorKey})}).catch(()=>{});
-    setEhsanThanks(true);
-    window.open("https://ehsan.sa","_blank","noopener,noreferrer");
-  };
-
+  const showDonation=(reason:string)=>{setDonationReason(reason);setTipText("أحسنت، تقبّل الله وردك");setShowSadaqah(true);sendTelegramAlert("sadaqah",`🤲 تذكير NAVIXA: تذكير بالصدقة بعد إتمام ${reason}`)};
+  const completeWird=()=>{localStorage.setItem(`navixa-wird-${today()}`,"1");const streak=Number(localStorage.getItem("navixa-wird-streak")||0)+1;localStorage.setItem("navixa-wird-streak",String(streak));setWirdStreak(streak);setWirdDone(true);showDonation("ورد القرآن");sendTelegramAlert("wird",`📖 أنجز ورد اليوم (صفحة ${dayPage()}) · سلسلة ${streak} يوم`)};
   const completeAzkar=()=>{localStorage.setItem(`navixa-azkar-${today()}`,"1");setAzkarDone(true);showDonation("أذكار اليوم")};
   const completeTasbih=()=>{localStorage.setItem(`navixa-tasbih-${today()}`,"1");setTasbihDone(true);showDonation("ورد التسبيح")};
-  const completedCount=[wirdDone,azkarDone,tasbihDone].filter(Boolean).length;
-  const hijriDate=now.toLocaleDateString("ar-SA-u-ca-islamic",{weekday:"long",day:"numeric",month:"long"});
+  const clickEhsan=()=>{setEhsanThanks(true);window.open("https://ehsan.sa","_blank","noopener,noreferrer")};
+  const completedCount=[wirdDone,azkarDone,tasbihDone].filter(Boolean).length,hijriDate=now.toLocaleDateString("ar-SA-u-ca-islamic",{weekday:"long",day:"numeric",month:"long"});
+  const locMessage=locStatus==="denied"?"إذن الموقع مرفوض في المتصفح. فعّل الموقع لهذا الموقع ثم اضغط «استخدم موقعي» مرة أخرى.":locStatus==="unavailable"?"الموقع غير متاح من الجهاز أو المتصفح حاليًا.":locStatus==="timeout"?"استغرق تحديد الموقع وقتًا طويلًا. جرّب مرة أخرى أو اختر المدينة يدويًا.":locStatus==="error"?"تعذر جلب المواقيت. يمكنك استخدام الرياض مؤقتًا أو إدخال المدينة.":"";
 
-  return <section className="worship-center" dir="rtl">
-    <article className="worship-hero">
-      <div className="worship-hero-copy"><span className="worship-kicker">وردك اليومي</span><h2>لحظات قليلة تقرّبك أكثر</h2><p>{hijriDate} · احفظ وردك على جهازك وارجع إليه متى شئت.</p><nav className="worship-jump-links" aria-label="أقسام الورد"><a href="#daily-azkar">الأذكار</a><a href="#daily-tasbih">التسبيح</a><a href="#daily-quran">القرآن</a></nav></div>
-      <div className="worship-hero-progress"><div className="worship-progress-ring" style={{"--worship-progress":`${(completedCount/3)*100}%`} as React.CSSProperties}><b>{completedCount}<small>/3</small></b></div><div><strong>{completedCount===3?"اكتمل وردك اليوم":"خطواتك اليوم"}</strong><span>{completedCount===3?"تقبّل الله منك":"أنجز ما يناسبك بهدوء"}</span></div></div>
-      <div className="worship-streak"><span>✦</span><div><small>سلسلة القرآن</small><b>{wirdStreak} يوم</b></div></div>
-    </article>
-    <article className="prayer-card">
-      <header><span className="card-explain-icon">🕌</span><div><small>مواقيت الصلاة والإقامة</small><h3>أوقاتك اليوم</h3></div></header>
-      {locStatus!=="ready"&&<div className="location-request">
-        <p>فعّل الموقع لعرض مواقيت الصلاة الدقيقة لمكانك، أو أدخل مدينتك يدويًا.</p>
-        <button type="button" onClick={requestLocation} disabled={locStatus==="loading"}>{locStatus==="loading"?"جارٍ التحديد…":"📍 استخدم موقعي"}</button>
-        <form onSubmit={submitCity}><input value={manualCity} onChange={e=>setManualCity(e.target.value)} placeholder="المدينة" required/><input value={manualCountry} onChange={e=>setManualCountry(e.target.value)} placeholder="الدولة" required/><button type="submit">تأكيد</button></form>
-        {locStatus==="error"&&<small className="loc-error">تعذر تحديد موقعك — جرّب إدخال المدينة يدويًا.</small>}
-      </div>}
-      {timings&&<>
-        <div className="prayer-grid">{prayerOrder.map(name=>{
-          const adhan=parseToday(timings[name]);
-          const iqama=addMinutes(adhan,iqamaOffsets[name]);
-          return <div key={name} className={nextPrayer?.name===name?"active":""}>
-            <b>{prayerLabels[name]}</b>
-            <span>{fmt(adhan)}</span>
-            <small>إقامة (تقديرية) {fmt(iqama)}</small>
-          </div>
-        })}</div>
-        {nextPrayer&&<p className="next-prayer">القادمة: <b>{prayerLabels[nextPrayer.name]||"الفجر غدًا"}</b> — {fmt(nextPrayer.time)}</p>}
-      </>}
-    </article>
-
-    {azkarPeriod&&azkarList&&<article className="azkar-card" id="daily-azkar">
-      <header><span className="card-explain-icon">{azkarPeriod==="sabah"?"🌅":"🌙"}</span><div><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>حصّن يومك بالذكر</h3></div></header>
-      <AzkarList items={azkarList}/><button type="button" className={`wird-done ${azkarDone?"is-complete":""}`} onClick={completeAzkar}>{azkarDone?"تم إتمام أذكار اليوم ✓":"تم إتمام الأذكار — تذكير بالصدقة"}</button>
-    </article>}
-
-    {afterPrayerName&&afterPrayerList&&<article className="azkar-card after-prayer">
-      <header><span className="card-explain-icon">🤲</span><div><small>أذكار بعد الصلاة</small><h3>بعد صلاة {prayerLabels[afterPrayerName]}</h3></div></header>
-      <AzkarList items={afterPrayerList}/><button type="button" className="wird-done" onClick={()=>showDonation(`أذكار بعد صلاة ${prayerLabels[afterPrayerName]}`)}>تم إتمام الأذكار — تذكير بالصدقة</button>
-    </article>}
-
-    <article className="tasbih-card" id="daily-tasbih">
-      <header><span className="card-explain-icon">📿</span><div><small>سبّح واستغفر</small><h3>عداد التسبيح اليومي</h3></div></header>
-      <TasbihCounter onComplete={completeTasbih}/>{tasbihDone&&<p className="worship-inline-complete">أتممت ورد التسبيح اليوم ✓</p>}
-    </article>
-
+  return <section className="worship-center worship-center-v2" dir="rtl">
+    <article className="worship-hero worship-hero-v2"><div className="worship-hero-copy"><span className="worship-kicker">وردك اليومي</span><h2>صفحة هادئة للقراءة والذكر</h2><p>{hijriDate} · كل شيء مرتب أمامك بدون زحمة.</p><nav className="worship-jump-links"><a href="#daily-quran">القرآن</a><a href="#daily-azkar">الأذكار</a><a href="#daily-tasbih">التسبيح</a><a href="#daily-prayer">الصلاة</a></nav></div><div className="worship-hero-progress"><div className="worship-progress-ring" style={{"--worship-progress":`${completedCount/3*100}%`} as React.CSSProperties}><b>{completedCount}<small>/3</small></b></div><div><strong>{completedCount===3?"اكتمل وردك اليوم":"خطواتك اليوم"}</strong><span>{completedCount===3?"تقبّل الله منك":"أنجز ما يناسبك"}</span></div></div><div className="worship-streak"><span>✦</span><div><small>سلسلة القرآن</small><b>{wirdStreak} يوم</b></div></div></article>
     <div id="daily-quran"><QuranReader wirdDone={wirdDone} onComplete={completeWird}/></div>
-
-    {showSadaqah&&<div className="sadaqah-back" onClick={()=>setShowSadaqah(false)}><article onClick={e=>e.stopPropagation()}>
-      <button className="sadaqah-close" onClick={()=>setShowSadaqah(false)}>×</button>
-      <span>🤲</span>
-      <h3>{tipText}</h3><small className="donation-reason">بعد إتمام {donationReason}</small>
-      <p>الصدقة ولو يسيرة تجلب البركة وتفرّح قلبك — جرّب تتصدق اليوم عبر منصة إحسان الموثوقة.</p>
-      <button type="button" className="ehsan-link" onClick={clickEhsan}>تصدق عبر منصة إحسان ↗</button>
-      {ehsanThanks&&<small>جزاك الله خيرًا 🌱</small>}
-    </article></div>}
-  </section>
+    {azkarPeriod&&azkarList&&<article className="azkar-card" id="daily-azkar"><header><span className="card-explain-icon">{azkarPeriod==="sabah"?"🌅":"🌙"}</span><div><small>{azkarPeriod==="sabah"?"أذكار الصباح":"أذكار المساء"}</small><h3>اقرأ واضغط ليحسب NAVIXA التكرار</h3></div></header><AzkarList items={azkarList}/><button type="button" className={`wird-done ${azkarDone?"is-complete":""}`} onClick={completeAzkar}>{azkarDone?"تم إتمام أذكار اليوم ✓":"تم إتمام الأذكار"}</button></article>}
+    {afterPrayerName&&afterPrayerList&&<article className="azkar-card after-prayer"><header><span className="card-explain-icon">🤲</span><div><small>أذكار بعد الصلاة</small><h3>بعد صلاة {prayerLabels[afterPrayerName]}</h3></div></header><AzkarList items={afterPrayerList}/></article>}
+    <article className="tasbih-card" id="daily-tasbih"><header><span className="card-explain-icon">📿</span><div><small>سبّح واستغفر</small><h3>عداد التسبيح اليومي</h3></div></header><TasbihCounter onComplete={completeTasbih}/>{tasbihDone&&<p className="worship-inline-complete">أتممت ورد التسبيح اليوم ✓</p>}</article>
+    <article className="prayer-card prayer-card-v2" id="daily-prayer"><header><span className="card-explain-icon">🕌</span><div><small>تقويم أم القرى</small><h3>مواقيت الصلاة المتغيرة يوميًا</h3><p className="prayer-source-note">أي تعديل يدوي عندك يصبح فرق دقائق عن التوقيت المعتمد، لذلك يتحرك تلقائيًا مع الأيام ولا يتجمد على ساعة ثابتة.</p></div></header><div className="location-status-panel"><div><small>الموقع الحالي</small><b>{locationLabel}</b></div><button type="button" onClick={requestLocation} disabled={locStatus==="loading"}>{locStatus==="loading"?"جارٍ التحديد…":"📍 استخدم موقعي"}</button><button type="button" className="ghost" onClick={useRiyadhFallback}>استخدم الرياض مؤقتًا</button></div>{locMessage&&<p className="loc-help">{locMessage}</p>}<form className="manual-location-form" onSubmit={submitCity}><input value={manualCity} onChange={e=>setManualCity(e.target.value)} placeholder="المدينة" required/><input value={manualCountry} onChange={e=>setManualCountry(e.target.value)} placeholder="الدولة" required/><button type="submit">اعتماد المدينة</button></form>{timings&&<><div className="prayer-grid">{prayerOrder.map(name=>{const adhan=parseTime(timings[name]),iqama=addMinutes(adhan,defaultIqamaOffset[name]);return <div key={name} className={nextPrayer?.name===name?"active":""}><b>{prayerLabels[name]}</b><span>{fmt(adhan)}</span><small>إقامة تقديرية {fmt(iqama)}</small></div>})}</div>{nextPrayer&&<p className="next-prayer">القادمة: <b>{prayerLabels[nextPrayer.name]}</b> · {fmt(nextPrayer.time)}</p>}</>}</article>
+    {showSadaqah&&<div className="sadaqah-back" onClick={()=>setShowSadaqah(false)}><article onClick={e=>e.stopPropagation()}><button className="sadaqah-close" onClick={()=>setShowSadaqah(false)}>×</button><span>🤲</span><h3>{tipText}</h3><small className="donation-reason">بعد إتمام {donationReason}</small><p>إن رغبت، تستطيع التصدق عبر منصة إحسان.</p><button type="button" className="ehsan-link" onClick={clickEhsan}>فتح منصة إحسان ↗</button>{ehsanThanks&&<small>جزاك الله خيرًا 🌱</small>}</article></div>}
+  </section>;
 }
