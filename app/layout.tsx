@@ -10,6 +10,7 @@ import "./mobile-spacing-fix.css";
 import "./direct-entry.css";
 import "./public-pricing.css";
 import "./pricing-header-shortcut.css";
+import "./worship-smart.css";
 
 const siteUrl = "https://navixasa.com";
 

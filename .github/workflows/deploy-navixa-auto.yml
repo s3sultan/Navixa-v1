@@ -1,0 +1,135 @@
+name: Deploy NAVIXA Auto
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: navixa-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify-and-deploy:
+    name: Verify, secure, deploy, smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ZIZMOR_VERSION: '1.30.0'
+    steps:
+      - name: Checkout reviewed master
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require merged pull request provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          associated_prs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls")"
+          if ! printf '%s' "$associated_prs" | jq -e 'map(select(.merged_at != null and .base.ref == "master")) | length > 0' >/dev/null; then
+            echo "Automatic production deployment refused: master commit lacks merged PR provenance."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Block high-risk production dependency vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Run lint, tests, UI smoke and production build
+        env:
+          CHROME_BIN: google-chrome
+        run: npm run test:verify
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+
+      - name: Audit GitHub Actions with zizmor
+        run: uvx "zizmor@${ZIZMOR_VERSION}" --strict-collection --min-severity=medium --format=github .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan repository for committed secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Require production secret readiness
+        env:
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test "${#ADMIN_JWT_SECRET}" -ge 32 || { echo "ADMIN_JWT_SECRET must be at least 32 characters"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
+
+      - name: Prepare production D1 migrations
+        run: |
+          set -euo pipefail
+          test -d migrations
+          mkdir -p dist/server/migrations
+          cp migrations/*.sql dist/server/migrations/
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'dist/server/wrangler.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          config.observability = { enabled: true, head_sampling_rate: 1 };
+          config.compatibility_flags = [...new Set([...(config.compatibility_flags || []), 'nodejs_compat'])];
+          config.triggers = { ...(config.triggers || {}), crons: ['* * * * *'] };
+          config.keep_vars = true;
+          fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
+          NODE
+
+      - name: Apply production D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install wrangler d1 migrations apply navixa-db --remote --config dist/server/wrangler.json
+
+      - name: Deploy NAVIXA Worker preserving remote secrets and bindings
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install wrangler deploy --config dist/server/wrangler.json --name navixa
+
+      - name: Synchronize admin JWT secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+        run: printf '%s' "$ADMIN_JWT_SECRET" | npx --no-install wrangler secret put ADMIN_JWT_SECRET --config dist/server/wrangler.json --name navixa
+
+      - name: Production smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /pricing /worship /api/prayer-times?city=Riyadh\&country=Saudi%20Arabia; do
+            url="https://navixasa.com${path}"
+            for attempt in 1 2 3 4 5; do
+              if curl --fail --silent --show-error --max-time 15 "$url" >/dev/null; then
+                echo "PASS $url"
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                echo "FAIL $url"
+                exit 1
+              fi
+              sleep 3
+            done
+          done
