@@ -1,0 +1,1 @@
+export const ACCESS_ERRORS={subscriptionRequired:"هذه الميزة تتطلب اشتراكًا مناسبًا بعد انتهاء التجربة.",trialQuotaReached:"وصلت للحد التجريبي لهذه الخدمة. يمكنك الاستمرار عبر هِمّة.",himmaQuotaReached:"وصلت للحد الحالي للخدمة. حاول لاحقًا أو راجع حدود الاستخدام."} as const;
