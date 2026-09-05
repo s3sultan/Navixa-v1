@@ -84,6 +84,7 @@ assert.match(stagingDeploy, /github\.actor == github\.repository_owner/);
 assert.match(stagingDeploy, /persist-credentials: false/);
 assert.match(stagingDeploy, /Install dependencies without deployment secrets/);
 assert.match(stagingDeploy, /ADMIN_JWT_SECRET_STAGING must be at least 32 characters/);
+assert.match(stagingDeploy, /if \[ "\$\{GITHUB_REF\}" = "refs\/heads\/security\/hardening-2026-09-04" \]; then/);
 
 for (const workflow of [setupPush, resetCounters]) {
   assert.match(workflow, /github\.actor == github\.repository_owner/);
