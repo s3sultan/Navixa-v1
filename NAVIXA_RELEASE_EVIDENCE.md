@@ -3,7 +3,7 @@
 ## 2026-09-05 — Launch readiness polish
 
 ### Context and conclusion
-The homepage release candidate fixes the verified greeting hydration mismatch and reduces first-screen density without changing authentication, authorization, billing, APIs, or production secrets. The branch includes the latest `master`; production remains blocked until the Pull Request checks and deployed staging verification pass.
+The homepage release candidate fixes the verified greeting hydration mismatch and reduces first-screen density without changing authentication, authorization, billing, APIs, or production secrets. The branch includes the latest `master`; Pull Request checks, the release gate, and deployed staging verification have passed with no unresolved BLOCK item.
 
 ### Before ← Delta ← After
 | Element | Classification | Evidence | Impact |
@@ -18,12 +18,15 @@ The homepage release candidate fixes the verified greeting hydration mismatch an
 | Gate | Status | Evidence / next action |
 | --- | --- | --- |
 | Build | PASS | `npm run test:verify`: lint, 115 tests, UI smoke, and production build passed after merging latest `master`. |
-| Security | PASS | Security/auth/access suites passed; `npm audit --omit=dev --audit-level=high` found 0 vulnerabilities. GitHub security gates remain required before merge. |
+| Security | PASS | Security/auth/access suites passed; `npm audit --omit=dev --audit-level=high` found 0 vulnerabilities; GitHub Actions security and secret exposure guards passed. |
 | SEO | PASS | Existing SEO/security baseline passed; canonical production URL is documented as `https://navixasa.com`. |
 | Accessibility | PASS | Semantic toggle with `aria-expanded`/`aria-controls`, visible focus, RTL mobile and desktop manual review. |
 | Performance | WARN | Secondary desktop content is deferred until requested; no synthetic performance number was measured in this change. |
 | Links | PASS | UI smoke passed homepage, Today, account/admin guard, and meetings paths. |
-| Preview | PENDING | Deploy and verify the updated branch on `navixa-staging` before merge. |
+| Preview | PASS | Staging run `33978081612` deployed and passed runtime/header/path/origin checks; manual review at 390×844 and 1440×1000 found no Console errors. |
+
+### Launch decision
+PASS with one documented, non-blocking performance WARN. Production may proceed only through the reviewed `master` deployment workflow and must still pass post-deploy verification on `https://navixasa.com`.
 
 ### Rollback
 - Pre-change production remains the active rollback until deployment succeeds.
