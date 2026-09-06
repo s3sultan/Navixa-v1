@@ -1,0 +1,49 @@
+name: Temporary unify NAVIXA water goal
+
+on:
+  push:
+    branches:
+      - fix/unify-water-goal-8-2026-09-06
+
+permissions:
+  contents: write
+
+jobs:
+  unify-water-goal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/unify-water-goal-8-2026-09-06
+      - name: Unify water goal to 8
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/page.tsx')
+          s = p.read_text()
+          replacements = {
+              'last7.filter(d=>dayCups(d)>=6).length': 'last7.filter(d=>dayCups(d)>=8).length',
+              'last30.filter(d=>dayCups(d)>=6).length': 'last30.filter(d=>dayCups(d)>=8).length',
+              '<b>{todayWaterCups}/6</b>': '<b>{todayWaterCups}/8</b>',
+              'todayWaterCups>=6?': 'todayWaterCups>=8?',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Expected source fragment not found: {old}')
+              s = s.replace(old, new)
+          p.write_text(s)
+          PY
+      - name: Remove temporary workflow and commit correction
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-water-goal-temporary.yml
+          if git diff --quiet; then
+            echo 'No changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/page.tsx .github/workflows/fix-water-goal-temporary.yml
+          git commit -m 'fix: unify water goal to 8 cups'
+          git push origin HEAD:fix/unify-water-goal-8-2026-09-06
