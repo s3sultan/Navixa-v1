@@ -1,0 +1,18 @@
+import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
+
+type Stmt={bind:(...v:unknown[])=>Stmt;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
+type Db={prepare:(sql:string)=>Stmt};
+type Env={DB:Db;NAVIXA_TELEGRAM_BOT_TOKEN?:string;NAVIXA_TELEGRAM_ENCRYPTION_KEY?:string};
+type Link={user_id:string;chat_id_ciphertext:string};
+type Manual={user_id:string;bot_token_ciphertext:string;chat_id_ciphertext:string};
+const prayers=["Fajr","Dhuhr","Asr","Maghrib","Isha"] as const;
+const labels:Record<(typeof prayers)[number],string>={Fajr:"الفجر",Dhuhr:"الظهر",Asr:"العصر",Maghrib:"المغرب",Isha:"العشاء"};
+const RIYADH_OFFSET_MS=3*60*60_000;
+
+function riyadhParts(now=new Date()){const local=new Date(now.getTime()+RIYADH_OFFSET_MS);return {date:`${local.getUTCFullYear()}-${String(local.getUTCMonth()+1).padStart(2,"0")}-${String(local.getUTCDate()).padStart(2,"0")}`,hhmm:`${String(local.getUTCHours()).padStart(2,"0")}:${String(local.getUTCMinutes()).padStart(2,"0")}`}}
+function clean(v:string){return String(v||"").replace(/\s*\(.+\)$/g,"").slice(0,5)}
+async function timings(){const r=await fetch("https://api.aladhan.com/v1/timingsByCity?city=Riyadh&country=Saudi%20Arabia&method=4&school=0");if(!r.ok)throw new Error("prayer_times_failed");const p=await r.json() as {data?:{timings?:Record<string,string>}};if(!p.data?.timings)throw new Error("prayer_times_missing");return p.data.timings}
+async function claim(db:Db,userId:string,key:string){await db.prepare("CREATE TABLE IF NOT EXISTS navixa_prayer_alert_delivery (user_id TEXT NOT NULL,event_key TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(user_id,event_key))").run();const prior=await db.prepare("SELECT event_key FROM navixa_prayer_alert_delivery WHERE user_id=? AND event_key=? LIMIT 1").bind(userId,key).all();if(prior.results.length)return false;await db.prepare("INSERT OR IGNORE INTO navixa_prayer_alert_delivery (user_id,event_key,created_at) VALUES (?,?,?)").bind(userId,key,new Date().toISOString()).run();return true}
+async function send(env:Env,userId:string,text:string){if(!env.NAVIXA_TELEGRAM_ENCRYPTION_KEY)return false;const manual=(await env.DB.prepare("SELECT user_id,bot_token_ciphertext,chat_id_ciphertext FROM navixa_user_telegram_manual WHERE user_id=? AND revoked_at='' LIMIT 1").bind(userId).all<Manual>()).results[0];if(manual){const [token,chatId]=await Promise.all([decryptTelegramIdentifier(manual.bot_token_ciphertext,env.NAVIXA_TELEGRAM_ENCRYPTION_KEY),decryptTelegramIdentifier(manual.chat_id_ciphertext,env.NAVIXA_TELEGRAM_ENCRYPTION_KEY)]);return sendOfficialTelegramMessage({chatId,token,text})}if(!env.NAVIXA_TELEGRAM_BOT_TOKEN)return false;const link=(await env.DB.prepare("SELECT user_id,chat_id_ciphertext FROM navixa_user_telegram_links WHERE user_id=? AND revoked_at='' LIMIT 1").bind(userId).all<Link>()).results[0];if(!link)return false;const chatId=await decryptTelegramIdentifier(link.chat_id_ciphertext,env.NAVIXA_TELEGRAM_ENCRYPTION_KEY);return sendOfficialTelegramMessage({chatId,token:env.NAVIXA_TELEGRAM_BOT_TOKEN,text})}
+
+export async function deliverDuePrayerAlerts(env:Env){const {date,hhmm}=riyadhParts();const t=await timings();const due=prayers.find(name=>clean(t[name])===hhmm);if(!due)return {due:false,delivered:0};const users=await env.DB.prepare("SELECT DISTINCT user_id FROM navixa_user_telegram_preferences WHERE notification_type='adhan' AND enabled=1").all<{user_id:string}>();let delivered=0;for(const row of users.results){const key=`${date}:adhan:${due}`;if(!await claim(env.DB,row.user_id,key))continue;try{if(await send(env,row.user_id,`🕌 حان الآن أذان ${labels[due]} · ${clean(t[due])}`))delivered++}catch{}}return {due:true,prayer:due,delivered}}
