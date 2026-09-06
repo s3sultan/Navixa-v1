@@ -236,13 +236,13 @@ export default function Home(){
   const weeklySessions=last7.map(d=>({date:d,count:ready?daySessions(d):0}));
   const todaySessions=ready?daySessions(today()):0;
   const weekSessionsTotal=weeklySessions.reduce((sum,w)=>sum+w.count,0);
-  const weekHydrationDays=ready?last7.filter(d=>dayCups(d)>=6).length:0;
+  const weekHydrationDays=ready?last7.filter(d=>dayCups(d)>=8).length:0;
   const todayWaterCups=ready?dayCups(today()):0;
   const monthSessionsTotal=ready?last30.reduce((sum,d)=>sum+daySessions(d),0):0;
   const monthWaterCups=ready?last30.reduce((sum,d)=>sum+dayCups(d),0):0;
   const weekSittingMinutes=ready?Math.round(last7.reduce((sum,d)=>sum+daySitting(d),0)/60):0;
   const monthSittingMinutes=ready?Math.round(last30.reduce((sum,d)=>sum+daySitting(d),0)/60):0;
-  const monthHydrationDays=ready?last30.filter(d=>dayCups(d)>=6).length:0;
+  const monthHydrationDays=ready?last30.filter(d=>dayCups(d)>=8).length:0;
   const sessionHours:string[]=ready?JSON.parse(localStorage.getItem("navixa-session-hours")||"[]"):[];
   const bestHour=computeBestHour(sessionHours);
   const tasksDoneCount=tasks.filter(t=>t.done).length;
@@ -355,7 +355,7 @@ export default function Home(){
         <button className="focus-card" onClick={()=>document.getElementById("focus")?.scrollIntoView({behavior:"smooth"})}><b>تركيز</b><span>{time}</span><small>جلسة تركيز</small><i/></button>
       </section>
 
-      <section hidden={!showMore} className="daily-strip" id="productivity"><div><small>جلسات اليوم</small><b>{todaySessions}</b><em>{todaySessions?"سجلتها اليوم":"ابدأ جلسة تركيز قصيرة"}</em></div><div><small>ماء اليوم</small><b>{todayWaterCups}/6</b><em>{todayWaterCups>=6?"أكملت هدف اليوم":"سجل كوبًا عند كل استراحة"}</em></div><div><small>المهام المكتملة</small><b>{tasks.filter(t=>t.done).length} / {tasks.length}</b><em>{tasks.length?"ابدأ بالأهم، والباقي نرتبه معك":"أضف أول مهمة لليوم"}</em></div><div><small>جلسة التركيز</small><b>{Math.round(focusDuration/60)} د</b><em>{running?"جلسة نشطة الآن":"جاهز عندما تبدأ"}</em></div></section>
+      <section hidden={!showMore} className="daily-strip" id="productivity"><div><small>جلسات اليوم</small><b>{todaySessions}</b><em>{todaySessions?"سجلتها اليوم":"ابدأ جلسة تركيز قصيرة"}</em></div><div><small>ماء اليوم</small><b>{todayWaterCups}/8</b><em>{todayWaterCups>=8?"أكملت هدف اليوم":"سجل كوبًا عند كل استراحة"}</em></div><div><small>المهام المكتملة</small><b>{tasks.filter(t=>t.done).length} / {tasks.length}</b><em>{tasks.length?"ابدأ بالأهم، والباقي نرتبه معك":"أضف أول مهمة لليوم"}</em></div><div><small>جلسة التركيز</small><b>{Math.round(focusDuration/60)} د</b><em>{running?"جلسة نشطة الآن":"جاهز عندما تبدأ"}</em></div></section>
 
       <section hidden={!showMore} className="insights-grid">
         <DailyReviewCard sessionsToday={todaySessions} tasksDone={tasksDoneCount} tasksTotal={tasks.length} bestHour={bestHour} onLogSession={logSession} onQuickTask={quickTask}/>
