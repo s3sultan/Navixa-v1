@@ -1,6 +1,7 @@
 import type { MeetingPart, TranscriptSegment } from "./meetingStore";
 
 const ARABIC_STOP_WORDS = new Set(["في","من","على","الى","إلى","عن","هذا","هذه","ذلك","التي","الذي","ثم","مع","كان","كانت","أن","إن","او","أو","لا","ما","فيه","لها","له","كما","بعد","قبل","عند","بين","كل","قد","تم","هو","هي","نحن","أنا","انت","أنت"]);
+const QUALITY_WARNING = "تعذر إنتاج ملخص موثوق لأن التفريغ يحتوي على تكرار أو تشويش مرتفع. أعد التفريغ بصوت أوضح قبل اعتماد النتيجة.";
 
 type LocalSummary = { summary: string; decisions: string[]; tasks: string[]; questions: string[] };
 
@@ -9,6 +10,20 @@ function fingerprint(text: string) { return normalizeText(text).toLowerCase().re
 
 export function splitSentences(text: string) {
   return text.replace(/\s+/g, " ").split(/(?<=[.!؟])\s+|\n+/).map((sentence) => sentence.trim()).filter((sentence) => sentence.length > 12);
+}
+
+function repeatedNgramRatio(words: string[]) {
+  if (words.length < 24) return 0;
+  const n = 4;
+  const grams = new Map<string, number>();
+  let repeated = 0;
+  for (let i = 0; i <= words.length - n; i += 1) {
+    const gram = words.slice(i, i + n).join(" ");
+    const count = (grams.get(gram) || 0) + 1;
+    grams.set(gram, count);
+    if (count > 1) repeated += 1;
+  }
+  return repeated / Math.max(1, words.length - n + 1);
 }
 
 export function cleanTranscriptNoise(text: string) {
@@ -26,13 +41,14 @@ export function cleanTranscriptNoise(text: string) {
   const uniqueWords = new Set(words);
   const lexicalRatio = words.length ? uniqueWords.size / words.length : 0;
   const duplicateRatio = sentences.length ? duplicates / sentences.length : 0;
-  const suspicious = words.length >= 35 && (duplicateRatio >= 0.28 || lexicalRatio < 0.16);
-  return { text: cleaned.join("\n"), suspicious, duplicateRatio, lexicalRatio };
+  const ngramRatio = repeatedNgramRatio(words);
+  const suspicious = words.length >= 35 && (duplicateRatio >= 0.28 || lexicalRatio < 0.16 || ngramRatio >= 0.22);
+  return { text: cleaned.join("\n"), suspicious, duplicateRatio, lexicalRatio, ngramRatio };
 }
 
 export function buildLocalSummary(transcript: string): LocalSummary {
   const quality = cleanTranscriptNoise(transcript);
-  if (quality.suspicious) return { summary: "تعذر إنتاج ملخص موثوق لأن التفريغ يحتوي على تكرار أو تشويش مرتفع. أعد التفريغ بصوت أوضح قبل اعتماد النتيجة.", decisions: [], tasks: [], questions: [] };
+  if (quality.suspicious) return { summary: QUALITY_WARNING, decisions: [], tasks: [], questions: [] };
   const sentences = splitSentences(quality.text);
   const tokens = quality.text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || [];
   const counts = new Map<string, number>();
@@ -53,8 +69,11 @@ export function mergeMeetingParts(parts: MeetingPart[]) {
   const quality = cleanTranscriptNoise(rawTranscript);
   const transcript = quality.text || rawTranscript;
   const segments: TranscriptSegment[] = completed.flatMap((part)=>part.segments.map((segment)=>({ start: segment.start + part.startMs/1000, end: segment.end + part.startMs/1000, text: segment.text }))).sort((a,b)=>a.start-b.start);
+  if (quality.suspicious) {
+    return { transcript, segments, summary: QUALITY_WARNING, decisions: [], tasks: [], questions: [] };
+  }
   const local = buildLocalSummary(transcript);
-  return { transcript, segments, summary: local.summary, decisions: quality.suspicious ? [] : unique([...completed.flatMap((part)=>part.decisions), ...local.decisions]).slice(0,12), tasks: quality.suspicious ? [] : unique([...completed.flatMap((part)=>part.tasks), ...local.tasks]).slice(0,14), questions: quality.suspicious ? [] : unique([...completed.flatMap((part)=>part.questions), ...local.questions]).slice(0,10) };
+  return { transcript, segments, summary: local.summary, decisions: unique([...completed.flatMap((part)=>part.decisions), ...local.decisions]).slice(0,12), tasks: unique([...completed.flatMap((part)=>part.tasks), ...local.tasks]).slice(0,14), questions: unique([...completed.flatMap((part)=>part.questions), ...local.questions]).slice(0,10) };
 }
 
 export function pendingMeetingParts(parts: MeetingPart[]) {
