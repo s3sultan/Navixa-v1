@@ -133,3 +133,23 @@ jobs:
               sleep 3
             done
           done
+
+      - name: Verify production security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl --fail --silent --show-error --max-time 15 --head https://navixasa.com/ > "$headers"
+
+          grep -Eqi '^strict-transport-security:' "$headers"
+          grep -Eqi '^content-security-policy:' "$headers"
+          grep -Eqi '^x-content-type-options:[[:space:]]*nosniff' "$headers"
+          grep -Eqi '^referrer-policy:' "$headers"
+          grep -Eqi '^permissions-policy:' "$headers"
+
+          if grep -Eqi '^server:.*(express|next|node)' "$headers"; then
+            echo "Unexpected framework/server fingerprint exposed"
+            exit 1
+          fi
+
+          echo "PASS production security headers"
