@@ -8,10 +8,7 @@ type WorkerRequest = {
   language: "auto" | "ar" | "en";
 };
 
-type ModelChoice = {
-  id: string;
-  dtype: "q8" | "q4";
-};
+type ModelChoice = { id: string; dtype: "q8" | "q4" };
 
 const MODELS: Record<"tiny" | "base", ModelChoice> = {
   tiny: { id: "Xenova/whisper-tiny", dtype: "q8" },
@@ -32,20 +29,40 @@ type TransformersRuntime = {
 };
 let runtimePromise: Promise<TransformersRuntime> | null = null;
 
-function send(payload: Record<string, unknown>) {
-  self.postMessage(payload);
+function send(payload: Record<string, unknown>) { self.postMessage(payload); }
+
+function normalizeArabicTranscript(text: string) {
+  return text
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+    .replace(/\s+([،؛؟.!])/g, "$1")
+    .replace(/([،؛؟.!])(?=[\p{L}\p{N}])/gu, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function collapseAdjacentDuplicateSegments(segments: Array<{ start: number; end: number; text: string }>) {
+  const result: typeof segments = [];
+  for (const segment of segments) {
+    const text = normalizeArabicTranscript(segment.text);
+    if (!text) continue;
+    const previous = result[result.length - 1];
+    const key = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const previousKey = previous?.text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    if (previous && key && key === previousKey) {
+      previous.end = Math.max(previous.end, segment.end);
+      continue;
+    }
+    result.push({ ...segment, text });
+  }
+  return result;
 }
 
 async function getTranscriber(model: "tiny" | "base") {
   if (transcriber && activeModelKey === model) return transcriber;
   const choice = MODELS[model];
   send({ type: "state", state: "loading-runtime", message: "جارٍ تنزيل محرك التفريغ لمرة واحدة إلى جهازك…" });
-  // يبقى هذا الاستيراد عنوانًا خارجيًا حتى لا تدخل ملفات ONNX/WASM الضخمة في Worker الإنتاجي.
-  // لا تُنقل بيانات الصوت إلى هذا العنوان؛ الاستيراد يحمّل المحرك فقط داخل Web Worker للمتصفح.
   runtimePromise ||= import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm") as unknown as Promise<TransformersRuntime>;
   const runtime = await runtimePromise;
-  // يمر تنزيل ملفات النموذج العامة فقط عبر وكيل NAVIXA بنفس الأصل؛ لا يمرر الوكيل
-  // الصوت أو النص أو أي معرّف للمستخدم. تطابق نسخة WASM إصدار ONNX Runtime في المكتبة.
   runtime.env.remoteHost = self.location.origin + "/";
   runtime.env.remotePathTemplate = "api/local-stt-model/{model}/resolve/{revision}/";
   runtime.env.allowRemoteModels = true;
@@ -73,20 +90,25 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
     send({ type: "state", state: "transcribing", message: "جارٍ تحويل الصوت إلى نص داخل جهازك…" });
     const options: Record<string, unknown> = {
       task: "transcribe",
-      chunk_length_s: 30,
-      stride_length_s: 5,
+      chunk_length_s: event.data.model === "base" ? 25 : 20,
+      stride_length_s: 4,
       return_timestamps: true,
+      condition_on_prev_tokens: false,
+      no_repeat_ngram_size: 3,
+      repetition_penalty: 1.12,
     };
-    // عند اختيار «تلقائي» لا نفرض لغة واحدة على Whisper، فتتحسن الجلسات المختلطة عربي/English.
     if (event.data.language === "ar") options.language = "arabic";
     if (event.data.language === "en") options.language = "english";
     const output = await worker(event.data.audio, options) as { text?: string; chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }> };
-    const segments = (output.chunks || []).map((chunk) => ({
+    const rawSegments = (output.chunks || []).map((chunk) => ({
       start: Number(chunk.timestamp?.[0] || 0),
       end: Number(chunk.timestamp?.[1] || chunk.timestamp?.[0] || 0),
       text: String(chunk.text || "").trim(),
-    })).filter((chunk) => chunk.text);
-    send({ type: "complete", partId: event.data.partId, transcript: String(output.text || "").trim(), segments });
+    }));
+    const segments = collapseAdjacentDuplicateSegments(rawSegments);
+    const transcriptFromSegments = segments.map((segment) => segment.text).join(" ");
+    const transcript = normalizeArabicTranscript(transcriptFromSegments || String(output.text || ""));
+    send({ type: "complete", partId: event.data.partId, transcript, segments });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";
     send({ type: "error", partId: event.data.partId, message: "تعذر تشغيل التفريغ المحلي. تحقق من الاتصال لأول تنزيل للنموذج أو من ذاكرة الجهاز.", detail });
