@@ -1,0 +1,1 @@
+export default function AdaptivePreview(){return <main style={{minHeight:"100dvh",padding:0,margin:0}}><iframe title="NAVIXA Adaptive Preview" src="/adaptive-preview.html" style={{display:"block",width:"100%",height:"100dvh",border:0}}/></main>}
