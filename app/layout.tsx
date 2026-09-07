@@ -13,6 +13,7 @@ import "./public-pricing.css";
 import "./pricing-header-shortcut.css";
 import "./worship-smart.css";
 import "./visitor-counter.css";
+import "./adaptive.css";
 
 const siteUrl = "https://navixasa.com";
 
