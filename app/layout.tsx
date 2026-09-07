@@ -8,6 +8,7 @@ import DirectEntry from "./DirectEntry";
 import PricingHeaderShortcut from "./PricingHeaderShortcut";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
+import "./adaptive.css";
 import "./direct-entry.css";
 import "./public-pricing.css";
 import "./pricing-header-shortcut.css";
