@@ -14,16 +14,19 @@ const DEFAULT_RETENTION_DAYS: Record<MemoryKind, number | null> = {
   context: 30,
 };
 
-const NEVER_INFER_PATTERNS = [
+const NEVER_STORE_PATTERNS = [
   /password/i,
   /passcode/i,
   /secret/i,
   /api[_ -]?key/i,
   /credit card/i,
+  /card number/i,
   /cvv/i,
   /otp/i,
   /رمز التحقق/i,
   /كلمة المرور/i,
+  /كلمة السر/i,
+  /رقم البطاقة/i,
 ];
 
 export function canReadMemory(
@@ -45,12 +48,7 @@ export function isExpiredMemory(memory: NavixaMemory, now = new Date()): boolean
 export function shouldRejectMemoryWrite(input: MemoryWriteInput): boolean {
   const content = input.content.trim();
   if (!content) return true;
-
-  if (input.source === "assistant_inferred") {
-    return NEVER_INFER_PATTERNS.some((pattern) => pattern.test(content));
-  }
-
-  return false;
+  return NEVER_STORE_PATTERNS.some((pattern) => pattern.test(content));
 }
 
 export function resolveMemoryExpiry(
