@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import "./sultan-class-pilot.css";
 
 type ClassItem={code:string;name:string;days:number[];start:string;end:string};
+type Session={signedIn:boolean;user?:{email?:string}|null};
+const PILOT_EMAIL="s2shug@gmail.com";
 const classes:ClassItem[]=[
   {code:"101",name:"الفيزياء العامة 1",days:[0,2],start:"15:00",end:"15:50"},
   {code:"232",name:"البرمجة كائنية التوجه",days:[1,3],start:"16:00",end:"16:50"},
@@ -30,11 +32,14 @@ function calendarFile(){
   return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//NAVIXA//Class Pilot//AR","CALSCALE:GREGORIAN","METHOD:PUBLISH",...events,"END:VCALENDAR"].join("\r\n");
 }
 export default function SultanClassPilot(){
-  // Private pilot guard: deliberately off for everyone unless this browser is explicitly enrolled.
-  const [enabled,setEnabled]=useState(false);const [now,setNow]=useState(()=>new Date());
-  useEffect(()=>{setEnabled(localStorage.getItem("navixa-sultan-class-pilot")==="enabled");const id=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(id)},[]);
+  const [authorized,setAuthorized]=useState(false);const [checked,setChecked]=useState(false);const [now,setNow]=useState(()=>new Date());
+  useEffect(()=>{
+    let live=true;
+    fetch("/api/account/session",{cache:"no-store",credentials:"same-origin"}).then(r=>r.json()).then((s:Session)=>{if(!live)return;const email=s?.user?.email?.trim().toLowerCase();setAuthorized(Boolean(s.signedIn&&email===PILOT_EMAIL));setChecked(true)}).catch(()=>{if(live){setAuthorized(false);setChecked(true)}});
+    const id=setInterval(()=>setNow(new Date()),30000);return()=>{live=false;clearInterval(id)};
+  },[]);
   const next=useMemo(()=>classes.map(item=>({item,date:nextOccurrence(item,now)})).filter(x=>x.date).sort((a,b)=>+a.date!-+b.date!)[0],[now]);
-  if(!enabled||!next?.date)return null;
+  if(!checked||!authorized||!next?.date)return null;
   const mins=Math.max(0,Math.round((+next.date-+now)/60000));
   const addCalendar=()=>{const blob=new Blob([calendarFile()],{type:"text/calendar;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="NAVIXA-جدولي-2026.ics";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
   return <section className="nx-class-pilot" aria-label="كلاسي القادم"><div><small>تجربة خاصة · كلاسي القادم</small><strong>{next.item.name}</strong><span>{dayNames[next.date.getDay()]} · {next.item.start} - {next.item.end} · عن بُعد</span><b>{mins<60?`باقي ${mins} دقيقة`:`الساعة ${next.item.start}`}</b></div><button onClick={addCalendar}>إضافة الجدول لتقويم iPhone</button></section>;
