@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server.js";
-import { resolveUserSession, type D1Database } from "../../../../../worker/userAuth.ts";
+import { resolveUserSession, type D1Database } from "../../../../worker/userAuth.ts";
 import { isNavixaPilotEmail } from "../../../config/pilot-user.ts";
 
 type WorkerBinding = { env?: { DB?: D1Database } };
