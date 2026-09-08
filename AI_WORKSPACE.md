@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: تنفيذ محرك تنبيهات تعليق الدراسة الرسمي وربطه بـ Telegram وWeb Push مع استهداف محافظ ومنع التكرار
 - الحالة: يعمل
-- الملفات المحجوزة: `worker/generalPush.ts`, `worker/studySuspension.ts`, `tests/study-suspension.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الملفات المحجوزة: `worker/generalPush.ts`, `worker/studySuspension.ts`, `tests/study-suspension.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
@@ -24,7 +24,7 @@
 - آخر تحقق: مراجعة الفرق ونجاح `git diff --check`؛ التحقق الحي النهائي يتم عبر GitHub Actions بعد اعتماد الدمج.
 - استبدال اختبارات قالب المعاينة المحذوف باختبار تصيير صفحة NAVIXA الحالية وبياناتها الوصفية واتجاهها العربي، وفق مراجعة Gemini وبعد التحقق من الكود الفعلي.
 - آخر تحقق: نجح بناء `vinext` واختبار `tests/rendered-html.test.mjs` محليًا على Windows؛ اختبار واحد ناجح وصفر فشل.
-- اجتاز جسر Gemini اختبار المهمة الحي #3 كاملًا: استلم المهمة على commit `99ab81b78b08b3fe2c5d68449122393dfb70f454` وأعاد تقريرًا إلى الـIssue دون تطبيق أو دمج أو نشر من Gemini.
+- اجتاز جسر Gemini Task Bridge اختبار المهمة الحي #3 كاملًا: استلم المهمة على commit `99ab81b78b08b3fe2c5d68449122393dfb70f454` وأعاد تقريرًا إلى الـIssue دون تطبيق أو دمج أو نشر من Gemini.
 - نجح تشغيل `Gemini Task Bridge` رقم `31596708880`، ونجح تشغيل `Deploy NAVIXA` رقم `31596693053` لنفس النسخة.
 - إنشاء جسر Gemini API محكوم يعيد تقريره إلى GitHub، ويرسل فقط نص المهمة ومقتطفات نصية محدودة من الملفات المذكورة صراحة في النطاق.
 - حفظ مفتاح Gemini الحالي داخل GitHub Secret ضمن مشروع Free tier، دون تفعيل فوترة أو كشف المفتاح.
