@@ -1,4 +1,4 @@
-import type { AiRouteRequest } from "./router";
+import type { AiRouteRequest } from "./router.ts";
 
 const MAX_TEXT_LENGTH = 40_000;
 const SECRET_PATTERNS = [

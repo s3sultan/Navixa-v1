@@ -1,7 +1,9 @@
-import { canUseAi, getAiBudgetPolicy, type AiUsageSnapshot } from "./budget";
-import { resolveAiAccess, type NavixaDb } from "./access";
-import { routeAiRequest, type AiRouteRequest } from "./router";
-import { validateAiInput } from "./security";
+import { canUseAi, getAiBudgetPolicy, type AiUsageSnapshot } from "./budget.ts";
+import { resolveAiAccess, type NavixaDb } from "./access.ts";
+import { retrieveMemories } from "./memory/retrieval.ts";
+import type { MemoryStore, NavixaMemory } from "./memory/types.ts";
+import { routeAiRequest, type AiRouteRequest } from "./router.ts";
+import { validateAiInput } from "./security.ts";
 
 export async function authorizeAiRequest(input: {
   db: NavixaDb;
@@ -9,6 +11,7 @@ export async function authorizeAiRequest(input: {
   route: AiRouteRequest;
   text: string;
   usage: AiUsageSnapshot;
+  memory?: { store: MemoryStore; includeCore?: boolean; limit?: number };
 }) {
   const safe = validateAiInput(input.text);
   if (!safe.ok) return { allowed: false as const, reason: safe.reason || "invalid-input" };
@@ -25,9 +28,36 @@ export async function authorizeAiRequest(input: {
     tier = policy.allowedTiers.includes("balanced") ? "balanced" : "economy";
   }
 
-  const estimatedTokens = Math.max(1, input.route.estimatedInputTokens || Math.ceil(input.text.length / 4)) + route.maxOutputTokens;
-  const budget = canUseAi(policy, input.usage, tier, estimatedTokens);
-  if (!budget.allowed) return { allowed: false as const, reason: budget.reason || "budget-denied" };
+  const baseEstimatedTokens = Math.max(1, input.route.estimatedInputTokens || Math.ceil(input.text.length / 4)) + route.maxOutputTokens;
+  const baseBudget = canUseAi(policy, input.usage, tier, baseEstimatedTokens);
+  if (!baseBudget.allowed) return { allowed: false as const, reason: baseBudget.reason || "budget-denied" };
+
+  let memories: NavixaMemory[] = [];
+  let estimatedTokens = baseEstimatedTokens;
+
+  if (input.memory) {
+    try {
+      const memoryQuery = {
+        userId: input.identity.userId,
+        project: input.route.project,
+        text: input.text,
+        includeCore: input.memory.includeCore ?? true,
+        includeRestricted: false,
+        limit: input.memory.limit ?? 8,
+      } as const;
+      const candidates = await input.memory.store.list(memoryQuery);
+      const safeCandidates = retrieveMemories(candidates, memoryQuery);
+      const memoryTokens = Math.ceil(safeCandidates.reduce((total, memory) => total + memory.content.length, 0) / 4);
+      const withMemoryTokens = baseEstimatedTokens + memoryTokens;
+      if (canUseAi(policy, input.usage, tier, withMemoryTokens).allowed) {
+        memories = safeCandidates;
+        estimatedTokens = withMemoryTokens;
+      }
+    } catch {
+      memories = [];
+      estimatedTokens = baseEstimatedTokens;
+    }
+  }
 
   return {
     allowed: true as const,
@@ -35,6 +65,7 @@ export async function authorizeAiRequest(input: {
     tier,
     maxOutputTokens: route.maxOutputTokens,
     estimatedTokens,
+    memories,
     routeReason: route.reason,
     accessReason: access.reason,
   };
