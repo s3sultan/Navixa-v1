@@ -6,7 +6,7 @@ import { isFeatureAccessActive, type FeatureAccessSession } from "./featureAcces
 import UsageTracker from "./UsageTracker";
 import "./feature-access.css";
 
-const PUBLIC_FREE_ACCESS_UNTIL = Date.parse("2026-09-13T00:00:00+03:00");
+const PUBLIC_FREE_ACCESS_UNTIL = Date.parse("2026-09-12T16:00:00+03:00");
 
 type AccountSession = FeatureAccessSession & {
   user?: { email?: string } | null;
@@ -44,8 +44,8 @@ export default function FeatureAccessGate({ children, feature = "مزايا NAVI
   const description = unavailable
     ? "نجهّز الدخول الآمن الآن. تبقى الصفحات التعريفية متاحة، بينما المزايا الشخصية تنتظر حتى يكتمل إعداد الحساب."
     : signedIn
-      ? `تحتاج ${feature} إلى تجربة NAVIXA أو اشتراك فعّال. لا نفتح الميكروفون أو مشاركة الشاشة أو بياناتك قبل تفعيل حسابك.`
-      : `تحتاج ${feature} إلى دخول آمن بالبريد ثم تفعيل تجربة NAVIXA أو اشتراكك. لا توجد كلمة مرور، ولا نطلب صلاحيات جهازك قبل ذلك.`;
+      ? `تحتاج ${feature} إلى اشتراك فعّال بعد انتهاء تجربة الإطلاق. لا نفتح الميكروفون أو مشاركة الشاشة أو بياناتك قبل تفعيل حسابك.`
+      : `تحتاج ${feature} إلى دخول آمن بالبريد واشتراك فعّال بعد انتهاء تجربة الإطلاق. لا توجد كلمة مرور، ولا نطلب صلاحيات جهازك قبل ذلك.`;
   const href = unavailable ? "/plus" : signedIn ? "/plus" : "/account";
   const label = unavailable ? "اعرف حالة هِمّة" : signedIn ? "فعّل حسابي" : "دخول أو إنشاء حساب";
 
