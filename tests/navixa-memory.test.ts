@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { authorizeAiRequest } from "../lib/ai/gateway.ts";
 import {
   canReadMemory,
   isExpiredMemory,
@@ -8,7 +9,7 @@ import {
   shouldRejectMemoryWrite,
 } from "../lib/ai/memory/policy.ts";
 import { retrieveMemories } from "../lib/ai/memory/retrieval.ts";
-import type { NavixaMemory } from "../lib/ai/memory/types.ts";
+import type { MemoryStore, NavixaMemory } from "../lib/ai/memory/types.ts";
 
 const base: NavixaMemory = {
   id: "m1",
@@ -37,6 +38,12 @@ test("core memory can be shared into a child project only when allowed", () => {
   assert.equal(canReadMemory(core, "u1", "learning", false), false);
 });
 
+test("meetings uses the same canonical NAVIXA project scope", () => {
+  const meeting = { ...base, project: "meetings" as const };
+  assert.equal(canReadMemory(meeting, "u1", "meetings"), true);
+  assert.equal(canReadMemory(meeting, "u1", "core"), false);
+});
+
 test("expired memories are excluded", () => {
   const expired = { ...base, expiresAt: "2026-08-01T00:00:00.000Z" };
   assert.equal(isExpiredMemory(expired, new Date("2026-09-01T00:00:00.000Z")), true);
@@ -47,6 +54,15 @@ test("expired memories are excluded", () => {
       now: "2026-09-01T00:00:00.000Z",
     }),
     [],
+  );
+});
+
+test("restricted memory never enters retrieval unless explicitly requested", () => {
+  const restricted = { ...base, id: "m2", sensitivity: "restricted" as const };
+  assert.deepEqual(retrieveMemories([restricted], { userId: "u1", project: "kids" }), []);
+  assert.equal(
+    retrieveMemories([restricted], { userId: "u1", project: "kids", includeRestricted: true }).length,
+    1,
   );
 });
 
@@ -76,4 +92,73 @@ test("writes are normalized and confidence is bounded", () => {
   assert.equal(value.content, "تذكير مؤقت");
   assert.equal(value.confidence, 1);
   assert.ok(value.expiresAt);
+});
+
+test("gateway fails open without memory when the memory store is unavailable", async () => {
+  const db = {
+    prepare() {
+      return {
+        bind() {
+          return {
+            async all<T>() {
+              return { results: [] as T[] };
+            },
+          };
+        },
+      };
+    },
+  };
+  const memoryStore: MemoryStore = {
+    async list() { throw new Error("offline"); },
+    async upsert() { throw new Error("not-used"); },
+    async remove() {},
+    async clearProject() {},
+  };
+
+  const result = await authorizeAiRequest({
+    db,
+    identity: { userId: "u1", email: "u1@example.test" },
+    route: { project: "core", task: "chat", userPlan: "free" },
+    text: "رتب يومي",
+    usage: { requestsToday: 0, tokensToday: 0 },
+    memory: { store: memoryStore },
+  });
+
+  assert.equal(result.allowed, true);
+  if (result.allowed) assert.deepEqual(result.memories, []);
+});
+
+test("gateway rechecks memory isolation even if a store returns unsafe candidates", async () => {
+  const db = {
+    prepare() {
+      return {
+        bind() {
+          return {
+            async all<T>() {
+              return { results: [] as T[] };
+            },
+          };
+        },
+      };
+    },
+  };
+  const unsafe = { ...base, userId: "other-user", project: "core" as const };
+  const memoryStore: MemoryStore = {
+    async list() { return [unsafe]; },
+    async upsert() { throw new Error("not-used"); },
+    async remove() {},
+    async clearProject() {},
+  };
+
+  const result = await authorizeAiRequest({
+    db,
+    identity: { userId: "u1", email: "u1@example.test" },
+    route: { project: "kids", task: "explain", userPlan: "free" },
+    text: "اشرح الدرس",
+    usage: { requestsToday: 0, tokensToday: 0 },
+    memory: { store: memoryStore },
+  });
+
+  assert.equal(result.allowed, true);
+  if (result.allowed) assert.deepEqual(result.memories, []);
 });
