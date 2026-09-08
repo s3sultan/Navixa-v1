@@ -19,6 +19,7 @@ export async function authorizeAiRequest(input: {
   const access = await resolveAiAccess(input.db, input.identity, input.route.project);
   if (!access.allowed) return { allowed: false as const, reason: access.reason };
 
+  // The plan comes from NAVIXA's server-side subscription authority, never from the client.
   const route = routeAiRequest({ ...input.route, userPlan: access.plan });
   const policy = getAiBudgetPolicy(access.plan, input.route.project);
 
