@@ -1,5 +1,6 @@
 import { canUseAi, getAiBudgetPolicy, type AiUsageSnapshot } from "./budget";
 import { resolveAiAccess, type NavixaDb } from "./access";
+import type { MemoryStore, NavixaMemory } from "./memory/types";
 import { routeAiRequest, type AiRouteRequest } from "./router";
 import { validateAiInput } from "./security";
 
@@ -9,6 +10,11 @@ export async function authorizeAiRequest(input: {
   route: AiRouteRequest;
   text: string;
   usage: AiUsageSnapshot;
+  memory?: {
+    store: MemoryStore;
+    includeCore?: boolean;
+    limit?: number;
+  };
 }) {
   const safe = validateAiInput(input.text);
   if (!safe.ok) return { allowed: false as const, reason: safe.reason || "invalid-input" };
@@ -25,9 +31,46 @@ export async function authorizeAiRequest(input: {
     tier = policy.allowedTiers.includes("balanced") ? "balanced" : "economy";
   }
 
-  const estimatedTokens = Math.max(1, input.route.estimatedInputTokens || Math.ceil(input.text.length / 4)) + route.maxOutputTokens;
-  const budget = canUseAi(policy, input.usage, tier, estimatedTokens);
-  if (!budget.allowed) return { allowed: false as const, reason: budget.reason || "budget-denied" };
+  const baseEstimatedTokens = Math.max(
+    1,
+    input.route.estimatedInputTokens || Math.ceil(input.text.length / 4),
+  ) + route.maxOutputTokens;
+  const baseBudget = canUseAi(policy, input.usage, tier, baseEstimatedTokens);
+  if (!baseBudget.allowed) {
+    return { allowed: false as const, reason: baseBudget.reason || "budget-denied" };
+  }
+
+  let memories: NavixaMemory[] = [];
+  let estimatedTokens = baseEstimatedTokens;
+
+  if (input.memory) {
+    try {
+      const candidates = await input.memory.store.list({
+        userId: input.identity.userId,
+        project: input.route.project,
+        text: input.text,
+        includeCore: input.memory.includeCore ?? true,
+        includeRestricted: false,
+        limit: input.memory.limit ?? 8,
+      });
+
+      const memoryTokens = Math.ceil(
+        candidates.reduce((total, memory) => total + memory.content.length, 0) / 4,
+      );
+      const withMemoryTokens = baseEstimatedTokens + memoryTokens;
+      const memoryBudget = canUseAi(policy, input.usage, tier, withMemoryTokens);
+
+      // Memory is an enhancement, never a reason to block an otherwise valid request.
+      if (memoryBudget.allowed) {
+        memories = candidates;
+        estimatedTokens = withMemoryTokens;
+      }
+    } catch {
+      // A memory-store failure must not break the core NAVIXA AI path.
+      memories = [];
+      estimatedTokens = baseEstimatedTokens;
+    }
+  }
 
   return {
     allowed: true as const,
@@ -35,6 +78,7 @@ export async function authorizeAiRequest(input: {
     tier,
     maxOutputTokens: route.maxOutputTokens,
     estimatedTokens,
+    memories,
     routeReason: route.reason,
     accessReason: access.reason,
   };
