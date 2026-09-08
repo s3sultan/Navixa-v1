@@ -1,5 +1,5 @@
-import type { AiTier, NavixaProject } from "./router";
-import { getAiBudgetPolicy } from "./budget";
+import type { AiTier, NavixaProject } from "./router.ts";
+import { getAiBudgetPolicy } from "./budget.ts";
 
 export type NavixaDb = {
   prepare: (sql: string) => {
