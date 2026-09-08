@@ -1,13 +1,13 @@
 # NAVIXA — مساحة العمل المشتركة
 
-آخر تحديث: 2026-09-07
+آخر تحديث: 2026-09-09
 
 ## حالة العمل
 
 - الوكيل النشط: ChatGPT
-- المهمة الحالية: تنفيذ تجربة NAVIXA المتكيفة Adaptive Responsive Design ومعالجة فراغ الجوال
+- المهمة الحالية: تنفيذ محرك تنبيهات تعليق الدراسة الرسمي وربطه بـ Telegram وWeb Push مع استهداف محافظ ومنع التكرار
 - الحالة: يعمل
-- الملفات المحجوزة: `app/page.tsx`, `app/navixa.css`, `app/adaptive.css`, `app/layout.tsx`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`, `PROJECT_MEMORY.md`
+- الملفات المحجوزة: `worker/generalPush.ts`, `worker/studySuspension.ts`, `tests/study-suspension.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
@@ -52,7 +52,7 @@
 
 ## التالي المقترح
 
-- تنفيذ طبقة Adaptive Responsive مستقلة للجوال واللوحي وiPad والكمبيوتر، ثم اختبار مصفوفة المقاسات الفعلية قبل الدمج.
+- إكمال محرك تعليق الدراسة على فرع معزول، اختباره ضد الاستهداف الخاطئ والتكرار، ثم عرضه للمراجعة دون نشر إنتاجي.
 
 ## بروتوكول التنسيق
 
