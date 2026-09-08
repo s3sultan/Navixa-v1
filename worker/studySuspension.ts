@@ -99,6 +99,12 @@ function hasScopeMatch(profileValue: string | undefined, ids: readonly string[])
   return Boolean(profileValue && normalizedIds(ids).has(profileValue));
 }
 
+function matchesAudience(profile: StudySuspensionProfile, audience: StudySuspensionAudience) {
+  if (audience === "all") return true;
+  if (audience === "students") return profile.role === "student";
+  return profile.role === "staff";
+}
+
 export function isOfficialStudySuspensionEvent(event: StudySuspensionEvent) {
   if (!event.id.trim() || !event.sourcePostId.trim() || !event.source.entityId.trim() || !event.source.name.trim()) return false;
   if (!event.source.verified || !dispatchableVerification.has(event.verification)) return false;
@@ -115,7 +121,7 @@ export function matchesStudySuspensionEvent(profile: StudySuspensionProfile, eve
   if (event.educationType !== "all" && profile.educationType !== event.educationType) return false;
   if (event.source.entityType === "education_admin" && profile.educationType !== "general") return false;
   if (event.source.entityType === "university" && profile.educationType !== "higher") return false;
-  if (event.audience !== "all" && profile.role !== event.audience.slice(0, -1)) return false;
+  if (!matchesAudience(profile, event.audience)) return false;
 
   switch (event.scope.type) {
     case "national":
@@ -140,7 +146,6 @@ export function studySuspensionDedupKey(event: StudySuspensionEvent) {
     event.source.entityId.trim(),
     event.sourcePostId.trim(),
     event.decisionType,
-    event.rawTextHash?.trim() || "nohash",
   ].join(":");
 }
 
