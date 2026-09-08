@@ -1,5 +1,6 @@
 import { canUseAi, getAiBudgetPolicy, type AiUsageSnapshot } from "./budget";
 import { resolveAiAccess, type NavixaDb } from "./access";
+import { retrieveMemories } from "./memory/retrieval";
 import type { MemoryStore, NavixaMemory } from "./memory/types";
 import { routeAiRequest, type AiRouteRequest } from "./router";
 import { validateAiInput } from "./security";
@@ -45,24 +46,26 @@ export async function authorizeAiRequest(input: {
 
   if (input.memory) {
     try {
-      const candidates = await input.memory.store.list({
+      const memoryQuery = {
         userId: input.identity.userId,
         project: input.route.project,
         text: input.text,
         includeCore: input.memory.includeCore ?? true,
         includeRestricted: false,
         limit: input.memory.limit ?? 8,
-      });
+      } as const;
+      const candidates = await input.memory.store.list(memoryQuery);
+      const safeCandidates = retrieveMemories(candidates, memoryQuery);
 
       const memoryTokens = Math.ceil(
-        candidates.reduce((total, memory) => total + memory.content.length, 0) / 4,
+        safeCandidates.reduce((total, memory) => total + memory.content.length, 0) / 4,
       );
       const withMemoryTokens = baseEstimatedTokens + memoryTokens;
       const memoryBudget = canUseAi(policy, input.usage, tier, withMemoryTokens);
 
       // Memory is an enhancement, never a reason to block an otherwise valid request.
       if (memoryBudget.allowed) {
-        memories = candidates;
+        memories = safeCandidates;
         estimatedTokens = withMemoryTokens;
       }
     } catch {
