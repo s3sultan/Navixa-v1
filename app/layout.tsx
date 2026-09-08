@@ -6,6 +6,7 @@ import VisitorCounter from "./VisitorCounter";
 import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import PricingHeaderShortcut from "./PricingHeaderShortcut";
+import SultanClassPilot from "./SultanClassPilot";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
 import "./direct-entry.css";
@@ -40,5 +41,5 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter /><VisitorReporter />{children}<VisitorCounter /><PricingHeaderShortcut /></body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter /><VisitorReporter /><SultanClassPilot />{children}<VisitorCounter /><PricingHeaderShortcut /></body></html>;
 }
