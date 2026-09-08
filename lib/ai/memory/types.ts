@@ -1,4 +1,4 @@
-import type { NavixaProject } from "../router";
+import type { NavixaProject } from "../router.ts";
 
 export type NavixaProjectScope = NavixaProject;
 
