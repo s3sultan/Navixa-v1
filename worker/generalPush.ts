@@ -1,7 +1,7 @@
 import webpush from "web-push";
 import { readRuntimeSecrets } from "./runtimeEnv";
 
-export type FeaturePushKind = "name_heard" | "screen_watch" | "security" | "billing" | "general";
+export type FeaturePushKind = "name_heard" | "screen_watch" | "security" | "billing" | "study_suspension" | "general";
 
 type Subscription = { endpoint:string; p256dh:string; auth:string };
 type PushPayload = {
