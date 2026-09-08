@@ -5,12 +5,12 @@ import { useEffect, useState } from "react";
 import "./class-schedule-shortcut.css";
 
 const SultanClassPilot=dynamic(()=>import("./SultanClassPilot"),{ssr:false});
-type Session={signedIn?:boolean;user?:{email?:string}|null};
-const PILOT_EMAIL="s2shug@gmail.com";
+
+type PilotResponse={enabled?:boolean};
 
 export default function ClassScheduleShortcut(){
   const [allowed,setAllowed]=useState(false);const [open,setOpen]=useState(false);
-  useEffect(()=>{let live=true;fetch("/api/account/session",{cache:"no-store",credentials:"same-origin"}).then(r=>r.ok?r.json():null).then((s:Session|null)=>{if(!live)return;setAllowed(Boolean(s?.signedIn&&s.user?.email?.trim().toLowerCase()===PILOT_EMAIL))}).catch(()=>{});return()=>{live=false}},[]);
+  useEffect(()=>{let live=true;fetch("/api/pilots/class-schedule",{cache:"no-store",credentials:"same-origin"}).then(async r=>r.ok?await r.json() as PilotResponse:null).then(data=>{if(live)setAllowed(Boolean(data?.enabled))}).catch(()=>{if(live)setAllowed(false)});return()=>{live=false}},[]);
   if(!allowed)return null;
   return <div className="nx-schedule-shortcut-wrap">
     <button type="button" className="nx-schedule-shortcut" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-controls="nx-private-schedule">
