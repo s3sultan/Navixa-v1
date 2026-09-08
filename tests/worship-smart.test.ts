@@ -49,7 +49,8 @@ assert.match(styles,/quran-verse-tap span/);
 assert.match(autoDeploy,/push:\s*\n\s*branches: \[master\]/);
 assert.match(autoDeploy,/npm audit --omit=dev --audit-level=high/);
 assert.match(autoDeploy,/zizmor/);
-assert.match(autoDeploy,/gitleaks\/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7/);
+assert.match(autoDeploy,/gitleaks\/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e\s+# v3\.0\.0/);
+assert.doesNotMatch(autoDeploy,/gitleaks\/gitleaks-action@v3/);
 assert.match(autoDeploy,/Production smoke test/);
 
 console.log("smart worship, shared prayer location, and automatic verified deployment contract: ok");
