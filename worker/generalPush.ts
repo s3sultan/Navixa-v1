@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { readRuntimeSecrets } from "./runtimeEnv";
+import { readRuntimeSecrets } from "./runtimeEnv.ts";
 
 export type FeaturePushKind = "name_heard" | "screen_watch" | "security" | "billing" | "study_suspension" | "general";
 
