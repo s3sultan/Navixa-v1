@@ -1,4 +1,4 @@
-import type { AiTier, NavixaProject } from "./router";
+import type { AiTier, NavixaProject } from "./router.ts";
 
 export interface AiBudgetPolicy {
   dailyRequestLimit: number;
