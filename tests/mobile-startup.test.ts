@@ -17,7 +17,9 @@ test("direct-entry hides welcome before hydration and persists the real preferen
     readFile(new URL("app/direct-entry.css", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
   ]);
-  assert.match(directEntryStyles, /\.welcome,\s*\n\s*html\[data-navixa-direct-entry=/);
+  assert.match(directEntryStyles, /\.welcome,\s*\n\.welcome-screen,\s*\n\.welcome-overlay,\s*\n\.welcome-gate\s*\{/);
+  assert.doesNotMatch(directEntryStyles, /data-navixa-direct-entry=\"true\"\]\s+\.welcome-screen/);
+  assert.match(directEntryStyles, /html\[data-navixa-direct-entry=\"true\"\]\s+\.entry-gate/);
   assert.match(layout, /import "\.\/direct-entry\.css";/);
   assert.match(directEntry, /localStorage\.setItem\("navixa-hide-welcome", "1"\)/);
   assert.match(directEntry, /document\.documentElement\.dataset\.navixaDirectEntry = "true"/);
