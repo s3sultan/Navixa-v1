@@ -1,8 +1,6 @@
-export type NavixaProjectScope =
-  | "core"
-  | "kids"
-  | "learning"
-  | "fitness";
+import type { NavixaProject } from "../router";
+
+export type NavixaProjectScope = NavixaProject;
 
 export type MemoryKind =
   | "preference"
@@ -44,6 +42,7 @@ export interface MemoryQuery {
   limit?: number;
   now?: string;
   includeCore?: boolean;
+  includeRestricted?: boolean;
 }
 
 export interface MemoryWriteInput {
