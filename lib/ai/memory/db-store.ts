@@ -28,7 +28,11 @@ type MemoryRow = {
 };
 
 export class NavixaDbMemoryStore implements MemoryStore {
-  constructor(private readonly db: MemorySqlDb) {}
+  private readonly db: MemorySqlDb;
+
+  constructor(db: MemorySqlDb) {
+    this.db = db;
+  }
 
   async list(query: MemoryQuery): Promise<NavixaMemory[]> {
     const includeCore = query.includeCore ?? true;
