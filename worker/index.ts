@@ -12,6 +12,7 @@ import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics"
 import { runWeeklySiteHealthCheck } from "./siteHealth";
 import { portfolioJwksFromPrivateKey } from "./portfolioAccess";
 import { pruneClosedSupportTickets } from "./supportTickets";
+import { pollStudySuspensionTestRecipients } from "./studySuspensionPoll";
 
 interface Env {
   ASSETS: Fetcher;
@@ -24,6 +25,7 @@ interface Env {
   NAVIXA_AUTH_FROM?: string;
   NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
   NAVIXA_PORTFOLIO_PRIVATE_JWK?: string;
+  X_API_BEARER_TOKEN?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -165,9 +167,6 @@ function applyBrowserSecurityHeaders(response: Response) {
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "geolocation=(), usb=(), serial=(), accelerometer=(), gyroscope=(), magnetometer=()");
-  // Enforce navigation/embed controls plus inline event-handler blocking now.
-  // Keep framework resource allowlists report-only until staging proves that
-  // removing unsafe-inline from script/style elements will not break NAVIXA.
   response.headers.set("Content-Security-Policy", CSP_ENFORCED);
   response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return response;
@@ -200,22 +199,15 @@ function rateLimitedResponse(retryAfterSeconds: number) {
 
 async function publicMutationGuard(request: Request, url: URL, env: Env) {
   if (!Object.hasOwn(publicMutationLimits, url.pathname) || !["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return null;
-  // CSP violation reports are sent by the browser and may omit Origin. Their
-  // dedicated receiver logs only a directive/source host and is rate-limited.
   if (url.pathname !== "/api/security/csp-report" && !isTrustedSameOriginRequest(request)) {
     return new Response(JSON.stringify({ error: "مصدر الطلب غير موثوق" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   }
 
   const ip = clientIp(request);
   const limit = publicMutationLimits[url.pathname];
-
-  // Layer 1: immediate per-isolate protection. This also remains as an
-  // availability-safe fallback if the shared database is temporarily unavailable.
   const local = publicMutationLimiter.consume(`${url.pathname}:${ip}`, limit, 60_000);
   if (!local.allowed) return rateLimitedResponse(local.retryAfterSeconds);
 
-  // Layer 2: shared D1 bucket. The same counter is observed by every Worker
-  // isolate, closing the gap where an attacker could spread requests across them.
   const pepper = await resolveAdminJwtSecret();
   if (pepper) {
     const shared = await consumeAuthRateLimit(
@@ -265,8 +257,6 @@ function utcFiveMinuteBucket(date: Date) {
 }
 
 async function aggregatePerformanceWindows(env: Env) {
-  // The current bucket is still receiving beacons. Aggregate the last completed
-  // five-minute window and retain only short-lived anonymous raw samples.
   const now = new Date();
   const bucket = utcFiveMinuteBucket(new Date(now.getTime() - PERFORMANCE_BUCKET_MINUTES * 60_000));
   const bucketStart = bucket.toISOString();
@@ -318,8 +308,6 @@ async function aggregatePerformanceWindows(env: Env) {
     }));
   }
 
-  // Short retention keeps the raw source anonymous and inexpensive. Aggregates
-  // remain available for the operational dashboard and long-term comparisons.
   if (now.getUTCMinutes() % 15 === 0) {
     const rawCutoff = new Date(now.getTime() - 2 * 60 * 60_000).toISOString();
     const aggregateCutoff = new Date(now.getTime() - 30 * 24 * 60 * 60_000).toISOString();
@@ -342,6 +330,7 @@ const worker = {
     ctx.waitUntil(scanUsageAnalyticsAlerts(env).then(result => console.log(JSON.stringify({ event: "usage_analytics_alert_scan", ...result }))).catch(error => console.log(JSON.stringify({ event: "usage_analytics_alert_scan_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(runWeeklySiteHealthCheck(env).then(result => console.log(JSON.stringify({ event: "weekly_site_health", ...result }))).catch(error => console.log(JSON.stringify({ event: "weekly_site_health_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(pruneClosedSupportTickets(env.DB).catch(error => console.log(JSON.stringify({ event: "support_ticket_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(pollStudySuspensionTestRecipients(env).then(result => console.log(JSON.stringify({ event: "study_suspension_test_poll", ...result }))).catch(error => console.log(JSON.stringify({ event: "study_suspension_test_poll_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
