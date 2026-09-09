@@ -12,6 +12,7 @@ import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics"
 import { runWeeklySiteHealthCheck } from "./siteHealth";
 import { portfolioJwksFromPrivateKey } from "./portfolioAccess";
 import { pruneClosedSupportTickets } from "./supportTickets";
+import { pollStudySuspensionTestRecipients } from "./studySuspensionPoll";
 
 interface Env {
   ASSETS: Fetcher;
@@ -24,6 +25,7 @@ interface Env {
   NAVIXA_AUTH_FROM?: string;
   NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
   NAVIXA_PORTFOLIO_PRIVATE_JWK?: string;
+  X_API_BEARER_TOKEN?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -342,6 +344,7 @@ const worker = {
     ctx.waitUntil(scanUsageAnalyticsAlerts(env).then(result => console.log(JSON.stringify({ event: "usage_analytics_alert_scan", ...result }))).catch(error => console.log(JSON.stringify({ event: "usage_analytics_alert_scan_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(runWeeklySiteHealthCheck(env).then(result => console.log(JSON.stringify({ event: "weekly_site_health", ...result }))).catch(error => console.log(JSON.stringify({ event: "weekly_site_health_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(pruneClosedSupportTickets(env.DB).catch(error => console.log(JSON.stringify({ event: "support_ticket_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
+    ctx.waitUntil(pollStudySuspensionTestRecipients(env).then(result => console.log(JSON.stringify({ event: "study_suspension_test_poll", ...result }))).catch(error => console.log(JSON.stringify({ event: "study_suspension_test_poll_failed", message: error instanceof Error ? error.message : "unknown" }))));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
