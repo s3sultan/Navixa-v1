@@ -9,8 +9,8 @@ import type { EmergencyState } from "./emergencyMode.ts";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export const PLAN_B_URL = "https://navixa.s2shug.chatgpt.site";
 const MAX_GRANT_SECONDS = 15 * 60;
+const NAVIXA_ROOT_HOST = "navixasa.com";
 
 type GrantPayload = {
   v: 1;
@@ -35,6 +35,27 @@ function decodeB64url(value: string) {
 async function signingKey(secret: string, usages: KeyUsage[]) {
   if (!secret) throw new Error("missing_plan_b_signing_secret");
   return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, usages);
+}
+
+/**
+ * Plan B must stay on a NAVIXA-controlled HTTPS origin. Invalid, credentialed,
+ * or third-party URLs fail closed so an outage cannot redirect users outside
+ * the NAVIXA trust boundary.
+ */
+export function resolvePlanBUrl(configuredUrl: string | undefined) {
+  const candidate = configuredUrl?.trim();
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    const hostname = url.hostname.toLowerCase();
+    const isNavixaHost = hostname === NAVIXA_ROOT_HOST || hostname.endsWith(`.${NAVIXA_ROOT_HOST}`);
+    if (url.protocol !== "https:" || !isNavixaHost || url.username || url.password) return null;
+    if (url.port && url.port !== "443") return null;
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
 }
 
 export function planBMayOpen(state: EmergencyState) {
