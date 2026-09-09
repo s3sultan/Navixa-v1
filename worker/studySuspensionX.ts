@@ -28,9 +28,11 @@ function cleanText(value: string) {
 export function classifyStudySuspensionDecision(text: string): StudySuspensionDecisionType | null {
   const normalized = text.replace(/[ـًٌٍَُِّْ]/g, "").replace(/\s+/g, " ").trim();
   if (!normalized) return null;
-  if (/(إلغاء|الغاء).{0,40}(تعليق|قرار)|استئناف.{0,40}(الدراسة|الدوام)/i.test(normalized)) return "cancel";
-  if (/تعليق.{0,30}(الدراسة|الدراسة الحضورية|الدوام)|تقرر.{0,30}تعليق/i.test(normalized)) return "suspend";
+  if (/(إلغاء|الغاء).{0,40}(تعليق|قرار|تحويل|تأخير|تاخير)/i.test(normalized)) return "cancel";
+  // A post that suspends in-person classes and explicitly moves them online is
+  // more actionable as a remote-learning event than a generic suspension.
   if (/(تحويل|تكون).{0,50}(عن بعد|عن بُعد|منصة مدرستي)|الدراسة.{0,30}(عن بعد|عن بُعد)/i.test(normalized)) return "remote";
+  if (/تعليق.{0,30}(الدراسة|الدراسة الحضورية|الدوام)|تقرر.{0,30}تعليق/i.test(normalized)) return "suspend";
   if (/(تأخير|تاخير).{0,40}(بداية|بدء|الدراسة|الدوام)/i.test(normalized)) return "delay";
   if (/استئناف.{0,40}(الدراسة|الدوام)/i.test(normalized)) return "resume";
   return null;
