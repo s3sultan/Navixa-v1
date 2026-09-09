@@ -1,0 +1,21 @@
+{
+  "name": "NAVIXA | يفهم يومك",
+  "short_name": "NAVIXA",
+  "description": "مساعد ذكي عربي لتنظيم يومك ومتابعة المحاضرات والاجتماعات والتنبيهات الذكية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
