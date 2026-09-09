@@ -544,3 +544,28 @@ html[data-navixa-theme="dark"] .worship-page{background:linear-gradient(145deg,#
   .mobile-more-panel{display:grid;gap:12px;padding:13px;border-top:1px solid rgba(20,184,170,.14)}.mobile-more-panel>div:first-child{display:grid;gap:3px}.mobile-more-panel small{color:#0b8b7e;font-size:10px;font-weight:800}.mobile-more-panel b{font-size:13px}.mobile-more-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mobile-more-links>a,.mobile-more-links>button{min-height:44px;padding:8px;border:1px solid rgba(20,184,170,.16);border-radius:12px;background:#fff;color:#31555b;text-decoration:none;font:700 11px "Alexandria",sans-serif;cursor:pointer;touch-action:manipulation}.mobile-more-links>button:last-child{grid-column:1/-1;background:linear-gradient(135deg,#0b8e82,#7660ba);color:#fff;border:0}
   .nx-page{width:min(100% - 22px,560px)!important;margin-top:0!important}.navixa-topbar,.nx-greeting,.priority-heading,.priority-feature-grid,.privacy-promise,.member-platform-ribbon,.matches-ribbon,.launch-tools-toggle,.launch-secondary-tools,.secondary-paths,.secondary-footer-tools{display:none!important}.navixa-command-center{margin:0!important;padding:0!important;min-height:0!important;background:transparent!important;border:0!important;box-shadow:none!important}.navixa-command-center>.academic-capture-card{margin-top:14px!important}.nx-page>section[hidden]{display:none!important}.nx-page>.contact{margin-top:24px!important}.nx-page>.contact .contact-description{display:none!important}.nx-public-footer-shell{margin-top:18px!important}
 }
+
+
+/* NAVIXA Micro Interactions: listener */
+.listener-feature .priority-icon,
+.listener-feature .priority-cta,
+.assistant-tool-actions button,
+.assistant-heard-preview strong { transition: transform 160ms ease, box-shadow 180ms ease, opacity 180ms ease; }
+.listener-feature .priority-cta:active,
+.assistant-tool-actions button:active { transform: scale(.98); }
+.listener-feature.active .priority-icon { animation: navixa-listener-pulse 1.8s ease-in-out infinite; }
+.assistant-heard-preview strong { animation: navixa-heard-highlight 520ms ease-out 1; }
+@keyframes navixa-listener-pulse {
+  0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(44,148,137,.18); }
+  50% { transform: scale(1.035); box-shadow: 0 0 0 10px rgba(44,148,137,0); }
+}
+@keyframes navixa-heard-highlight {
+  from { transform: translateY(2px); opacity: .72; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listener-feature .priority-icon,
+  .listener-feature .priority-cta,
+  .assistant-tool-actions button,
+  .assistant-heard-preview strong { animation: none !important; transition: none !important; }
+}

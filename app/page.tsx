@@ -25,6 +25,8 @@ import { betaUsageLabel, betaUsageRemaining, consumeBetaUsage } from "./betaUsag
 import { captureAcademicDate, type AcademicCapture } from "./academicCapture";
 import { readAcademicReminders, type AcademicReminder } from "./academicReminders";
 import type { PublicRuntimeFeatures } from "./runtimeFeatures";
+import { createNavixaBrowserVoiceEngine, type NavixaVoiceEngine } from "./voice/voiceEngine";
+import { findNavixaVoiceTerm, splitNavixaVoiceTerms } from "./voice/voiceDetection";
 
 const FloatingAssistant = dynamic(() => import("./FloatingAssistant"), { ssr: false });
 const GameAdBox = dynamic(() => import("./GameAdBox"), { ssr: false });
@@ -158,7 +160,7 @@ export default function Home(){
   const [matchDisplay,setMatchDisplay]=useState<MatchDisplaySettings>(DEFAULT_MATCH_DISPLAY);
   const [selectedMatch,setSelectedMatch]=useState<FootballMatch|null>(null);
   const [matchNow,setMatchNow]=useState(()=>Date.now());
-  const recognitionRef=useRef<any>(null);
+  const voiceEngineRef=useRef<NavixaVoiceEngine|null>(null);
   const listeningRequestedRef=useRef(false);
   const watchTermsRef=useRef("");
   const screenRef=useRef<MediaStream|null>(null);
@@ -216,7 +218,7 @@ export default function Home(){
   useEffect(()=>{if(ready)localStorage.setItem("navixa-tutorials-hidden",JSON.stringify(tutorialHidden))},[tutorialHidden,ready]);
   const hideTutorial=(key:TutorialKey)=>{setTutorialHidden(current=>({...current,[key]:true}));setTutorialOpen(null);notify("لن يظهر هذا الشرح تلقائيًا مرة أخرى")};
   const restoreTutorial=(key:TutorialKey)=>setTutorialHidden(current=>({...current,[key]:false}));
-  useEffect(()=>()=>{listeningRequestedRef.current=false;recognitionRef.current?.abort();recognitionRef.current=null},[]);
+  useEffect(()=>()=>{listeningRequestedRef.current=false;voiceEngineRef.current?.destroy();voiceEngineRef.current=null},[]);
   useEffect(()=>{const merge=(items:AcademicReminder[])=>setTasks(current=>{const additions=items.filter(item=>!current.some(task=>task.meta===`تذكير أكاديمي · ${item.id}`)).map(item=>({title:item.title,done:false,meta:`تذكير أكاديمي · ${item.id}`}));return additions.length?[...current,...additions]:current});merge(readAcademicReminders());const onReminder=(event:Event)=>merge([(event as CustomEvent<AcademicReminder>).detail]);window.addEventListener("navixa:academic-reminder",onReminder);return()=>window.removeEventListener("navixa:academic-reminder",onReminder)},[]);
   useEffect(()=>{const settings=JSON.parse(localStorage.getItem("navixa-counter-settings")||'{"enabled":true,"start":0}');setShowCounter(settings.enabled!==false);const next=Number(localStorage.getItem("navixa-visit-count")||settings.start||0)+1;localStorage.setItem("navixa-visit-count",String(next));setVisitCount(next)},[]);
   useEffect(()=>{if(!runtimeFeatures.publicCounterEnabled){setStatsConfigured(false);return}const stored=localStorage.getItem("navixa-stats-visitor-key");const visitorKey=stored||((crypto as any).randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);if(!stored)localStorage.setItem("navixa-stats-visitor-key",visitorKey);fetch("/api/stats",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({event:"visit",visitorKey})}).then(response=>response.json()).then(data=>{if(data?.configured&&data?.stats){setVisitCount(Number(data.stats.visits)||0);setStatsConfigured(true)}else setStatsConfigured(false)}).catch(()=>setStatsConfigured(false));},[runtimeFeatures.publicCounterEnabled]);
@@ -249,16 +251,64 @@ export default function Home(){
   const captureSpokenIntent=(spoken:string)=>{const text=spoken.trim();if(!text||text===lastIntentRef.current)return;const academic=captureAcademicDate(text);if(academic){lastIntentRef.current=text;setAcademicSuggestion(academic);notify(`رصدت ${academic.label} محتملًا — راجعه قبل الحفظ`);return}const kinds=[{words:["موعد","اجتماع","مقابلة"],label:"موعد"},{words:["تاريخ","ملاحظة","لاحظ","ركز على","تذكر"],label:"ملاحظة"}];const kind=kinds.find(k=>k.words.some(w=>text.includes(w)));if(!kind)return;const date=text.match(/(?:اليوم|بكرة|غدا|الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|الساعة\s+\d{1,2}(?::\d{2})?)/)?.[0]||"من الكلام المسموع";lastIntentRef.current=text;setTasks(current=>[...current,{title:`${kind.label}: ${text}`,done:false,meta:date}]);setModal("tasks");notify(`فهمت ${kind.label} وأضفته للمهام`)};
   const saveAcademicSuggestion=()=>{if(!academicSuggestion)return;const item={title:`${academicSuggestion.label}: ${academicSuggestion.raw}`,done:false,meta:`${academicSuggestion.dateLabel} · ${academicSuggestion.timeLabel}`};setTasks(current=>[...current,item]);try{const saved=JSON.parse(localStorage.getItem("navixa-academic-notes")||"[]");localStorage.setItem("navixa-academic-notes",JSON.stringify([...saved,{...academicSuggestion,savedAt:new Date().toISOString(),reminder:"قبل يوم"}]));}catch{}setAcademicSuggestion(null);setModal("tasks");notify("تم حفظ الموعد في مهامك وملاحظاتك — التذكير الافتراضي قبل يوم")};
   const toggleListening=()=>{
-    if(listeningRequestedRef.current){listeningRequestedRef.current=false;recognitionRef.current?.stop();recognitionRef.current=null;setListening(false);setInterimText("");return}
-    const SpeechRecognition=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
-    if(!SpeechRecognition){notify("متصفحك لا يدعم الاستماع الصوتي");return}
-    const recognition=new SpeechRecognition();recognition.lang="ar-SA";recognition.continuous=true;recognition.interimResults=true;
-    recognition.onstart=()=>setListening(true);
-    recognition.onresult=(event:any)=>{let interim="";for(let i=event.resultIndex;i<event.results.length;i++){const result=event.results[i],text=result[0].transcript,normalized=normalizeName(text),terms=splitWatchTerms(watchTermsRef.current),padded=` ${normalized} `,matched=terms.find(term=>padded.includes(` ${term} `));if(matched)alertName(matched);if(result.isFinal){setHeardText(previous=>`${previous} ${text}`.trim().slice(-5000));captureSpokenIntent(text)}else interim+=`${text} `}setInterimText(interim.trim())};
-    recognition.onerror=(event:any)=>{if(event.error==="no-speech")return;listeningRequestedRef.current=false;recognitionRef.current=null;setListening(false);setInterimText("");notify(event.error==="not-allowed"?"لم تُمنح صلاحية الميكروفون":"تعذر تشغيل الاستماع — تحقق من الميكروفون")};
-    recognition.onend=()=>{setListening(false);setInterimText("");if(listeningRequestedRef.current)setTimeout(()=>{try{recognition.start()}catch{listeningRequestedRef.current=false;recognitionRef.current=null}},250);else recognitionRef.current=null};
-    listeningRequestedRef.current=true;recognitionRef.current=recognition;try{recognition.start();notify("بدأ الاستماع للكلمات المختارة")}catch{listeningRequestedRef.current=false;recognitionRef.current=null;notify("تعذر بدء الاستماع الآن")}
-  };
+  if(listeningRequestedRef.current){
+    listeningRequestedRef.current=false;
+    const engine=voiceEngineRef.current;
+    voiceEngineRef.current=null;
+    engine?.destroy();
+    setListening(false);
+    setInterimText("");
+    return
+  }
+  const engine=createNavixaBrowserVoiceEngine({
+    language:"ar-SA",
+    continuous:true,
+    interimResults:true,
+    handlers:{
+      onStart:()=>setListening(true),
+      onTranscript:({text,interim})=>{
+        const terms=splitNavixaVoiceTerms(watchTermsRef.current),matched=findNavixaVoiceTerm(text,terms);
+        if(matched)alertName(matched.normalizedTerm);
+        if(interim){setInterimText(text);return}
+        setInterimText("");
+        setHeardText(previous=>`${previous} ${text}`.trim().slice(-5000));
+        captureSpokenIntent(text)
+      },
+      onError:(error)=>{
+        if(error==="no-speech")return;
+        listeningRequestedRef.current=false;
+        const current=voiceEngineRef.current;
+        voiceEngineRef.current=null;
+        current?.destroy();
+        setListening(false);
+        setInterimText("");
+        notify(error==="not-allowed"?"لم تُمنح صلاحية الميكروفون":"تعذر تشغيل الاستماع — تحقق من الميكروفون")
+      },
+      onEnd:()=>{
+        setListening(false);
+        setInterimText("");
+        if(!listeningRequestedRef.current){voiceEngineRef.current=null;return}
+        window.setTimeout(()=>{
+          const current=voiceEngineRef.current;
+          if(!current||!listeningRequestedRef.current)return;
+          if(current.start())return;
+          listeningRequestedRef.current=false;
+          current.destroy();
+          voiceEngineRef.current=null;
+          setListening(false)
+        },250)
+      }
+    }
+  });
+  if(!engine.supported){notify("متصفحك لا يدعم الاستماع الصوتي");return}
+  listeningRequestedRef.current=true;
+  voiceEngineRef.current=engine;
+  if(engine.start()){notify("بدأ الاستماع للكلمات المختارة");return}
+  listeningRequestedRef.current=false;
+  voiceEngineRef.current=null;
+  engine.destroy();
+  notify("تعذر بدء الاستماع الآن")
+};
   const toggleScreen=async()=>{
     if(screen){screenRef.current?.getTracks().forEach(t=>t.stop());screenRef.current=null;if(screenVideoRef.current)screenVideoRef.current.srcObject=null;setScreen(false);setScreenMonitoring(false);setScreenAlert("");screenPreviousRef.current=null;return}
     try{const stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});screenRef.current=stream;stream.getVideoTracks()[0].onended=()=>{setScreen(false);setScreenMonitoring(false);screenRef.current=null};setScreen(true);setScreenMonitoring(true);setScreenAlert("");screenPreviousRef.current=null;notify("تمت المشاركة — ارسم إطار المتابعة داخل المعاينة")}
