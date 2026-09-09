@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { issuePlanBGrant, PLAN_B_URL, planBMayOpen, verifyPlanBGrant } from "../worker/planBAccess.ts";
+import { issuePlanBGrant, planBMayOpen, resolvePlanBUrl, verifyPlanBGrant } from "../worker/planBAccess.ts";
 import { emergencyEntitlementKey, type EmergencyEntitlementSnapshot } from "../worker/emergencyEntitlements.ts";
 
 const entitlementSecret = "entitlement-secret-for-tests-123456";
@@ -19,8 +19,15 @@ async function snapshot(): Promise<EmergencyEntitlementSnapshot> {
   };
 }
 
-test("Plan B URL stays canonical and emergency access excludes security hold", () => {
-  assert.equal(PLAN_B_URL, "https://navixa.s2shug.chatgpt.site");
+test("Plan B only accepts NAVIXA-controlled HTTPS fallbacks and emergency access excludes security hold", () => {
+  assert.equal(resolvePlanBUrl(undefined), null);
+  assert.equal(resolvePlanBUrl("http://fallback.navixasa.com"), null);
+  assert.equal(resolvePlanBUrl("https://navixa.s2shug.chatgpt.site"), null);
+  assert.equal(resolvePlanBUrl("https://navixasa.com.evil.example"), null);
+  assert.equal(resolvePlanBUrl("https://user:pass@fallback.navixasa.com"), null);
+  assert.equal(resolvePlanBUrl("https://fallback.navixasa.com:8443"), null);
+  assert.equal(resolvePlanBUrl("https://navixasa.com/plan-b#private"), "https://navixasa.com/plan-b");
+  assert.equal(resolvePlanBUrl("https://fallback.navixasa.com/"), "https://fallback.navixasa.com");
   assert.equal(planBMayOpen("healthy"), false);
   assert.equal(planBMayOpen("degraded"), false);
   assert.equal(planBMayOpen("security-hold"), false);
