@@ -3,7 +3,6 @@ import { resolveUserSession, type D1Database } from "../../../../worker/userAuth
 import { isNavixaPilotEmail } from "../../../config/pilot-user.ts";
 import {
   CLASS_SCHEDULE_CLASSES,
-  CLASS_SCHEDULE_RECURRENCE_UNTIL_UTC,
   CLASS_SCHEDULE_REMINDERS,
   CLASS_SCHEDULE_TIMEZONE,
 } from "../../../config/class-schedule-pilot.ts";
@@ -37,7 +36,6 @@ export async function GET(request: Request) {
       enabled: true,
       timezone: CLASS_SCHEDULE_TIMEZONE,
       reminders: CLASS_SCHEDULE_REMINDERS,
-      recurrenceUntilUtc: CLASS_SCHEDULE_RECURRENCE_UNTIL_UTC,
       classes: CLASS_SCHEDULE_CLASSES,
     }, { headers });
   } catch {
