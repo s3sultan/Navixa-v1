@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import PerformanceReporter from "./PerformanceReporter";
 import VisitorReporter from "./VisitorReporter";
@@ -18,11 +18,20 @@ import "./visitor-counter.css";
 
 const siteUrl = "https://navixasa.com";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: "NAVIXA | مساعد ذكي لتنظيم يومك ومتابعة المحاضرات", template: "%s | NAVIXA" },
   description: "NAVIXA مساعد ذكي عربي لتنظيم يومك ومتابعة المحاضرات والاجتماعات، التنبيه عند ذكر اسمك، مراقبة الشاشة، التذكيرات الذكية وأدوات التركيز والصحة والعبادة مع اهتمام بالخصوصية.",
   applicationName: "NAVIXA",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "NAVIXA", statusBarStyle: "default" },
   keywords: ["NAVIXA", "نافيكسا", "مساعد ذكي عربي", "تنظيم اليوم", "متابعة المحاضرات", "تنبيه عند ذكر الاسم", "مراقبة الشاشة", "تذكيرات ذكية", "تلخيص المحاضرات", "تلخيص الاجتماعات", "تنظيم المهام", "التركيز", "الإنتاجية"],
   authors: [{ name: "NAVIXA" }], creator: "NAVIXA", publisher: "NAVIXA", category: "productivity",
   alternates: { languages: { "ar-SA": "/" } },
