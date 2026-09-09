@@ -48,12 +48,13 @@ test("active Plus can receive a short-lived incident-bound signed grant", async 
 });
 
 test("non-Plus and security-hold cannot obtain grants", async () => {
+  const currentSnapshot = await snapshot();
   await assert.rejects(() => issuePlanBGrant({
-    snapshot: await snapshot(), email: "other@example.com", entitlementSecret, signingSecret,
+    snapshot: currentSnapshot, email: "other@example.com", entitlementSecret, signingSecret,
     emergencyState: "outage", incidentId: "incident-1", now,
   }), /plus_required/);
   await assert.rejects(() => issuePlanBGrant({
-    snapshot: await snapshot(), email, entitlementSecret, signingSecret,
+    snapshot: currentSnapshot, email, entitlementSecret, signingSecret,
     emergencyState: "security-hold", incidentId: "incident-1", now,
   }), /plan_b_not_open/);
 });
