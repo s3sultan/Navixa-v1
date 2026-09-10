@@ -17,6 +17,7 @@ type SyncPayload = {
 
 type CloudSnapshot = {
   ok?: boolean;
+  scopeId?: string;
   found?: boolean;
   version?: number;
   payload?: string | null;
@@ -25,9 +26,14 @@ type CloudSnapshot = {
 
 const TASKS_KEY = "navixa-life-tasks";
 const REMINDERS_KEY = "navixa-academic-reminders";
+const OWNER_KEY = "navixa-account-sync-owner-v1";
+const CACHE_PREFIX = "navixa-account-sync-cache-v1:";
+const SCOPE_PATTERN = /^[a-zA-Z0-9_-]{20,64}$/;
 const MAX_ITEMS = 250;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let running: Promise<AccountTodaySyncResult> | null = null;
+
+const emptyPayload = (): SyncPayload => ({ schema: 1, today: { tasks: [], academicReminders: [] } });
 
 function readArray(key: string): unknown[] {
   if (typeof window === "undefined") return [];
@@ -75,7 +81,7 @@ function localPayload(): SyncPayload {
 }
 
 function parsePayload(raw: string | null | undefined): SyncPayload {
-  if (!raw) return { schema: 1, today: { tasks: [], academicReminders: [] } };
+  if (!raw) return emptyPayload();
   try {
     const value = JSON.parse(raw) as Record<string, unknown>;
     const today = value?.today && typeof value.today === "object" ? value.today as Record<string, unknown> : {};
@@ -86,9 +92,27 @@ function parsePayload(raw: string | null | undefined): SyncPayload {
         academicReminders: cleanReminders(today.academicReminders),
       },
     };
-  } catch {
-    return { schema: 1, today: { tasks: [], academicReminders: [] } };
-  }
+  } catch { return emptyPayload(); }
+}
+
+function readAccountCache(scopeId: string): SyncPayload {
+  if (typeof window === "undefined") return emptyPayload();
+  return parsePayload(window.localStorage.getItem(`${CACHE_PREFIX}${scopeId}`));
+}
+
+function saveAccountCache(scopeId: string, payload: SyncPayload) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(`${CACHE_PREFIX}${scopeId}`, JSON.stringify(payload));
+}
+
+function localPayloadForScope(scopeId: string): SyncPayload {
+  if (typeof window === "undefined") return emptyPayload();
+  const visible = localPayload();
+  const currentOwner = window.localStorage.getItem(OWNER_KEY) || "";
+  if (!currentOwner) return visible;
+  if (currentOwner === scopeId) return visible;
+  if (SCOPE_PATTERN.test(currentOwner)) saveAccountCache(currentOwner, visible);
+  return readAccountCache(scopeId);
 }
 
 function mergePayload(local: SyncPayload, cloud: SyncPayload): SyncPayload {
@@ -114,10 +138,12 @@ function mergePayload(local: SyncPayload, cloud: SyncPayload): SyncPayload {
   };
 }
 
-function persist(payload: SyncPayload) {
+function persist(scopeId: string, payload: SyncPayload) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(TASKS_KEY, JSON.stringify(payload.today.tasks));
   window.localStorage.setItem(REMINDERS_KEY, JSON.stringify(payload.today.academicReminders));
+  saveAccountCache(scopeId, payload);
+  window.localStorage.setItem(OWNER_KEY, scopeId);
   window.dispatchEvent(new Event("navixa:account-sync"));
 }
 
@@ -129,9 +155,12 @@ async function runSync(): Promise<AccountTodaySyncResult> {
       if (response.status === 401) return { status: "signed-out", tasks: fallback.today.tasks, academicReminders: fallback.today.academicReminders };
       if (!response.ok) return { status: "offline", tasks: fallback.today.tasks, academicReminders: fallback.today.academicReminders };
       const cloud = await response.json() as CloudSnapshot;
-      const currentLocal = localPayload();
-      const merged = mergePayload(currentLocal, parsePayload(cloud.payload));
-      persist(merged);
+      const scopeId = typeof cloud.scopeId === "string" && SCOPE_PATTERN.test(cloud.scopeId) ? cloud.scopeId : "";
+      if (!scopeId) return { status: "offline", tasks: fallback.today.tasks, academicReminders: fallback.today.academicReminders };
+
+      const scopedLocal = localPayloadForScope(scopeId);
+      const merged = mergePayload(scopedLocal, parsePayload(cloud.payload));
+      persist(scopeId, merged);
       const serialized = JSON.stringify(merged);
       if (cloud.found && serialized === cloud.payload) {
         return { status: "synced", tasks: merged.today.tasks, academicReminders: merged.today.academicReminders };
