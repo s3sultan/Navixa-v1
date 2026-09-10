@@ -1,6 +1,7 @@
 import { buildNavixaVoiceBiasPhrases } from "./voiceDetection.ts";
+import { createNavixaLocalNameFallback } from "./localNameFallback.ts";
 
-export type NavixaVoiceLanguage = "ar-SA" | "en-US";
+export type NavixaVoiceLanguage = "ar-SA" | "en-US" | "en-IN";
 
 export type NavixaVoiceTranscript = {
   text: string;
@@ -68,6 +69,7 @@ type BrowserVoiceEngineOptions = {
   language?: NavixaVoiceLanguage;
   continuous?: boolean;
   interimResults?: boolean;
+  localAccuracyFallback?: boolean;
   handlers: NavixaVoiceEngineHandlers;
 };
 
@@ -117,6 +119,7 @@ export function createNavixaBrowserVoiceEngine({
   language = "ar-SA",
   continuous = true,
   interimResults = true,
+  localAccuracyFallback = true,
   handlers,
 }: BrowserVoiceEngineOptions): NavixaVoiceEngine {
   const Recognition = getRecognitionConstructor();
@@ -136,6 +139,12 @@ export function createNavixaBrowserVoiceEngine({
   recognition.interimResults = interimResults;
   recognition.maxAlternatives = 5;
   applyStoredContextualBias(recognition);
+
+  const localFallback = localAccuracyFallback
+    ? createNavixaLocalNameFallback({
+      onTranscript: (text) => handlers.onTranscript({ text, interim: true }),
+    })
+    : null;
 
   let destroyed = false;
   let active = false;
@@ -201,6 +210,7 @@ export function createNavixaBrowserVoiceEngine({
       if (destroyed || active) return false;
       try {
         recognition.start();
+        if (localFallback?.supported) void localFallback.start();
         return true;
       } catch {
         return false;
@@ -208,6 +218,7 @@ export function createNavixaBrowserVoiceEngine({
     },
     stop: () => {
       if (destroyed) return;
+      localFallback?.stop();
       try {
         recognition.stop();
       } catch {
@@ -218,6 +229,7 @@ export function createNavixaBrowserVoiceEngine({
       if (destroyed) return;
       destroyed = true;
       active = false;
+      localFallback?.destroy();
       recognition.onstart = null;
       recognition.onresult = null;
       recognition.onerror = null;
