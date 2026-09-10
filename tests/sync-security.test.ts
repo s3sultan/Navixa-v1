@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GET, POST } from "../app/api/sync/route.ts";
+import { decryptSyncPayload, encryptSyncPayload, normalizeSyncPassphrase } from "../lib/accountSyncCrypto.ts";
 import { hashOpaqueValue, USER_SESSION_COOKIE } from "../worker/userAuth.ts";
 
 const syncId = "a".repeat(32);
@@ -172,4 +173,18 @@ test("account sync rejects stale optimistic versions", async () => {
   } finally {
     delete (globalThis as typeof globalThis & { DB?: unknown }).DB;
   }
+});
+
+test("account sync passphrases normalize Unicode and surrounding whitespace", () => {
+  assert.equal(normalizeSyncPassphrase("  ＮＡＶＩＸＡ１２３  "), "NAVIXA123");
+});
+
+test("account sync crypto restores with the canonical passphrase on another device", async () => {
+  const encrypted = await encryptSyncPayload("navixa-cross-device", "  ＮＡＶＩＸＡ１２３  ");
+  assert.equal(await decryptSyncPayload(encrypted, "NAVIXA123"), "navixa-cross-device");
+});
+
+test("account sync crypto reports a wrong passphrase without exposing plaintext", async () => {
+  const encrypted = await encryptSyncPayload("private-navixa-data", "correct-passphrase");
+  await assert.rejects(() => decryptSyncPayload(encrypted, "wrong-passphrase"), /passphrase-mismatch/);
 });
