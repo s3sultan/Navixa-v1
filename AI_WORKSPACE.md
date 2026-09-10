@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: ربط المزامنة بجلسة OTP الحالية دون تغيير تسجيل الدخول مع إبقاء المزامنة القديمة كمسار توافق مؤقت
 - الحالة: يعمل
-- الملفات المحجوزة: `app/api/sync/route.ts`, `tests/sync-security.test.ts`, `migrations/0049_account_bound_sync.sql`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الملفات المحجوزة: `app/api/sync/route.ts`, `app/page.tsx`, `tests/sync-security.test.ts`, `migrations/0049_account_bound_sync.sql`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
