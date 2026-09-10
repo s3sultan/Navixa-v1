@@ -6,13 +6,14 @@ const root = new URL("../", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("emergency mode is admin-only and sends only approved Plus continuity alerts", async () => {
-  const [core, route, notifications, preferences, account, plan] = await Promise.all([
+  const [core, route, notifications, preferences, account, plan, planBAccess] = await Promise.all([
     read("worker/emergencyMode.ts"),
     read("app/api/admin/emergency-mode/route.ts"),
     read("worker/emergencyNotifications.ts"),
     read("app/api/account/telegram/preferences/route.ts"),
     read("app/account/AccountAccess.tsx"),
     read("docs/emergency-mode-plan.md"),
+    read("worker/planBAccess.ts"),
   ]);
 
   assert.match(core, /healthy.*degraded.*outage.*security-hold.*recovery/s);
@@ -29,7 +30,10 @@ test("emergency mode is admin-only and sends only approved Plus continuity alert
   assert.match(route, /Cache-Control": "no-store/);
   assert.doesNotMatch(route, /billing|moyasar|payment/i);
 
-  assert.match(notifications, /https:\/\/navixa\.s2shug\.chatgpt\.site/);
+  assert.match(notifications, /NAVIXA_PLAN_B_URL/);
+  assert.match(notifications, /resolvePlanBUrl/);
+  assert.match(notifications, /plan_b_url_not_ready/);
+  assert.doesNotMatch(notifications, /chatgpt\.site/);
   assert.match(notifications, /status='active'/);
   assert.match(notifications, /subscription_ends_at>\?/);
   assert.match(notifications, /notification_type='emergency'/);
@@ -41,6 +45,10 @@ test("emergency mode is admin-only and sends only approved Plus continuity alert
   assert.match(notifications, /input\.state === "outage"/);
   assert.match(notifications, /input\.state === "recovery"/);
   assert.doesNotMatch(notifications, /status IN \('trial','active'\)|moyasar|payment/i);
+
+  assert.match(planBAccess, /NAVIXA_ROOT_HOST = "navixasa\.com"/);
+  assert.match(planBAccess, /hostname\.endsWith\(`\.\$\{NAVIXA_ROOT_HOST\}`\)/);
+  assert.match(planBAccess, /url\.protocol !== "https:"/);
 
   assert.match(preferences, /"renewal","emergency"/);
   assert.match(preferences, /notification_type IN \('renewal','emergency'\)/);

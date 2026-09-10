@@ -1,4 +1,5 @@
 import { type EmergencyDatabase, type EmergencyState } from "./emergencyMode";
+import { resolvePlanBUrl } from "./planBAccess";
 import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
 
 type Statement = {
@@ -16,6 +17,7 @@ export type EmergencyNotificationEnv = {
   NAVIXA_AUTH_FROM?: string;
   NAVIXA_TELEGRAM_BOT_TOKEN?: string;
   NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
+  NAVIXA_PLAN_B_URL?: string;
 };
 
 type ActivePlusSubscriber = {
@@ -28,7 +30,6 @@ type ActivePlusSubscriber = {
 type DeliveryChannel = "email" | "telegram";
 type DeliveryKind = "start" | "recovery";
 
-const PLAN_B_URL = "https://navixa.s2shug.chatgpt.site";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DELIVERY_LEASE_MS = 5 * 60 * 1000;
 let deliverySchemaReady: Promise<void> | null = null;
@@ -70,17 +71,18 @@ async function finishDelivery(db: Database, id: string, ok: boolean, error = "")
   await db.prepare("UPDATE navixa_emergency_deliveries SET status='failed',error=? WHERE id=?").bind(error.slice(0, 300), id).run();
 }
 
-function copy(kind: DeliveryKind, name: string) {
+function copy(kind: DeliveryKind, name: string, planBUrl: string | null) {
   const greeting = name ? `أهلًا ${name}` : "أهلًا";
   if (kind === "start") {
+    if (!planBUrl) throw new Error("plan_b_url_not_ready");
     return {
-      subject: "NAVIXA Plus: تم تفعيل المنصة الاحتياطية",
-      email: `${greeting}\n\nرصدنا تعطلًا مؤكدًا في خدمة NAVIXA الأساسية، وتم تفعيل وضع الطوارئ لمشتركي Plus.\n\nيمكنك استخدام المنصة الاحتياطية مؤقتًا من هنا:\n${PLAN_B_URL}\n\nسنبلغك عند استقرار الخدمة الأساسية وعودتها.\n\nNAVIXA SA`,
-      telegram: `${greeting}\n\nتم تفعيل وضع الطوارئ لمشتركي NAVIXA Plus بعد تعطل مؤكد في الخدمة الأساسية.\n\nالمنصة الاحتياطية:\n${PLAN_B_URL}\n\nسنبلغك عند عودة الخدمة الأساسية واستقرارها.`,
+      subject: "NAVIXA هِمّة: تم تفعيل المنصة الاحتياطية",
+      email: `${greeting}\n\nرصدنا تعطلًا مؤكدًا في خدمة NAVIXA الأساسية، وتم تفعيل وضع الطوارئ لمشتركي هِمّة.\n\nيمكنك استخدام المنصة الاحتياطية مؤقتًا من هنا:\n${planBUrl}\n\nسنبلغك عند استقرار الخدمة الأساسية وعودتها.\n\nNAVIXA SA`,
+      telegram: `${greeting}\n\nتم تفعيل وضع الطوارئ لمشتركي NAVIXA هِمّة بعد تعطل مؤكد في الخدمة الأساسية.\n\nالمنصة الاحتياطية:\n${planBUrl}\n\nسنبلغك عند عودة الخدمة الأساسية واستقرارها.`,
     };
   }
   return {
-    subject: "NAVIXA Plus: عادت الخدمة الأساسية",
+    subject: "NAVIXA هِمّة: عادت الخدمة الأساسية",
     email: `${greeting}\n\nعادت خدمة NAVIXA الأساسية واستقرت. يمكنك الرجوع الآن إلى الموقع الرسمي:\nhttps://navixasa.com\n\nشكرًا لصبرك.\n\nNAVIXA SA`,
     telegram: `${greeting}\n\nعادت خدمة NAVIXA الأساسية واستقرت ✅\nيمكنك الرجوع الآن إلى:\nhttps://navixasa.com`,
   };
@@ -120,13 +122,18 @@ export async function deliverEmergencyIncidentNotifications(env: EmergencyNotifi
   const kind: DeliveryKind | null = input.state === "outage" ? "start" : input.state === "recovery" ? "recovery" : null;
   if (!kind || !input.incidentId) return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0 };
 
+  const planBUrl = kind === "start" ? resolvePlanBUrl(env.NAVIXA_PLAN_B_URL) : null;
+  if (kind === "start" && !planBUrl) {
+    return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0, blocked: "plan_b_url_not_ready" as const };
+  }
+
   const subscribers = await activePlusSubscribers(env.DB);
   let emailSent = 0;
   let telegramSent = 0;
   let failed = 0;
 
   for (const subscriber of subscribers) {
-    const message = copy(kind, subscriber.display_name);
+    const message = copy(kind, subscriber.display_name, planBUrl);
 
     const emailDelivery = await claimDelivery(env.DB, input.incidentId, subscriber.id, kind, "email");
     if (emailDelivery) {
@@ -151,4 +158,6 @@ export async function deliverEmergencyIncidentNotifications(env: EmergencyNotifi
   return { claimed: true, checked: subscribers.length, emailSent, telegramSent, failed };
 }
 
-export const EMERGENCY_PLAN_B_URL = PLAN_B_URL;
+export function configuredEmergencyPlanBUrl(env: Pick<EmergencyNotificationEnv, "NAVIXA_PLAN_B_URL">) {
+  return resolvePlanBUrl(env.NAVIXA_PLAN_B_URL);
+}
