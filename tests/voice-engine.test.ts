@@ -57,7 +57,10 @@ const setFakeWindow = (storedTerms = "") => {
     value: {
       SpeechRecognition: FakeRecognition,
       SpeechRecognitionPhrase: FakePhrase,
-      localStorage: { getItem: (key: string) => key === "navixa-watch-terms" ? storedTerms : null },
+      localStorage: {
+        getItem: (key: string) => key === "navixa-watch-terms" ? storedTerms : null,
+        setItem: () => undefined,
+      },
     },
   });
 };
@@ -162,6 +165,81 @@ test("surfaces lower-ranked recognition alternatives for name matching without t
       { text: "please ask sultaan", interim: true },
       { text: "please ask someone", interim: false },
     ]);
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("switches the same browser recognizer from Arabic to Indian English when speech becomes English", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "ar-SA",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onresult && recognition.onend);
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "ar-SA");
+    recognition.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "please call sultan now", confidence: 0.9 }, isFinal: true }],
+    });
+    assert.equal(recognition.stopCalls, 1);
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-IN");
+    assert.equal(FakeRecognition.latest, recognition);
+    engine.destroy();
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("returns the same recognizer to Arabic when Arabic speech follows English", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "en-IN",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onresult && recognition.onend);
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-IN");
+    recognition.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "يا سلطان انت موجود", confidence: 0.9 }, isFinal: true }],
+    });
+    assert.equal(recognition.stopCalls, 1);
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "ar-SA");
+    assert.equal(FakeRecognition.latest, recognition);
+    engine.destroy();
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("cycles toward Indian English after a no-speech recognition cycle", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "ar-SA",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onerror && recognition.onend);
+    assert.equal(engine.start(), true);
+    recognition.onerror({ error: "no-speech" });
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-IN");
+    engine.destroy();
   } finally {
     clearFakeWindow();
   }
