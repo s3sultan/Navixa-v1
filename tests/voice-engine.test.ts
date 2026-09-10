@@ -42,7 +42,13 @@ class FakeRecognition {
 }
 
 class FakePhrase {
-  constructor(public phrase: string, public boost = 1) {}
+  phrase: string;
+  boost: number;
+
+  constructor(phrase: string, boost = 1) {
+    this.phrase = phrase;
+    this.boost = boost;
+  }
 }
 
 const setFakeWindow = (storedTerms = "") => {
