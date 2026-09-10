@@ -1,5 +1,6 @@
 import { buildNavixaVoiceBiasPhrases } from "./voiceDetection.ts";
 import { createNavixaLocalNameFallback } from "./localNameFallback.ts";
+import { buildNavixaVoiceBiasInput, learnNavixaVoiceTranscript, type NavixaVoiceAliasSource } from "./voiceLearning.ts";
 
 export type NavixaVoiceLanguage = "ar-SA" | "en-US" | "en-IN";
 
@@ -56,6 +57,7 @@ type BrowserSpeechRecognition = {
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onnomatch: (() => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -78,6 +80,7 @@ const ADAPTIVE_LANGUAGES: NavixaVoiceLanguage[] = ["ar-SA", "en-IN", "en-US"];
 const LANGUAGE_HINT_STORAGE_KEY = "navixa-voice-language-hint";
 const INITIAL_LANGUAGE_PROBE_MS = 12_000;
 const ACTIVE_LANGUAGE_PROBE_MS = 18_000;
+const LOW_CONFIDENCE_PROBE_MS = 6_000;
 
 const getRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
   if (typeof window === "undefined") return null;
@@ -97,7 +100,8 @@ const applyStoredContextualBias = (recognition: BrowserSpeechRecognition) => {
     const Phrase = browserWindow.SpeechRecognitionPhrase;
     if (!Phrase) return;
     const storedTerms = window.localStorage?.getItem("navixa-watch-terms") || "";
-    const phrases = buildNavixaVoiceBiasPhrases(storedTerms);
+    const biasInput = buildNavixaVoiceBiasInput(storedTerms);
+    const phrases = buildNavixaVoiceBiasPhrases(biasInput);
     if (!phrases.length) return;
     recognition.phrases = phrases.map((phrase) => new Phrase(phrase, 5.5));
   } catch {
@@ -177,9 +181,14 @@ export function createNavixaBrowserVoiceEngine({
   recognition.maxAlternatives = 5;
   applyStoredContextualBias(recognition);
 
+  const emitTranscript = (transcript: NavixaVoiceTranscript, source: NavixaVoiceAliasSource) => {
+    if (learnNavixaVoiceTranscript(transcript.text, source)) applyStoredContextualBias(recognition);
+    handlers.onTranscript(transcript);
+  };
+
   const localFallback = localAccuracyFallback
     ? createNavixaLocalNameFallback({
-      onTranscript: (text) => handlers.onTranscript({ text, interim: true }),
+      onTranscript: (text) => emitTranscript({ text, interim: true }, "local"),
     })
     : null;
 
@@ -232,6 +241,7 @@ export function createNavixaBrowserVoiceEngine({
     const resultIndex = Number.isInteger(event.resultIndex) ? Math.max(0, event.resultIndex ?? 0) : 0;
     const interimByRank = new Map<number, Array<{ text: string; confidence?: number }>>();
     let finalPrimaryText = "";
+    let finalPrimaryConfidence: number | undefined;
 
     for (let index = resultIndex; index < event.results.length; index += 1) {
       const result = event.results[index];
@@ -240,10 +250,11 @@ export function createNavixaBrowserVoiceEngine({
 
       if (result?.isFinal) {
         for (let alternativeIndex = 1; alternativeIndex < alternatives.length; alternativeIndex += 1) {
-          handlers.onTranscript({ ...alternatives[alternativeIndex], interim: true });
+          emitTranscript({ ...alternatives[alternativeIndex], interim: true }, "browser");
         }
         finalPrimaryText = alternatives[0].text;
-        handlers.onTranscript({ ...alternatives[0], interim: false });
+        finalPrimaryConfidence = alternatives[0].confidence;
+        emitTranscript({ ...alternatives[0], interim: false }, "browser");
         continue;
       }
 
@@ -258,14 +269,19 @@ export function createNavixaBrowserVoiceEngine({
     for (const rank of ranks) {
       const parts = interimByRank.get(rank) || [];
       if (!parts.length) continue;
-      handlers.onTranscript({
+      emitTranscript({
         text: parts.map((part) => part.text).join(" "),
         interim: true,
         confidence: parts.at(-1)?.confidence,
-      });
+      }, "browser");
     }
 
     if (!adaptiveLanguage || !finalPrimaryText) return;
+    if (typeof finalPrimaryConfidence === "number" && finalPrimaryConfidence > 0 && finalPrimaryConfidence < 0.35) {
+      requestLanguageRestart();
+      return;
+    }
+
     const script = detectTranscriptScript(finalPrimaryText);
     const activeLanguage = currentLanguage();
     if (script === "ar" && activeLanguage !== "ar-SA") {
@@ -274,6 +290,10 @@ export function createNavixaBrowserVoiceEngine({
     }
     if (script === "en" && activeLanguage === "ar-SA") {
       requestLanguageRestart("en-IN");
+      return;
+    }
+    if (typeof finalPrimaryConfidence === "number" && finalPrimaryConfidence > 0 && finalPrimaryConfidence < 0.5) {
+      armLanguageProbe(LOW_CONFIDENCE_PROBE_MS);
       return;
     }
     rememberLanguageHint(activeLanguage);
@@ -285,6 +305,11 @@ export function createNavixaBrowserVoiceEngine({
     const error = typeof event?.error === "string" ? event.error : "voice-recognition-error";
     if (adaptiveLanguage && error === "no-speech") advanceLanguage();
     handlers.onError?.(error);
+  };
+
+  recognition.onnomatch = () => {
+    if (destroyed || !adaptiveLanguage) return;
+    requestLanguageRestart();
   };
 
   recognition.onend = () => {
@@ -326,6 +351,7 @@ export function createNavixaBrowserVoiceEngine({
       recognition.onstart = null;
       recognition.onresult = null;
       recognition.onerror = null;
+      recognition.onnomatch = null;
       recognition.onend = null;
       try {
         recognition.abort();
