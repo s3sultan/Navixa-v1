@@ -1,3 +1,5 @@
+import { buildNavixaVoiceBiasPhrases } from "./voiceDetection";
+
 export type NavixaVoiceLanguage = "ar-SA" | "en-US";
 
 export type NavixaVoiceTranscript = {
@@ -28,6 +30,7 @@ type SpeechRecognitionAlternativeLike = {
 
 type SpeechRecognitionResultLike = {
   isFinal?: boolean;
+  length?: number;
   [index: number]: SpeechRecognitionAlternativeLike | undefined;
 };
 
@@ -48,6 +51,7 @@ type BrowserSpeechRecognition = {
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
+  phrases?: unknown;
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
@@ -58,6 +62,7 @@ type BrowserSpeechRecognition = {
 };
 
 type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+type SpeechRecognitionPhraseConstructor = new (phrase: string, boost?: number) => unknown;
 
 type BrowserVoiceEngineOptions = {
   language?: NavixaVoiceLanguage;
@@ -73,6 +78,39 @@ const getRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
   };
   return browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition || null;
+};
+
+const applyStoredContextualBias = (recognition: BrowserSpeechRecognition) => {
+  if (typeof window === "undefined") return;
+  try {
+    const browserWindow = window as typeof window & {
+      SpeechRecognitionPhrase?: SpeechRecognitionPhraseConstructor;
+    };
+    const Phrase = browserWindow.SpeechRecognitionPhrase;
+    if (!Phrase) return;
+    const storedTerms = window.localStorage?.getItem("navixa-watch-terms") || "";
+    const phrases = buildNavixaVoiceBiasPhrases(storedTerms);
+    if (!phrases.length) return;
+    recognition.phrases = phrases.map((phrase) => new Phrase(phrase, 5.5));
+  } catch {
+    // Contextual biasing is experimental. Unsupported browsers keep the normal listener.
+  }
+};
+
+const readAlternatives = (result: SpeechRecognitionResultLike | undefined, limit: number) => {
+  const alternatives: Array<{ text: string; confidence?: number }> = [];
+  if (!result) return alternatives;
+  const resultLength = typeof result.length === "number" && result.length > 0 ? result.length : limit;
+  const count = Math.min(Math.max(1, resultLength), limit);
+  for (let index = 0; index < count; index += 1) {
+    const alternative = result[index];
+    if (!alternative) break;
+    const text = typeof alternative.transcript === "string" ? alternative.transcript.trim() : "";
+    if (!text) continue;
+    const confidence = typeof alternative.confidence === "number" ? alternative.confidence : undefined;
+    alternatives.push({ text, confidence });
+  }
+  return alternatives;
 };
 
 export function createNavixaBrowserVoiceEngine({
@@ -96,7 +134,8 @@ export function createNavixaBrowserVoiceEngine({
   recognition.lang = language;
   recognition.continuous = continuous;
   recognition.interimResults = interimResults;
-  recognition.maxAlternatives = 1;
+  recognition.maxAlternatives = 5;
+  applyStoredContextualBias(recognition);
 
   let destroyed = false;
   let active = false;
@@ -110,30 +149,36 @@ export function createNavixaBrowserVoiceEngine({
   recognition.onresult = (event) => {
     if (destroyed || !event.results) return;
     const resultIndex = Number.isInteger(event.resultIndex) ? Math.max(0, event.resultIndex ?? 0) : 0;
-    const interimParts: string[] = [];
-    let interimConfidence: number | undefined;
+    const interimByRank = new Map<number, Array<{ text: string; confidence?: number }>>();
 
     for (let index = resultIndex; index < event.results.length; index += 1) {
       const result = event.results[index];
-      const alternative = result?.[0];
-      const text = typeof alternative?.transcript === "string" ? alternative.transcript.trim() : "";
-      if (!text) continue;
-      const confidence = typeof alternative?.confidence === "number" ? alternative.confidence : undefined;
+      const alternatives = readAlternatives(result, recognition.maxAlternatives);
+      if (!alternatives.length) continue;
 
       if (result?.isFinal) {
-        handlers.onTranscript({ text, interim: false, confidence });
+        for (let alternativeIndex = 1; alternativeIndex < alternatives.length; alternativeIndex += 1) {
+          handlers.onTranscript({ ...alternatives[alternativeIndex], interim: true });
+        }
+        handlers.onTranscript({ ...alternatives[0], interim: false });
         continue;
       }
 
-      interimParts.push(text);
-      if (confidence !== undefined) interimConfidence = confidence;
+      alternatives.forEach((alternative, alternativeIndex) => {
+        const parts = interimByRank.get(alternativeIndex) || [];
+        parts.push(alternative);
+        interimByRank.set(alternativeIndex, parts);
+      });
     }
 
-    if (interimParts.length) {
+    const ranks = [...interimByRank.keys()].sort((left, right) => right - left);
+    for (const rank of ranks) {
+      const parts = interimByRank.get(rank) || [];
+      if (!parts.length) continue;
       handlers.onTranscript({
-        text: interimParts.join(" "),
+        text: parts.map((part) => part.text).join(" "),
         interim: true,
-        confidence: interimConfidence,
+        confidence: parts.at(-1)?.confidence,
       });
     }
   };
