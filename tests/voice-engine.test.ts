@@ -3,7 +3,7 @@ import test from "node:test";
 import { createNavixaBrowserVoiceEngine } from "../app/voice/voiceEngine.ts";
 
 type FakeAlternative = { transcript: string; confidence: number };
-type FakeResult = { 0: FakeAlternative; isFinal: boolean };
+type FakeResult = { 0: FakeAlternative; 1?: FakeAlternative; 2?: FakeAlternative; length?: number; isFinal: boolean };
 type FakeResultEvent = { resultIndex: number; results: FakeResult[] };
 type FakeErrorEvent = { error?: string };
 
@@ -14,6 +14,7 @@ class FakeRecognition {
   continuous = false;
   interimResults = false;
   maxAlternatives = 0;
+  phrases: unknown = undefined;
   onstart: (() => void) | null = null;
   onresult: ((event: FakeResultEvent) => void) | null = null;
   onerror: ((event: FakeErrorEvent) => void) | null = null;
@@ -40,10 +41,18 @@ class FakeRecognition {
   }
 }
 
-const setFakeWindow = () => {
+class FakePhrase {
+  constructor(public phrase: string, public boost = 1) {}
+}
+
+const setFakeWindow = (storedTerms = "") => {
   Object.defineProperty(globalThis, "window", {
     configurable: true,
-    value: { SpeechRecognition: FakeRecognition },
+    value: {
+      SpeechRecognition: FakeRecognition,
+      SpeechRecognitionPhrase: FakePhrase,
+      localStorage: { getItem: (key: string) => key === "navixa-watch-terms" ? storedTerms : null },
+    },
   });
 };
 
@@ -69,12 +78,27 @@ test("configures and cleans up the browser voice engine", () => {
     assert.equal(recognition.lang, "ar-SA");
     assert.equal(recognition.continuous, true);
     assert.equal(recognition.interimResults, true);
+    assert.equal(recognition.maxAlternatives, 5);
     assert.equal(engine.start(), true);
     assert.equal(starts, 1);
     assert.equal(engine.start(), false);
     engine.destroy();
     assert.equal(recognition.abortCalls, 1);
     assert.equal(recognition.onresult, null);
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("adds stored watched names as conservative contextual recognition hints", () => {
+  setFakeWindow("سلطان الحربي، quiz");
+  try {
+    createNavixaBrowserVoiceEngine({ handlers: { onTranscript: () => undefined } });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition);
+    const phrases = recognition.phrases as FakePhrase[];
+    assert.deepEqual(phrases.map(({ phrase }) => phrase), ["سلطان الحربي", "سلطان", "الحربي", "quiz"]);
+    assert.ok(phrases.every(({ boost }) => boost === 5.5));
   } finally {
     clearFakeWindow();
   }
@@ -102,6 +126,35 @@ test("emits final transcripts and aggregates interim parts like the original lis
     assert.deepEqual(transcripts, [
       { text: "تم تحديد الموعد", interim: false },
       { text: "يا سلطان عندك واجب", interim: true },
+    ]);
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("surfaces lower-ranked recognition alternatives for name matching without treating them as final intent", () => {
+  setFakeWindow();
+  try {
+    const transcripts: Array<{ text: string; interim: boolean }> = [];
+    createNavixaBrowserVoiceEngine({
+      handlers: {
+        onTranscript: ({ text, interim }) => transcripts.push({ text, interim }),
+      },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onresult);
+    recognition.onresult({
+      resultIndex: 0,
+      results: [{
+        0: { transcript: "please ask someone", confidence: 0.7 },
+        1: { transcript: "please ask sultaan", confidence: 0.64 },
+        length: 2,
+        isFinal: true,
+      }],
+    });
+    assert.deepEqual(transcripts, [
+      { text: "please ask sultaan", interim: true },
+      { text: "please ask someone", interim: false },
     ]);
   } finally {
     clearFakeWindow();
