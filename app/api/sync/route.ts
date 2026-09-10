@@ -99,6 +99,11 @@ export async function POST(request: Request) {
     const payload = body.payload;
     if (!isValidPayload(payload)) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
 
+    const accountRequested = Boolean(readUserSessionToken(request));
+    const syncId = body.syncId;
+    const syncKey = body.syncKey;
+    if (!accountRequested && (!isValidId(syncId) || !isValidKey(syncKey))) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
+
     const db = await getDb();
     if (!db) return noStore({ ok: false, configured: false }, 503);
 
@@ -133,11 +138,8 @@ export async function POST(request: Request) {
       return privateNoStore({ ok: true, mode: "account", version: 1, updatedAt });
     }
 
-    const syncId = body.syncId;
-    const syncKey = body.syncKey;
-    if (!isValidId(syncId) || !isValidKey(syncKey)) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
     await ensureLegacySchema(db);
-    const { syncKeyHash, row } = await lookupLegacy(db, syncId, syncKey);
+    const { syncKeyHash, row } = await lookupLegacy(db, syncId as string, syncKey as string);
     const exists = await db.prepare("SELECT sync_id FROM navixa_secure_sync WHERE sync_id=?").bind(syncId).all<{ sync_id: string }>();
     if (exists.results[0] && !row) return noStore({ error: "تعذر الوصول إلى مزامنة الطلب" }, 404);
     const updatedAt = new Date().toISOString();
@@ -153,6 +155,12 @@ export async function GET(request: Request) {
   const rejected = requestAllowed(request, false);
   if (rejected) return rejected;
   try {
+    const accountRequested = Boolean(readUserSessionToken(request));
+    const url = new URL(request.url);
+    const syncId = url.searchParams.get("syncId");
+    const syncKey = request.headers.get("x-navixa-sync-key");
+    if (!accountRequested && (!isValidId(syncId) || !isValidKey(syncKey))) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
+
     const db = await getDb();
     if (!db) return noStore({ ok: false, configured: false }, 503);
 
@@ -163,12 +171,8 @@ export async function GET(request: Request) {
       return privateNoStore({ ok: true, mode: "account", found: Boolean(row), payload: row?.payload || null, version: row?.version || 0, updatedAt: row?.updated_at || null });
     }
 
-    const url = new URL(request.url);
-    const syncId = url.searchParams.get("syncId");
-    const syncKey = request.headers.get("x-navixa-sync-key");
-    if (!isValidId(syncId) || !isValidKey(syncKey)) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
     await ensureLegacySchema(db);
-    const { row } = await lookupLegacy(db, syncId, syncKey);
+    const { row } = await lookupLegacy(db, syncId as string, syncKey as string);
     return noStore({ ok: true, mode: "legacy", found: Boolean(row), payload: row?.payload || null, updatedAt: row?.updated_at || null });
   } catch {
     return noStore({ error: "تعذر قراءة المزامنة" }, 500);
@@ -179,6 +183,12 @@ export async function DELETE(request: Request) {
   const rejected = requestAllowed(request);
   if (rejected) return rejected;
   try {
+    const accountRequested = Boolean(readUserSessionToken(request));
+    const url = new URL(request.url);
+    const syncId = url.searchParams.get("syncId");
+    const syncKey = request.headers.get("x-navixa-sync-key");
+    if (!accountRequested && (!isValidId(syncId) || !isValidKey(syncKey))) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
+
     const db = await getDb();
     if (!db) return noStore({ ok: false, configured: false }, 503);
 
@@ -189,14 +199,10 @@ export async function DELETE(request: Request) {
       return privateNoStore({ ok: true, mode: "account", found: (result.meta?.changes || 0) > 0 });
     }
 
-    const url = new URL(request.url);
-    const syncId = url.searchParams.get("syncId");
-    const syncKey = request.headers.get("x-navixa-sync-key");
-    if (!isValidId(syncId) || !isValidKey(syncKey)) return noStore({ error: "طلب المزامنة غير صالح" }, 400);
     await ensureLegacySchema(db);
-    const { row } = await lookupLegacy(db, syncId, syncKey);
+    const { row } = await lookupLegacy(db, syncId as string, syncKey as string);
     if (!row) return noStore({ ok: true, mode: "legacy", found: false });
-    await db.prepare("DELETE FROM navixa_secure_sync WHERE sync_id=? AND sync_key_hash=?").bind(syncId, await hashSyncKey(syncKey)).run();
+    await db.prepare("DELETE FROM navixa_secure_sync WHERE sync_id=? AND sync_key_hash=?").bind(syncId, await hashSyncKey(syncKey as string)).run();
     return noStore({ ok: true, mode: "legacy", found: true });
   } catch {
     return noStore({ error: "تعذر حذف المزامنة" }, 500);
