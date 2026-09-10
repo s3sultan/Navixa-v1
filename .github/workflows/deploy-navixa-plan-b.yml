@@ -99,7 +99,7 @@ jobs:
             sleep 3
           done
           echo "FAIL backup.navixasa.com health"
-          cat "$response"
+          jq -c '{ok,service,mode,verifierReady}' "$response" 2>/dev/null || true
           exit 1
 
       - name: Run signed-grant end-to-end drill
@@ -145,8 +145,16 @@ jobs:
             --header 'Content-Type: application/json' \
             --data "$(jq -cn --arg token "$smoke_grant" '{token:$token}')" \
             https://backup.navixasa.com/api/verify)"
-          test "$valid_status" = "200"
-          jq -e '.ok == true and .incident == "deployment-smoke" and (.expiresAt | type == "string") and (has("sub") | not)' "$valid_response" >/dev/null
+          if [ "$valid_status" != "200" ]; then
+            echo "Plan B valid-grant check failed: expected HTTP 200, got $valid_status"
+            jq -c '{ok,error}' "$valid_response" 2>/dev/null || echo 'Plan B returned a non-JSON error response'
+            exit 1
+          fi
+          if ! jq -e '.ok == true and .incident == "deployment-smoke" and (.expiresAt | type == "string") and (has("sub") | not)' "$valid_response" >/dev/null; then
+            echo "Plan B valid-grant response shape rejected"
+            jq -c '{ok,error,incident,expiresAt,hasSub:has("sub")}' "$valid_response" 2>/dev/null || true
+            exit 1
+          fi
 
           invalid_response="$(mktemp)"
           invalid_status="$(curl --silent --show-error --max-time 15 -o "$invalid_response" -w '%{http_code}' \
@@ -155,8 +163,16 @@ jobs:
             --header 'Content-Type: application/json' \
             --data '{"token":"invalid"}' \
             https://backup.navixasa.com/api/verify)"
-          test "$invalid_status" = "401"
-          jq -e '.ok == false and .error == "invalid_or_expired_grant"' "$invalid_response" >/dev/null
+          if [ "$invalid_status" != "401" ]; then
+            echo "Plan B invalid-grant check failed: expected HTTP 401, got $invalid_status"
+            jq -c '{ok,error}' "$invalid_response" 2>/dev/null || echo 'Plan B returned a non-JSON error response'
+            exit 1
+          fi
+          if ! jq -e '.ok == false and .error == "invalid_or_expired_grant"' "$invalid_response" >/dev/null; then
+            echo "Plan B invalid-grant response shape rejected"
+            jq -c '{ok,error}' "$invalid_response" 2>/dev/null || true
+            exit 1
+          fi
           echo "PASS Plan B signed-grant drill"
 
       - name: Wire verified Plan B into primary Worker
