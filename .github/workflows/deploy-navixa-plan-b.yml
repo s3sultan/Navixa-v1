@@ -7,6 +7,7 @@ on:
       - 'plan-b/**'
       - 'worker/planBAccess.ts'
       - 'worker/emergencyNotifications.ts'
+      - 'app/api/healthz/route.ts'
       - 'tests/plan-b-access.test.ts'
       - '.github/workflows/deploy-navixa-plan-b.yml'
   workflow_dispatch:
@@ -68,6 +69,30 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
 
+      - name: Ensure independent monitor state bucket
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets"
+          list_response="$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "${endpoint}?name=navixa-plan-b-state")"
+          if printf '%s' "$list_response" | jq -e '.success == true and any(.result.buckets[]?; .name == "navixa-plan-b-state")' >/dev/null; then
+            echo "PASS Plan B R2 state bucket exists"
+          else
+            create_response="$(curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header 'Content-Type: application/json' \
+              --data '{"name":"navixa-plan-b-state"}' \
+              "$endpoint")"
+            printf '%s' "$create_response" | jq -e '.success == true and .result.name == "navixa-plan-b-state"' >/dev/null
+            echo "PASS Plan B R2 state bucket created"
+          fi
+
       - name: Derive isolated Plan B keys and deploy fallback
         env:
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
@@ -91,7 +116,7 @@ jobs:
           response="$(mktemp)"
           for attempt in 1 2 3 4 5 6; do
             if curl --fail --silent --show-error --max-time 15 https://backup.navixasa.com/healthz > "$response"; then
-              if jq -e '.ok == true and .service == "navixa-plan-b" and .verifierReady == true' "$response" >/dev/null; then
+              if jq -e '.ok == true and .service == "navixa-plan-b" and .verifierReady == true and .stateStoreReady == true' "$response" >/dev/null; then
                 echo "PASS backup.navixasa.com health"
                 exit 0
               fi
@@ -99,7 +124,7 @@ jobs:
             sleep 3
           done
           echo "FAIL backup.navixasa.com health"
-          jq -c '{ok,service,mode,verifierReady}' "$response" 2>/dev/null || true
+          jq -c '{ok,service,mode,verifierReady,stateStoreReady}' "$response" 2>/dev/null || true
           exit 1
 
       - name: Run signed-grant end-to-end drill
@@ -212,3 +237,30 @@ jobs:
           curl --fail --silent --show-error --max-time 15 https://navixasa.com/ >/dev/null
           curl --fail --silent --show-error --max-time 15 https://backup.navixasa.com/access >/dev/null
           echo "PASS Plan B host and primary bindings"
+
+      - name: Verify independent monitor heartbeat
+        shell: bash
+        run: |
+          set -euo pipefail
+          primary="$(mktemp)"
+          monitor="$(mktemp)"
+          for attempt in $(seq 1 40); do
+            primary_ok=false
+            monitor_ok=false
+            if curl --fail --silent --show-error --max-time 12 https://navixasa.com/api/healthz > "$primary"; then
+              if jq -e '.ok == true and .service == "navixa-primary"' "$primary" >/dev/null; then primary_ok=true; fi
+            fi
+            if curl --fail --silent --show-error --max-time 12 https://backup.navixasa.com/monitor/status > "$monitor"; then
+              if jq -e '.ok == true and (.lastCheckedAt | type == "string" and length > 0) and .canonicalHealthy == true' "$monitor" >/dev/null; then monitor_ok=true; fi
+            fi
+            if [ "$primary_ok" = true ] && [ "$monitor_ok" = true ]; then
+              echo "PASS independent Plan B monitor heartbeat"
+              jq -c '{state,lastCheckedAt,canonicalHealthy,originHealthy}' "$monitor"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "FAIL independent Plan B monitor heartbeat"
+          jq -c '{ok,service}' "$primary" 2>/dev/null || true
+          jq -c '{ok,state,lastCheckedAt,canonicalHealthy,originHealthy,error}' "$monitor" 2>/dev/null || true
+          exit 1
