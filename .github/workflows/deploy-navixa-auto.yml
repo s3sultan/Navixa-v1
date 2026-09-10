@@ -134,6 +134,22 @@ jobs:
             done
           done
 
+      - name: Verify production sync route
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(mktemp)"
+          headers="$(mktemp)"
+          sync_id="navixa-production-smoke-0001"
+          sync_key="navixa-production-smoke-key-000000000001"
+          curl --fail --silent --show-error --max-time 15 \
+            --dump-header "$headers" \
+            --header "x-navixa-sync-key: $sync_key" \
+            "https://navixasa.com/api/sync?syncId=$sync_id" > "$response"
+          jq -e '.ok == true and .mode == "legacy" and (.found | type == "boolean")' "$response" >/dev/null
+          grep -Eqi '^cache-control:[[:space:]]*no-store' "$headers"
+          echo "PASS production /api/sync route"
+
       - name: Verify production security headers
         shell: bash
         run: |
