@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
-test("emergency mode is admin-only and sends only approved Plus continuity alerts", async () => {
+test("emergency mode is admin-only and sends only approved Hِmmah continuity alerts", async () => {
   const [core, route, notifications, preferences, account, plan, planBAccess] = await Promise.all([
     read("worker/emergencyMode.ts"),
     read("app/api/admin/emergency-mode/route.ts"),
@@ -31,8 +31,15 @@ test("emergency mode is admin-only and sends only approved Plus continuity alert
   assert.doesNotMatch(route, /billing|moyasar|payment/i);
 
   assert.match(notifications, /NAVIXA_PLAN_B_URL/);
+  assert.match(notifications, /NAVIXA_EMERGENCY_ENTITLEMENT_SECRET/);
+  assert.match(notifications, /NAVIXA_PLAN_B_SIGNING_SECRET/);
   assert.match(notifications, /resolvePlanBUrl/);
+  assert.match(notifications, /buildEmergencyEntitlementSnapshot/);
+  assert.match(notifications, /issuePlanBGrant/);
   assert.match(notifications, /plan_b_url_not_ready/);
+  assert.match(notifications, /plan_b_grants_not_ready/);
+  assert.match(notifications, /ttlSeconds: 10 \* 60/);
+  assert.match(notifications, /url\.hash = `grant=\$\{grant\}`/);
   assert.doesNotMatch(notifications, /chatgpt\.site/);
   assert.match(notifications, /status='active'/);
   assert.match(notifications, /subscription_ends_at>\?/);
@@ -60,5 +67,6 @@ test("emergency mode is admin-only and sends only approved Plus continuity alert
 
   assert.match(plan, /Payment remains disabled/);
   assert.match(plan, /short-lived signed access grants/);
-  assert.match(plan, /Do not assume `chatgpt\.site` can remove ChatGPT-account requirements/);
+  assert.match(plan, /URL fragment/);
+  assert.doesNotMatch(plan, /chatgpt\.site/);
 });
