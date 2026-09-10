@@ -66,7 +66,7 @@ test("emergency mode is admin-only and sends only approved Hِmmah continuity al
   assert.match(account, /إيقاف تنبيهات الطوارئ/);
 
   assert.match(plan, /Payment remains disabled/);
-  assert.match(plan, /short-lived signed access grants/);
+  assert.match(plan, /short-lived.*signed Plan B access grant/);
   assert.match(plan, /URL fragment/);
   assert.doesNotMatch(plan, /chatgpt\.site/);
 });
