@@ -1,4 +1,4 @@
-import { buildNavixaVoiceBiasPhrases } from "./voiceDetection";
+import { buildNavixaVoiceBiasPhrases } from "./voiceDetection.ts";
 
 export type NavixaVoiceLanguage = "ar-SA" | "en-US";
 
