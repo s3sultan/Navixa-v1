@@ -106,7 +106,7 @@ test("account sync requires the existing NAVIXA OTP session", async () => {
   }
 });
 
-test("account sync isolates users and detects stale writes", async () => {
+test("account sync isolates users, returns pseudonymous scopes, and detects stale writes", async () => {
   const db = new FakeAccountSyncDb();
   const tokenA = "A".repeat(48);
   const tokenB = "B".repeat(48);
@@ -124,12 +124,17 @@ test("account sync isolates users and detects stale writes", async () => {
     const aBody = await readA.json();
     assert.equal(aBody.found, true);
     assert.match(String(aBody.payload), /A only/);
+    assert.match(String(aBody.scopeId), /^[a-f0-9]{32}$/);
+    assert.notEqual(aBody.scopeId, "user-a");
 
     const readB = await accountSyncGET(accountRequest(tokenB));
     assert.equal(readB.status, 200);
     const bBody = await readB.json();
     assert.equal(bBody.found, false);
     assert.equal(bBody.payload, null);
+    assert.match(String(bBody.scopeId), /^[a-f0-9]{32}$/);
+    assert.notEqual(bBody.scopeId, aBody.scopeId);
+    assert.notEqual(bBody.scopeId, "user-b");
 
     const staleWrite = await accountSyncPUT(accountRequest(tokenA, "PUT", { payload: "{\"schema\":1}", expectedVersion: 0 }));
     assert.equal(staleWrite.status, 409);
