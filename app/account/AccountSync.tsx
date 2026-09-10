@@ -37,31 +37,72 @@ export default function AccountSync() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
+  const clearSignedOutState = () => {
+    setSignedIn(false);
+    setFound(false);
+    setVersion(0);
+    setUpdatedAt(null);
+    setPassphrase("");
+    setPassphraseConfirm("");
+    setNotice("");
+  };
+
   const refreshCloudState = async () => {
     const response = await fetch("/api/sync", { cache: "no-store", credentials: "same-origin" });
-    if (!response.ok) return;
+    if (response.status === 401) {
+      clearSignedOutState();
+      return false;
+    }
+    if (!response.ok) return false;
     const data = await response.json().catch(() => ({})) as SyncResponse;
     setFound(Boolean(data.found));
     setVersion(Number.isInteger(data.version) ? Number(data.version) : 0);
     setUpdatedAt(typeof data.updatedAt === "string" ? data.updatedAt : null);
+    return true;
   };
 
   useEffect(() => {
     let active = true;
+    let interactionTimer: ReturnType<typeof setTimeout> | undefined;
+
     const load = async () => {
       try {
         const response = await fetch("/api/account/session", { cache: "no-store", credentials: "same-origin" });
         const session = await response.json().catch(() => ({})) as SessionResponse;
         if (!active) return;
         const authenticated = response.ok && Boolean(session.signedIn);
-        setSignedIn(authenticated);
-        if (authenticated) await refreshCloudState();
+        if (!authenticated) {
+          clearSignedOutState();
+          return;
+        }
+        setSignedIn(true);
+        await refreshCloudState();
       } finally {
         if (active) setReady(true);
       }
     };
+
+    const refreshAfterInteraction = () => {
+      if (interactionTimer) clearTimeout(interactionTimer);
+      interactionTimer = setTimeout(() => { if (active) void load(); }, 250);
+    };
+    const refreshOnFocus = () => { if (active) void load(); };
+    const refreshOnVisibility = () => { if (document.visibilityState === "visible" && active) void load(); };
+
     void load();
-    return () => { active = false; };
+    window.addEventListener("click", refreshAfterInteraction, true);
+    window.addEventListener("focus", refreshOnFocus);
+    window.addEventListener("pageshow", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+
+    return () => {
+      active = false;
+      if (interactionTimer) clearTimeout(interactionTimer);
+      window.removeEventListener("click", refreshAfterInteraction, true);
+      window.removeEventListener("focus", refreshOnFocus);
+      window.removeEventListener("pageshow", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+    };
   }, []);
 
   const validatePassphrase = () => {
@@ -90,6 +131,7 @@ export default function AccountSync() {
       let expectedVersion = version;
       if (found) {
         const currentResponse = await fetch("/api/sync", { cache: "no-store", credentials: "same-origin" });
+        if (currentResponse.status === 401) { clearSignedOutState(); return; }
         const current = await currentResponse.json().catch(() => ({})) as SyncResponse;
         if (!currentResponse.ok || !current.found || typeof current.payload !== "string") throw new Error("current-backup-unavailable");
         await decryptSyncPayload(current.payload, encryptionPassphrase);
@@ -114,6 +156,7 @@ export default function AccountSync() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (response.status === 401) { clearSignedOutState(); return; }
       const data = await response.json().catch(() => ({})) as SyncResponse;
       if (response.status === 409 || data.conflict) {
         setVersion(Number(data.currentVersion) || expectedVersion);
@@ -146,6 +189,7 @@ export default function AccountSync() {
     setNotice("جارٍ جلب النسخة المشفرة وفكها على هذا الجهاز…");
     try {
       const response = await fetch("/api/sync", { cache: "no-store", credentials: "same-origin" });
+      if (response.status === 401) { clearSignedOutState(); return; }
       const data = await response.json().catch(() => ({})) as SyncResponse;
       if (!response.ok || !data.found || typeof data.payload !== "string") throw new Error("not-found");
       const plain = await decryptSyncPayload(data.payload, decryptionPassphrase);
@@ -177,6 +221,7 @@ export default function AccountSync() {
     setNotice("");
     try {
       const response = await fetch("/api/sync", { method: "DELETE", credentials: "same-origin" });
+      if (response.status === 401) { clearSignedOutState(); return; }
       if (!response.ok) throw new Error("delete-failed");
       setFound(false);
       setVersion(0);
