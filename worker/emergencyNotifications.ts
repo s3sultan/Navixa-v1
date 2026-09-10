@@ -1,5 +1,6 @@
+import { buildEmergencyEntitlementSnapshot } from "./emergencyEntitlements";
 import { type EmergencyDatabase, type EmergencyState } from "./emergencyMode";
-import { resolvePlanBUrl } from "./planBAccess";
+import { issuePlanBGrant, resolvePlanBUrl } from "./planBAccess";
 import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
 
 type Statement = {
@@ -18,6 +19,8 @@ export type EmergencyNotificationEnv = {
   NAVIXA_TELEGRAM_BOT_TOKEN?: string;
   NAVIXA_TELEGRAM_ENCRYPTION_KEY?: string;
   NAVIXA_PLAN_B_URL?: string;
+  NAVIXA_EMERGENCY_ENTITLEMENT_SECRET?: string;
+  NAVIXA_PLAN_B_SIGNING_SECRET?: string;
 };
 
 type ActivePlusSubscriber = {
@@ -71,14 +74,23 @@ async function finishDelivery(db: Database, id: string, ok: boolean, error = "")
   await db.prepare("UPDATE navixa_emergency_deliveries SET status='failed',error=? WHERE id=?").bind(error.slice(0, 300), id).run();
 }
 
-function copy(kind: DeliveryKind, name: string, planBUrl: string | null) {
+function planBAccessUrl(planBUrl: string, grant: string) {
+  const url = new URL(planBUrl);
+  const basePath = url.pathname.replace(/\/+$/, "");
+  url.pathname = `${basePath}/access`.replace(/\/+/g, "/");
+  url.search = "";
+  url.hash = `grant=${grant}`;
+  return url.toString();
+}
+
+function copy(kind: DeliveryKind, name: string, accessUrl: string | null) {
   const greeting = name ? `أهلًا ${name}` : "أهلًا";
   if (kind === "start") {
-    if (!planBUrl) throw new Error("plan_b_url_not_ready");
+    if (!accessUrl) throw new Error("plan_b_access_not_ready");
     return {
       subject: "NAVIXA هِمّة: تم تفعيل المنصة الاحتياطية",
-      email: `${greeting}\n\nرصدنا تعطلًا مؤكدًا في خدمة NAVIXA الأساسية، وتم تفعيل وضع الطوارئ لمشتركي هِمّة.\n\nيمكنك استخدام المنصة الاحتياطية مؤقتًا من هنا:\n${planBUrl}\n\nسنبلغك عند استقرار الخدمة الأساسية وعودتها.\n\nNAVIXA SA`,
-      telegram: `${greeting}\n\nتم تفعيل وضع الطوارئ لمشتركي NAVIXA هِمّة بعد تعطل مؤكد في الخدمة الأساسية.\n\nالمنصة الاحتياطية:\n${planBUrl}\n\nسنبلغك عند عودة الخدمة الأساسية واستقرارها.`,
+      email: `${greeting}\n\nرصدنا تعطلًا مؤكدًا في خدمة NAVIXA الأساسية، وتم تفعيل وضع الطوارئ لمشتركي هِمّة.\n\nاستخدم تصريح الطوارئ المؤقت من هذا الرابط:\n${accessUrl}\n\nالتصريح قصير العمر ومخصص لهذا الحادث فقط. سنبلغك عند استقرار الخدمة الأساسية وعودتها.\n\nNAVIXA SA`,
+      telegram: `${greeting}\n\nتم تفعيل وضع الطوارئ لمشتركي NAVIXA هِمّة بعد تعطل مؤكد في الخدمة الأساسية.\n\nرابط الدخول المؤقت:\n${accessUrl}\n\nالتصريح قصير العمر ومخصص لهذا الحادث فقط. سنبلغك عند عودة الخدمة الأساسية واستقرارها.`,
     };
   }
   return {
@@ -127,13 +139,39 @@ export async function deliverEmergencyIncidentNotifications(env: EmergencyNotifi
     return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0, blocked: "plan_b_url_not_ready" as const };
   }
 
+  const entitlementSecret = env.NAVIXA_EMERGENCY_ENTITLEMENT_SECRET?.trim() || "";
+  const signingSecret = env.NAVIXA_PLAN_B_SIGNING_SECRET?.trim() || "";
+  if (kind === "start" && (entitlementSecret.length < 32 || signingSecret.length < 32)) {
+    return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0, blocked: "plan_b_grants_not_ready" as const };
+  }
+
   const subscribers = await activePlusSubscribers(env.DB);
+  const snapshot = kind === "start" ? await buildEmergencyEntitlementSnapshot(env.DB, entitlementSecret) : null;
   let emailSent = 0;
   let telegramSent = 0;
   let failed = 0;
 
   for (const subscriber of subscribers) {
-    const message = copy(kind, subscriber.display_name, planBUrl);
+    let accessUrl: string | null = null;
+    if (kind === "start" && snapshot && planBUrl) {
+      try {
+        const grant = await issuePlanBGrant({
+          snapshot,
+          email: subscriber.contact,
+          entitlementSecret,
+          signingSecret,
+          emergencyState: input.state,
+          incidentId: input.incidentId,
+          ttlSeconds: 10 * 60,
+        });
+        accessUrl = planBAccessUrl(planBUrl, grant);
+      } catch {
+        failed += 1;
+        continue;
+      }
+    }
+
+    const message = copy(kind, subscriber.display_name, accessUrl);
 
     const emailDelivery = await claimDelivery(env.DB, input.incidentId, subscriber.id, kind, "email");
     if (emailDelivery) {
