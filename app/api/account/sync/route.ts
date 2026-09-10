@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server.js";
 import { createMemoryRateLimiter } from "../../../../worker/adminAuth.ts";
 import {
+  hashOpaqueValue,
   refreshUserSessionIfNeeded,
   resolveUserSession,
   trustedUserMutation,
@@ -51,6 +52,10 @@ async function authenticated(request: Request, db: Database): Promise<{ session:
   return refreshUserSessionIfNeeded(request, db, session).catch(() => ({ session, cookie: null }));
 }
 
+async function syncScopeId(userId: string) {
+  return (await hashOpaqueValue(`account-sync:${userId}`)).slice(0, 32);
+}
+
 function validExpectedVersion(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= Number.MAX_SAFE_INTEGER;
 }
@@ -69,6 +74,7 @@ export async function GET(request: Request) {
     const row = result.results[0] || null;
     return json({
       ok: true,
+      scopeId: await syncScopeId(auth.session.userId),
       found: Boolean(row),
       version: row?.version || 0,
       payload: row?.payload || null,
