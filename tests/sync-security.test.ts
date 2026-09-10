@@ -12,21 +12,22 @@ class FakeAccountSyncDb {
   sync = new Map<string, { version: number; payload: string; updated_at: string }>();
 
   prepare(sql: string) {
-    const database = this;
+    const sessions = this.sessions;
+    const syncRows = this.sync;
     let values: unknown[] = [];
     return {
       bind(...nextValues: unknown[]) { values = nextValues; return this; },
       async all<T = Record<string, unknown>>() {
         if (sql.includes("FROM navixa_user_sessions s JOIN navixa_users u")) {
-          const row = database.sessions.get(String(values[0] || ""));
+          const row = sessions.get(String(values[0] || ""));
           return { results: (row ? [row] : []) as T[] };
         }
         if (sql.includes("SELECT version,payload,updated_at FROM navixa_user_sync")) {
-          const row = database.sync.get(String(values[0] || ""));
+          const row = syncRows.get(String(values[0] || ""));
           return { results: (row ? [row] : []) as T[] };
         }
         if (sql.includes("SELECT version FROM navixa_user_sync")) {
-          const row = database.sync.get(String(values[0] || ""));
+          const row = syncRows.get(String(values[0] || ""));
           return { results: (row ? [{ version: row.version }] : []) as T[] };
         }
         throw new Error(`Unhandled fake D1 all(): ${sql}`);
@@ -34,17 +35,17 @@ class FakeAccountSyncDb {
       async run() {
         if (sql.includes("INSERT INTO navixa_user_sync")) {
           const [userId, payload, updatedAt] = values.map(String);
-          if (database.sync.has(userId)) throw new Error("UNIQUE constraint failed");
-          database.sync.set(userId, { version: 1, payload, updated_at: updatedAt });
+          if (syncRows.has(userId)) throw new Error("UNIQUE constraint failed");
+          syncRows.set(userId, { version: 1, payload, updated_at: updatedAt });
           return { meta: { changes: 1 } };
         }
         if (sql.includes("UPDATE navixa_user_sync SET payload=?,version=version+1")) {
           const [payload, updatedAt, userIdRaw, expectedVersionRaw] = values;
           const userId = String(userIdRaw || "");
           const expectedVersion = Number(expectedVersionRaw);
-          const current = database.sync.get(userId);
+          const current = syncRows.get(userId);
           if (!current || current.version !== expectedVersion) return { meta: { changes: 0 } };
-          database.sync.set(userId, { version: current.version + 1, payload: String(payload), updated_at: String(updatedAt) });
+          syncRows.set(userId, { version: current.version + 1, payload: String(payload), updated_at: String(updatedAt) });
           return { meta: { changes: 1 } };
         }
         throw new Error(`Unhandled fake D1 run(): ${sql}`);
