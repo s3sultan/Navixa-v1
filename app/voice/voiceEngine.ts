@@ -70,8 +70,14 @@ type BrowserVoiceEngineOptions = {
   continuous?: boolean;
   interimResults?: boolean;
   localAccuracyFallback?: boolean;
+  adaptiveLanguage?: boolean;
   handlers: NavixaVoiceEngineHandlers;
 };
+
+const ADAPTIVE_LANGUAGES: NavixaVoiceLanguage[] = ["ar-SA", "en-IN", "en-US"];
+const LANGUAGE_HINT_STORAGE_KEY = "navixa-voice-language-hint";
+const INITIAL_LANGUAGE_PROBE_MS = 12_000;
+const ACTIVE_LANGUAGE_PROBE_MS = 18_000;
 
 const getRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
   if (typeof window === "undefined") return null;
@@ -115,11 +121,39 @@ const readAlternatives = (result: SpeechRecognitionResultLike | undefined, limit
   return alternatives;
 };
 
+const readStoredLanguageHint = (): NavixaVoiceLanguage | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.localStorage?.getItem(LANGUAGE_HINT_STORAGE_KEY);
+    return ADAPTIVE_LANGUAGES.includes(value as NavixaVoiceLanguage) ? value as NavixaVoiceLanguage : null;
+  } catch {
+    return null;
+  }
+};
+
+const rememberLanguageHint = (language: NavixaVoiceLanguage) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage?.setItem?.(LANGUAGE_HINT_STORAGE_KEY, language);
+  } catch {
+    // Language hints are only a local optimization; recognition does not depend on storage.
+  }
+};
+
+const detectTranscriptScript = (text: string): "ar" | "en" | null => {
+  const arabic = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  if (arabic >= 2 && arabic > latin * 1.25) return "ar";
+  if (latin >= 3 && latin > arabic * 1.25) return "en";
+  return null;
+};
+
 export function createNavixaBrowserVoiceEngine({
   language = "ar-SA",
   continuous = true,
   interimResults = true,
   localAccuracyFallback = true,
+  adaptiveLanguage = true,
   handlers,
 }: BrowserVoiceEngineOptions): NavixaVoiceEngine {
   const Recognition = getRecognitionConstructor();
@@ -134,7 +168,10 @@ export function createNavixaBrowserVoiceEngine({
   }
 
   const recognition = new Recognition();
-  recognition.lang = language;
+  const initialLanguage = adaptiveLanguage ? readStoredLanguageHint() || language : language;
+  let languageIndex = Math.max(0, ADAPTIVE_LANGUAGES.indexOf(initialLanguage));
+  const currentLanguage = () => adaptiveLanguage ? ADAPTIVE_LANGUAGES[languageIndex] : language;
+  recognition.lang = currentLanguage();
   recognition.continuous = continuous;
   recognition.interimResults = interimResults;
   recognition.maxAlternatives = 5;
@@ -148,10 +185,45 @@ export function createNavixaBrowserVoiceEngine({
 
   let destroyed = false;
   let active = false;
+  let languageProbeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearLanguageProbe = () => {
+    if (languageProbeTimer) clearTimeout(languageProbeTimer);
+    languageProbeTimer = null;
+  };
+
+  const setLanguage = (next: NavixaVoiceLanguage) => {
+    const index = ADAPTIVE_LANGUAGES.indexOf(next);
+    if (index >= 0) languageIndex = index;
+  };
+
+  const advanceLanguage = () => {
+    if (!adaptiveLanguage) return;
+    languageIndex = (languageIndex + 1) % ADAPTIVE_LANGUAGES.length;
+  };
+
+  const requestLanguageRestart = (next?: NavixaVoiceLanguage) => {
+    if (!adaptiveLanguage || destroyed || !active) return;
+    if (next) setLanguage(next);
+    else advanceLanguage();
+    clearLanguageProbe();
+    try {
+      recognition.stop();
+    } catch {
+      // The browser may already be between recognition sessions.
+    }
+  };
+
+  const armLanguageProbe = (delay = INITIAL_LANGUAGE_PROBE_MS) => {
+    if (!adaptiveLanguage || destroyed || !active) return;
+    clearLanguageProbe();
+    languageProbeTimer = setTimeout(() => requestLanguageRestart(), delay);
+  };
 
   recognition.onstart = () => {
     if (destroyed) return;
     active = true;
+    armLanguageProbe();
     handlers.onStart?.();
   };
 
@@ -159,6 +231,7 @@ export function createNavixaBrowserVoiceEngine({
     if (destroyed || !event.results) return;
     const resultIndex = Number.isInteger(event.resultIndex) ? Math.max(0, event.resultIndex ?? 0) : 0;
     const interimByRank = new Map<number, Array<{ text: string; confidence?: number }>>();
+    let finalPrimaryText = "";
 
     for (let index = resultIndex; index < event.results.length; index += 1) {
       const result = event.results[index];
@@ -169,6 +242,7 @@ export function createNavixaBrowserVoiceEngine({
         for (let alternativeIndex = 1; alternativeIndex < alternatives.length; alternativeIndex += 1) {
           handlers.onTranscript({ ...alternatives[alternativeIndex], interim: true });
         }
+        finalPrimaryText = alternatives[0].text;
         handlers.onTranscript({ ...alternatives[0], interim: false });
         continue;
       }
@@ -190,16 +264,32 @@ export function createNavixaBrowserVoiceEngine({
         confidence: parts.at(-1)?.confidence,
       });
     }
+
+    if (!adaptiveLanguage || !finalPrimaryText) return;
+    const script = detectTranscriptScript(finalPrimaryText);
+    const activeLanguage = currentLanguage();
+    if (script === "ar" && activeLanguage !== "ar-SA") {
+      requestLanguageRestart("ar-SA");
+      return;
+    }
+    if (script === "en" && activeLanguage === "ar-SA") {
+      requestLanguageRestart("en-IN");
+      return;
+    }
+    rememberLanguageHint(activeLanguage);
+    armLanguageProbe(ACTIVE_LANGUAGE_PROBE_MS);
   };
 
   recognition.onerror = (event) => {
     if (destroyed) return;
     const error = typeof event?.error === "string" ? event.error : "voice-recognition-error";
+    if (adaptiveLanguage && error === "no-speech") advanceLanguage();
     handlers.onError?.(error);
   };
 
   recognition.onend = () => {
     active = false;
+    clearLanguageProbe();
     if (!destroyed) handlers.onEnd?.();
   };
 
@@ -209,6 +299,7 @@ export function createNavixaBrowserVoiceEngine({
     start: () => {
       if (destroyed || active) return false;
       try {
+        recognition.lang = currentLanguage();
         recognition.start();
         if (localFallback?.supported) void localFallback.start();
         return true;
@@ -218,6 +309,7 @@ export function createNavixaBrowserVoiceEngine({
     },
     stop: () => {
       if (destroyed) return;
+      clearLanguageProbe();
       localFallback?.stop();
       try {
         recognition.stop();
@@ -229,6 +321,7 @@ export function createNavixaBrowserVoiceEngine({
       if (destroyed) return;
       destroyed = true;
       active = false;
+      clearLanguageProbe();
       localFallback?.destroy();
       recognition.onstart = null;
       recognition.onresult = null;
