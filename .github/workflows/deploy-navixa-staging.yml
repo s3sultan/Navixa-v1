@@ -3,7 +3,7 @@ name: Deploy NAVIXA Staging
 on:
   workflow_dispatch:
   push:
-    branches: [staging, security/hardening-2026-09-04, feat/account-session-sync-20260910]
+    branches: [staging, security/hardening-2026-09-04]
     paths-ignore:
       - "**/*.md"
 
