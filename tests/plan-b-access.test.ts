@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { issuePlanBGrant, planBMayOpen, resolvePlanBUrl, verifyPlanBGrant } from "../worker/planBAccess.ts";
 import { emergencyEntitlementKey, type EmergencyEntitlementSnapshot } from "../worker/emergencyEntitlements.ts";
+import { handlePlanBRequest, verifyPlanBGrantToken } from "../plan-b/worker.mjs";
 
 const entitlementSecret = "entitlement-secret-for-tests-123456";
 const signingSecret = "signing-secret-for-tests-123456789";
@@ -28,6 +30,7 @@ test("Plan B only accepts NAVIXA-controlled HTTPS fallbacks and emergency access
   assert.equal(resolvePlanBUrl("https://fallback.navixasa.com:8443"), null);
   assert.equal(resolvePlanBUrl("https://navixasa.com/plan-b#private"), "https://navixasa.com/plan-b");
   assert.equal(resolvePlanBUrl("https://fallback.navixasa.com/"), "https://fallback.navixasa.com");
+  assert.equal(resolvePlanBUrl("https://backup.navixasa.com/"), "https://backup.navixasa.com");
   assert.equal(planBMayOpen("healthy"), false);
   assert.equal(planBMayOpen("degraded"), false);
   assert.equal(planBMayOpen("security-hold"), false);
@@ -65,4 +68,53 @@ test("tampered grants are rejected", async () => {
     emergencyState: "outage", incidentId: "incident-1", now,
   });
   assert.equal(await verifyPlanBGrant(`${token}x`, signingSecret, now), null);
+});
+
+test("independent Plan B worker verifies grants without D1 and redacts entitlement identity", async () => {
+  const liveNow = new Date();
+  const liveEmail = "plan-b-worker-test@navixa.invalid";
+  const liveSnapshot: EmergencyEntitlementSnapshot = {
+    version: 1,
+    generatedAt: liveNow.toISOString(),
+    records: [{
+      entitlementKey: await emergencyEntitlementKey(liveEmail, entitlementSecret),
+      activeUntil: new Date(liveNow.getTime() + 60 * 60 * 1000).toISOString(),
+    }],
+  };
+  const token = await issuePlanBGrant({
+    snapshot: liveSnapshot,
+    email: liveEmail,
+    entitlementSecret,
+    signingSecret,
+    emergencyState: "outage",
+    incidentId: "worker-test",
+    now: liveNow,
+    ttlSeconds: 300,
+  });
+
+  const workerPayload = await verifyPlanBGrantToken(token, signingSecret, new Date(liveNow.getTime() + 60_000));
+  assert.equal(workerPayload?.incident, "worker-test");
+
+  const response = await handlePlanBRequest(new Request("https://backup.navixasa.com/api/verify", {
+    method: "POST",
+    headers: { "Origin": "https://backup.navixasa.com", "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  }), { NAVIXA_PLAN_B_SIGNING_SECRET: signingSecret });
+  assert.equal(response.status, 200);
+  const body = await response.json() as Record<string, unknown>;
+  assert.equal(body.ok, true);
+  assert.equal(body.incident, "worker-test");
+  assert.equal("sub" in body, false);
+
+  const wrongOrigin = await handlePlanBRequest(new Request("https://backup.navixasa.com/api/verify", {
+    method: "POST",
+    headers: { "Origin": "https://evil.example", "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  }), { NAVIXA_PLAN_B_SIGNING_SECRET: signingSecret });
+  assert.equal(wrongOrigin.status, 403);
+
+  const wrangler = await readFile(new URL("../plan-b/wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(wrangler, /backup\.navixasa\.com/);
+  assert.match(wrangler, /"custom_domain": true/);
+  assert.doesNotMatch(wrangler, /d1_databases|navixa-db|DB/);
 });
