@@ -35,6 +35,20 @@ test("matches multi-word watched phrases across normalized spacing", () => {
   assert.equal(findNavixaVoiceTerm("يا   سلطان الحربي انتبه", ["سلطان الحربي"])?.normalizedTerm, "سلطان الحربي");
 });
 
+test("returns candidate, method and score for accent variants", () => {
+  const fuzzy = findNavixaVoiceTerm("Doctor called Soltan", ["sultan"]);
+  assert.ok(fuzzy);
+  assert.equal(fuzzy.candidate, "soltan");
+  assert.equal(fuzzy.method, "fuzzy");
+  assert.ok(fuzzy.score >= 0.82);
+
+  const phonetic = findNavixaVoiceTerm("Please ask Mohammed now", ["محمد"]);
+  assert.ok(phonetic);
+  assert.equal(phonetic.candidate, "mohammed");
+  assert.equal(phonetic.method, "phonetic");
+  assert.equal(phonetic.score, 0.9);
+});
+
 test("matches safe Latin accent and segmentation variants", () => {
   assert.equal(findNavixaVoiceTerm("Please ask Sultaan now", ["sultan"])?.normalizedTerm, "sultan");
   assert.equal(findNavixaVoiceTerm("Please ask soul tan now", ["sultan"])?.normalizedTerm, "sultan");
