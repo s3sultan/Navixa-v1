@@ -5,6 +5,7 @@ import Link from "next/link";
 import FeatureAccessGate from "../FeatureAccessGate";
 import PersonalReminderEngine from "../PersonalReminderEngine";
 import { readAcademicReminders, saveAcademicReminder, type AcademicReminder } from "../academicReminders";
+import { scheduleAccountTodaySync, syncAccountTodayData } from "../accountSync";
 import "../navixa.css";
 import "./today.css";
 
@@ -32,15 +33,36 @@ export default function TodayPage() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     try { setTasks(JSON.parse(localStorage.getItem(TASKS_KEY) || "[]")); } catch { setTasks([]); }
     setAcademicReminders(readAcademicReminders());
-    const refresh = () => setAcademicReminders(readAcademicReminders());
+    const refresh = () => {
+      setAcademicReminders(readAcademicReminders());
+      scheduleAccountTodaySync();
+    };
+    const applyAccountSync = () => {
+      void syncAccountTodayData().then((result) => {
+        if (cancelled || result.status !== "synced") return;
+        setTasks(result.tasks);
+        setAcademicReminders(result.academicReminders);
+      });
+    };
     window.addEventListener("navixa:academic-reminder", refresh);
+    window.addEventListener("focus", applyAccountSync);
     setReady(true);
-    return () => window.removeEventListener("navixa:academic-reminder", refresh);
+    applyAccountSync();
+    return () => {
+      cancelled = true;
+      window.removeEventListener("navixa:academic-reminder", refresh);
+      window.removeEventListener("focus", applyAccountSync);
+    };
   }, []);
 
-  useEffect(() => { if (ready) localStorage.setItem(TASKS_KEY, JSON.stringify(tasks)); }, [tasks, ready]);
+  useEffect(() => {
+    if (!ready) return;
+    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+    scheduleAccountTodaySync();
+  }, [tasks, ready]);
 
   const openQuickAdd = (nextKind: QuickAddKind = "task") => {
     setKind(nextKind);
@@ -105,7 +127,7 @@ export default function TodayPage() {
 
       <nav className="today-bottom-nav" aria-label="اختصارات الجوال"><Link href="/"><span>⌂</span><b>الرئيسية</b></Link><Link className="active" href="/today"><span>◷</span><b>يومي</b></Link><button type="button" onClick={() => openQuickAdd("task")} aria-label="إضافة سريعة"><span>＋</span><b>إضافة</b></button><Link href="/progress"><span>↗</span><b>تقدّمي</b></Link><Link href="/reminders"><span>♢</span><b>التذكيرات</b></Link><Link href="/account"><span>⌾</span><b>حسابي</b></Link></nav>
 
-      {sheetOpen && <div className="quick-add-backdrop" onClick={() => setSheetOpen(false)}><section className="quick-add-sheet" role="dialog" aria-modal="true" aria-labelledby="quick-add-title" onClick={(event) => event.stopPropagation()}><button className="quick-add-close" type="button" onClick={() => setSheetOpen(false)} aria-label="إغلاق">×</button><small>إضافة سريعة</small><h2 id="quick-add-title">{kind === "task" ? "أضف مهمة واضحة" : kind === "appointment" ? "أضف موعدًا وتذكيرًا" : "جهّز جلسة تركيز"}</h2><div className="quick-add-types"><button type="button" className={kind === "task" ? "selected" : ""} onClick={() => setKind("task")}>✓ مهمة</button><button type="button" className={kind === "appointment" ? "selected" : ""} onClick={() => setKind("appointment")}>◷ موعد</button><button type="button" className={kind === "focus" ? "selected" : ""} onClick={() => setKind("focus")}>◎ تركيز</button></div><form onSubmit={submitQuickAdd}>{kind === "focus" ? <label>المدة بالدقائق<input autoFocus value={title} inputMode="numeric" onChange={(event) => setTitle(event.target.value)} placeholder="25" /></label> : <><label>{kind === "task" ? "ما المهمة؟" : "ما الموعد؟"}<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "task" ? "مثال: مراجعة محاضرة اليوم" : "مثال: كويز مادة الإحصاء"} maxLength={120} /></label><div className="quick-add-datetime"><label>التاريخ<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>{kind === "appointment" && <label>الوقت<input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>}</div></>}<button type="submit">{kind === "appointment" ? "حفظ الموعد والتذكير" : kind === "focus" ? "تجهيز جلسة التركيز" : "إضافة المهمة"}</button></form><p>{kind === "appointment" ? "سيظهر الموعد في يومي ويُضاف له تذكير قبل يوم. يمكنك إدارة قناة الوصول من مركز التنبيهات." : "تُحفظ هذه الإضافة على جهازك، ويمكنك تعديلها أو حذفها لاحقًا."}</p></section></div>}
+      {sheetOpen && <div className="quick-add-backdrop" onClick={() => setSheetOpen(false)}><section className="quick-add-sheet" role="dialog" aria-modal="true" aria-labelledby="quick-add-title" onClick={(event) => event.stopPropagation()}><button className="quick-add-close" type="button" onClick={() => setSheetOpen(false)} aria-label="إغلاق">×</button><small>إضافة سريعة</small><h2 id="quick-add-title">{kind === "task" ? "أضف مهمة واضحة" : kind === "appointment" ? "أضف موعدًا وتذكيرًا" : "جهّز جلسة تركيز"}</h2><div className="quick-add-types"><button type="button" className={kind === "task" ? "selected" : ""} onClick={() => setKind("task")}>✓ مهمة</button><button type="button" className={kind === "appointment" ? "selected" : ""} onClick={() => setKind("appointment")}>◷ موعد</button><button type="button" className={kind === "focus" ? "selected" : ""} onClick={() => setKind("focus")}>◎ تركيز</button></div><form onSubmit={submitQuickAdd}>{kind === "focus" ? <label>المدة بالدقائق<input autoFocus value={title} inputMode="numeric" onChange={(event) => setTitle(event.target.value)} placeholder="25" /></label> : <><label>{kind === "task" ? "ما المهمة؟" : "ما الموعد؟"}<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "task" ? "مثال: مراجعة محاضرة اليوم" : "مثال: كويز مادة الإحصاء"} maxLength={120} /></label><div className="quick-add-datetime"><label>التاريخ<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>{kind === "appointment" && <label>الوقت<input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>}</div></>}<button type="submit">{kind === "appointment" ? "حفظ الموعد والتذكير" : kind === "focus" ? "تجهيز جلسة التركيز" : "إضافة المهمة"}</button></form><p>{kind === "appointment" ? "سيظهر الموعد في يومي ويُضاف له تذكير قبل يوم، ومع تسجيل الدخول تتم مزامنته مع حسابك." : kind === "focus" ? "مدة التركيز تبقى على هذا الجهاز ولا تُرفع إلى السحابة." : "تُحفظ المهمة على جهازك، ومع تسجيل الدخول تتم مزامنتها مع حسابك."}</p></section></div>}
     </FeatureAccessGate>
   </main>;
 }
