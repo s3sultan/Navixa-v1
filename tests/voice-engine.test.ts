@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { findNavixaVoiceTerm } from "../app/voice/voiceDetection.ts";
 import { createNavixaBrowserVoiceEngine } from "../app/voice/voiceEngine.ts";
+import { readNavixaLearnedVoiceAliases, rememberNavixaVoiceMatch } from "../app/voice/voiceLearning.ts";
 
 type FakeAlternative = { transcript: string; confidence: number };
 type FakeResult = { 0: FakeAlternative; 1?: FakeAlternative; 2?: FakeAlternative; length?: number; isFinal: boolean };
@@ -18,6 +20,7 @@ class FakeRecognition {
   onstart: (() => void) | null = null;
   onresult: ((event: FakeResultEvent) => void) | null = null;
   onerror: ((event: FakeErrorEvent) => void) | null = null;
+  onnomatch: (() => void) | null = null;
   onend: (() => void) | null = null;
   startCalls = 0;
   stopCalls = 0;
@@ -52,17 +55,20 @@ class FakePhrase {
 }
 
 const setFakeWindow = (storedTerms = "") => {
+  const store = new Map<string, string>();
+  if (storedTerms) store.set("navixa-watch-terms", storedTerms);
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: {
       SpeechRecognition: FakeRecognition,
       SpeechRecognitionPhrase: FakePhrase,
       localStorage: {
-        getItem: (key: string) => key === "navixa-watch-terms" ? storedTerms : null,
-        setItem: () => undefined,
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
       },
     },
   });
+  return store;
 };
 
 const clearFakeWindow = () => {
@@ -94,6 +100,7 @@ test("configures and cleans up the browser voice engine", () => {
     engine.destroy();
     assert.equal(recognition.abortCalls, 1);
     assert.equal(recognition.onresult, null);
+    assert.equal(recognition.onnomatch, null);
   } finally {
     clearFakeWindow();
   }
@@ -108,6 +115,39 @@ test("adds stored watched names as conservative contextual recognition hints", (
     const phrases = recognition.phrases as FakePhrase[];
     assert.deepEqual(phrases.map(({ phrase }) => phrase), ["سلطان الحربي", "سلطان", "الحربي", "quiz"]);
     assert.ok(phrases.every(({ boost }) => boost === 5.5));
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("learns an accented pronunciation only after repeat evidence or source agreement", () => {
+  setFakeWindow("sultan");
+  try {
+    const match = findNavixaVoiceTerm("Doctor called Soltan", ["sultan"]);
+    assert.ok(match);
+    const now = Date.now();
+    assert.equal(rememberNavixaVoiceMatch(match, "browser", now), false);
+    assert.deepEqual(readNavixaLearnedVoiceAliases("sultan", now), []);
+    assert.equal(rememberNavixaVoiceMatch(match, "local", now + 1), true);
+    assert.deepEqual(readNavixaLearnedVoiceAliases("sultan", now + 1), ["soltan"]);
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("reuses a trusted learned pronunciation as contextual bias", () => {
+  setFakeWindow("sultan");
+  try {
+    const match = findNavixaVoiceTerm("Doctor called Soltan", ["sultan"]);
+    assert.ok(match);
+    const now = Date.now();
+    rememberNavixaVoiceMatch(match, "browser", now);
+    rememberNavixaVoiceMatch(match, "local", now + 1);
+    createNavixaBrowserVoiceEngine({ handlers: { onTranscript: () => undefined } });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition);
+    const phrases = recognition.phrases as FakePhrase[];
+    assert.deepEqual(phrases.map(({ phrase }) => phrase), ["sultan", "soltan"]);
   } finally {
     clearFakeWindow();
   }
@@ -236,6 +276,53 @@ test("cycles toward Indian English after a no-speech recognition cycle", () => {
     assert.ok(recognition?.onerror && recognition.onend);
     assert.equal(engine.start(), true);
     recognition.onerror({ error: "no-speech" });
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-IN");
+    engine.destroy();
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("rotates language after an explicit browser no-match", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "ar-SA",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onnomatch && recognition.onend);
+    assert.equal(engine.start(), true);
+    recognition.onnomatch();
+    assert.equal(recognition.stopCalls, 1);
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-IN");
+    engine.destroy();
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("rotates language early after a very low-confidence final result", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "ar-SA",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onresult && recognition.onend);
+    assert.equal(engine.start(), true);
+    recognition.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "unclear speech", confidence: 0.2 }, isFinal: true }],
+    });
+    assert.equal(recognition.stopCalls, 1);
     recognition.onend();
     assert.equal(engine.start(), true);
     assert.equal(recognition.lang, "en-IN");

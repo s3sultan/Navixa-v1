@@ -1,6 +1,11 @@
+export type NavixaVoiceMatchMethod = "exact" | "fuzzy" | "phonetic";
+
 export type NavixaVoiceMatch = {
   term: string;
   normalizedTerm: string;
+  candidate: string;
+  method: NavixaVoiceMatchMethod;
+  score: number;
 };
 
 const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670]/g;
@@ -116,14 +121,16 @@ const editDistance = (left: string, right: string): number => {
   return previous[right.length];
 };
 
-const isSafeFuzzyLatinMatch = (candidate: string, term: string): boolean => {
+const safeFuzzyLatinScore = (candidate: string, term: string): number | null => {
   const compactCandidate = candidate.replace(/\s+/g, "");
   const compactTerm = term.replace(/\s+/g, "");
-  if (!LATIN.test(compactTerm) || compactTerm.length < 5 || compactCandidate.length < 4) return false;
-  if (compactCandidate[0] !== compactTerm[0]) return false;
+  if (!LATIN.test(compactTerm) || compactTerm.length < 5 || compactCandidate.length < 4) return null;
+  if (compactCandidate[0] !== compactTerm[0]) return null;
   const allowance = compactTerm.length >= 9 ? 2 : 1;
-  if (Math.abs(compactCandidate.length - compactTerm.length) > allowance) return false;
-  return editDistance(compactCandidate, compactTerm) <= allowance;
+  if (Math.abs(compactCandidate.length - compactTerm.length) > allowance) return null;
+  const distance = editDistance(compactCandidate, compactTerm);
+  if (distance > allowance) return null;
+  return Math.max(0.82, 1 - distance / Math.max(compactCandidate.length, compactTerm.length));
 };
 
 const candidateWindows = (tokens: string[]): string[] => {
@@ -148,17 +155,22 @@ export function findNavixaVoiceTerm(text: string, terms: string[]): NavixaVoiceM
     if (!normalizedTerm) continue;
     if (normalizedTerm.includes(" ")) {
       const paddedText = ` ${normalizedText} `;
-      if (paddedText.includes(` ${normalizedTerm} `)) return { term: rawTerm, normalizedTerm };
+      if (paddedText.includes(` ${normalizedTerm} `)) {
+        return { term: rawTerm, normalizedTerm, candidate: normalizedTerm, method: "exact", score: 1 };
+      }
     } else if (tokens.has(normalizedTerm)) {
-      return { term: rawTerm, normalizedTerm };
+      return { term: rawTerm, normalizedTerm, candidate: normalizedTerm, method: "exact", score: 1 };
     }
 
     const termSkeleton = navixaVoicePhoneticSkeleton(normalizedTerm);
     for (const candidate of windows) {
-      if (isSafeFuzzyLatinMatch(candidate, normalizedTerm)) return { term: rawTerm, normalizedTerm };
+      const fuzzyScore = safeFuzzyLatinScore(candidate, normalizedTerm);
+      if (fuzzyScore !== null) {
+        return { term: rawTerm, normalizedTerm, candidate, method: "fuzzy", score: fuzzyScore };
+      }
       const candidateSkeleton = navixaVoicePhoneticSkeleton(candidate);
       if (termSkeleton.length >= 4 && candidateSkeleton === termSkeleton) {
-        return { term: rawTerm, normalizedTerm };
+        return { term: rawTerm, normalizedTerm, candidate, method: "phonetic", score: 0.9 };
       }
     }
   }
