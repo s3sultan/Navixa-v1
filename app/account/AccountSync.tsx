@@ -88,8 +88,16 @@ export default function AccountSync() {
     };
     const refreshOnFocus = () => { if (active) void load(); };
     const refreshOnVisibility = () => { if (document.visibilityState === "visible" && active) void load(); };
+    const accountStack = document.querySelector(".account-access-stack");
+    const accountObserver = new MutationObserver(() => {
+      if (!active) return;
+      const signedAccountCard = document.querySelector(".account-access-stack > .account-signed");
+      if (!signedAccountCard) clearSignedOutState();
+      else void load();
+    });
 
     void load();
+    if (accountStack) accountObserver.observe(accountStack, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     window.addEventListener("click", refreshAfterInteraction, true);
     window.addEventListener("focus", refreshOnFocus);
     window.addEventListener("pageshow", refreshOnFocus);
@@ -97,6 +105,7 @@ export default function AccountSync() {
 
     return () => {
       active = false;
+      accountObserver.disconnect();
       if (interactionTimer) clearTimeout(interactionTimer);
       window.removeEventListener("click", refreshAfterInteraction, true);
       window.removeEventListener("focus", refreshOnFocus);
