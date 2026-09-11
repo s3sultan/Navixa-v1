@@ -36,13 +36,15 @@ const protocol = {
     perAccentFalsePositiveUpper95: 0.70,
     p95LatencyMs: 1500
   },
-  latency: { boundary: "client-vad-name-end-to-alert" }
+  latency: { boundary: "client-vad-name-end-to-alert" },
+  signalQuality: { minRms: 0.0035, minVariance: 1e-6, minActiveSpeechMs: 80, frameMs: 20 }
 };
 
 const base = {
   mode: "human", split: "holdout", provenance: "controlled-live", captureMethod: "live-microphone",
   consent: true, rawAudioRetained: false, accent: "en-IN", latencyEligible: true,
-  latencyBoundary: "client-vad-name-end-to-alert"
+  latencyBoundary: "client-vad-name-end-to-alert", signalQualityPassed: true, vadSpeechConfirmed: true,
+  signalRms: 0.025, signalVariance: 0.0006
 };
 const humanTrials = [
   { ...base, id: "p1", speakerId: "s1", deviceClass: "laptop", browser: "chrome", noise: "clean", expected: "hit", detected: true, latencyMs: 800 },
@@ -101,6 +103,22 @@ test("fails when a holdout speaker also appears in development evidence", () => 
 
 test("rejects latency values measured with a different boundary", () => {
   assert.throws(() => scoreNameSenseBenchmark(protocol, humanTrials.map((trial) => trial.id === "p1" ? { ...trial, latencyBoundary: "audio-start-to-alert" } : trial)), /latencyBoundary mismatch/);
+});
+
+test("rejects silent or invalid human trials from release evidence", () => {
+  const invalid = humanTrials.map((trial, index) => ({ ...trial, id: `silent-${index}`, signalQualityPassed: false, vadSpeechConfirmed: false, signalRms: 0, signalVariance: 0 }));
+  const report = scoreNameSenseBenchmark(protocol, invalid);
+  assert.equal(report.humanTrials, 0);
+  assert.equal(report.rejectedHumanTrials, 4);
+  assert.equal(report.releaseReady, false);
+});
+
+test("blocks the same holdout speaker from appearing in two accent cohorts", () => {
+  const twoAccentProtocol = { ...protocol, requiredAccents: [{ id: "en-IN", label: "Indian English" }, { id: "en-US", label: "American English" }] };
+  const duplicated = humanTrials.map((trial, index) => ({ ...trial, id: `us-${index}`, accent: "en-US" }));
+  const report = scoreNameSenseBenchmark(twoAccentProtocol, [...humanTrials, ...duplicated]);
+  assert.equal(report.crossAccentSpeakerLeakageCount, 2);
+  assert.equal(report.releaseReady, false);
 });
 
 test("uses nearest-rank p95 latency", () => {

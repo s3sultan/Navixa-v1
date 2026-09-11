@@ -60,5 +60,11 @@
     "includesRecognitionRuntime": true,
     "includesUiAlertDispatch": true,
     "excludesSetupAndPermissionTime": true
+  },
+  "signalQuality": {
+    "minRms": 0.0035,
+    "minVariance": 0.000001,
+    "minActiveSpeechMs": 80,
+    "frameMs": 20
   }
 }

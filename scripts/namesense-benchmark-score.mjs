@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const REQUIRED_TRIAL_FIELDS = [
   "id", "mode", "split", "provenance", "captureMethod", "consent", "rawAudioRetained",
-  "accent", "speakerId", "deviceClass", "browser", "noise", "expected", "detected", "latencyEligible"
+  "accent", "speakerId", "deviceClass", "browser", "noise", "expected", "detected", "latencyEligible",
+  "signalQualityPassed", "vadSpeechConfirmed", "signalRms", "signalVariance"
 ];
 
 const ratio = (numerator, denominator) => denominator ? numerator / denominator : null;
@@ -29,8 +30,8 @@ function validateProtocol(protocol) {
   if (!protocol || !Array.isArray(protocol.requiredAccents) || !protocol.requiredAccents.length) {
     throw new Error("protocol.requiredAccents must be a non-empty array");
   }
-  if (!protocol.minimums || !protocol.thresholds || !protocol.latency?.boundary) {
-    throw new Error("protocol minimums/thresholds/latency boundary are required");
+  if (!protocol.minimums || !protocol.thresholds || !protocol.latency?.boundary || !protocol.signalQuality) {
+    throw new Error("protocol minimums/thresholds/latency/signalQuality are required");
   }
 }
 
@@ -46,6 +47,8 @@ function validateTrials(trials, protocol) {
     if (trial.mode !== "human" && trial.mode !== "synthetic") throw new Error(`invalid mode for ${trial.id}`);
     if (typeof trial.consent !== "boolean" || typeof trial.rawAudioRetained !== "boolean") throw new Error(`invalid consent/rawAudioRetained flags for ${trial.id}`);
     if (typeof trial.latencyEligible !== "boolean") throw new Error(`latencyEligible must be boolean for ${trial.id}`);
+    if (typeof trial.signalQualityPassed !== "boolean" || typeof trial.vadSpeechConfirmed !== "boolean") throw new Error(`invalid signal-quality flags for ${trial.id}`);
+    if (!Number.isFinite(trial.signalRms) || trial.signalRms < 0 || !Number.isFinite(trial.signalVariance) || trial.signalVariance < 0) throw new Error(`invalid signal metrics for ${trial.id}`);
     if (trial.expected !== "hit" && trial.expected !== "miss") throw new Error(`invalid expected value for ${trial.id}`);
     if (typeof trial.detected !== "boolean") throw new Error(`detected must be boolean for ${trial.id}`);
     if (trial.latencyMs != null && (!Number.isFinite(trial.latencyMs) || trial.latencyMs < 0)) {
@@ -172,6 +175,10 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
     && trial.captureMethod === protocol.requiredCaptureMethod
     && trial.consent === true
     && trial.rawAudioRetained === false
+    && trial.signalQualityPassed === true
+    && trial.vadSpeechConfirmed === true
+    && trial.signalRms >= protocol.signalQuality.minRms
+    && trial.signalVariance >= protocol.signalQuality.minVariance
     && requiredAccentIds.includes(trial.accent)
   );
   const syntheticTrials = rawTrials.filter((trial) => trial.mode === "synthetic");
@@ -181,6 +188,13 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
     .map((trial) => trial.speakerId));
   const holdoutSpeakerIds = new Set(humanTrials.map((trial) => trial.speakerId));
   const leakedSpeakerIds = [...holdoutSpeakerIds].filter((speakerId) => developmentHumanSpeakerIds.has(speakerId));
+  const speakerAccents = new Map();
+  for (const trial of humanTrials) {
+    const accents = speakerAccents.get(trial.speakerId) || new Set();
+    accents.add(trial.accent);
+    speakerAccents.set(trial.speakerId, accents);
+  }
+  const crossAccentSpeakerIds = [...speakerAccents.entries()].filter(([, accents]) => accents.size > 1).map(([speakerId]) => speakerId);
   const byAccent = {};
 
   for (const accent of protocol.requiredAccents) {
@@ -191,6 +205,7 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
   const overall = summarizeTrials(humanTrials);
   const overallReasons = [];
   if (leakedSpeakerIds.length) overallReasons.push(`holdout speaker leakage: ${leakedSpeakerIds.length} speaker(s)`);
+  if (crossAccentSpeakerIds.length) overallReasons.push(`cross-accent speaker leakage: ${crossAccentSpeakerIds.length} speaker(s)`);
   if (overall.positives === 0) overallReasons.push("no eligible human positive trials");
   else {
     if ((overall.recall ?? 0) < protocol.thresholds.overallRecall) overallReasons.push(`overall recall ${(overall.recall ?? 0).toFixed(4)} < ${protocol.thresholds.overallRecall}`);
@@ -198,7 +213,7 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
   }
   if (overall.negatives === 0) overallReasons.push("no eligible human negative trials");
   else {
-    if ((overall.falsePositiveRate ?? 0) > protocol.thresholds.overallFalsePositiveRate) overallReasons.push(`overall FPR ${(overall.falsePositiveRate ?? 0).toFixed(4)} > ${protocol.thresholds.overallFalsePositiveRate}`);
+    if ((overall.falsePositiveRate ?? 0) > protocol.thresholds.overallFalsePositiveRate) overallReasons.push(`overall FPR ${(overall.falsePositiveRate ?? 0).toFixed(4)} < ${protocol.thresholds.overallFalsePositiveRate}`);
     if ((overall.falsePositiveRate95.upper ?? 1) > protocol.thresholds.overallFalsePositiveUpper95) overallReasons.push(`overall FPR upper95 ${(overall.falsePositiveRate95.upper ?? 1).toFixed(4)} > ${protocol.thresholds.overallFalsePositiveUpper95}`);
   }
   if (overall.latencyEligibleTruePositives === 0) overallReasons.push("no latency-eligible true-positive evidence");
@@ -213,6 +228,7 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
     rejectedHumanTrials: rejectedHumanTrials.length,
     syntheticTrialsExcludedFromReleaseEvidence: syntheticTrials.length,
     holdoutSpeakerLeakageCount: leakedSpeakerIds.length,
+    crossAccentSpeakerLeakageCount: crossAccentSpeakerIds.length,
     overall: { ...overall, gate: { pass: overallReasons.length === 0, reasons: overallReasons } },
     byAccent,
     releaseReady: overallReasons.length === 0
@@ -227,6 +243,8 @@ export function formatNameSenseBenchmarkReport(report) {
     `Rejected human-labelled trials: ${report.rejectedHumanTrials}`,
     `Synthetic trials excluded from release evidence: ${report.syntheticTrialsExcludedFromReleaseEvidence}`,
     `Holdout speaker leakage: ${report.holdoutSpeakerLeakageCount}`,
+    `Cross-accent speaker leakage: ${report.crossAccentSpeakerLeakageCount}`,
+    `Audio provenance is verified procedurally via client-side application constraints and environment assertions; it does not rely on cryptographic hardware attestation or synthetic-audio detection algorithms.`,
     `Overall recall: ${percent(report.overall.recall)} (95% CI ${percent(report.overall.recall95.lower)}-${percent(report.overall.recall95.upper)})`,
     `Overall false-positive rate: ${percent(report.overall.falsePositiveRate)} (95% CI ${percent(report.overall.falsePositiveRate95.lower)}-${percent(report.overall.falsePositiveRate95.upper)})`,
     `Overall p95 latency: ${report.overall.p95LatencyMs ?? "n/a"} ms`
