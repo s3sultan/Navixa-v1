@@ -12,6 +12,7 @@ const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670]/g;
 const TATWEEL = /\u0640/g;
 const NON_WORD = /[^\p{L}\p{N}]+/gu;
 const LATIN = /[a-z]/;
+const ARABIC = /[\u0600-\u06FF]/;
 
 export function normalizeNavixaVoiceText(value: string): string {
   return value
@@ -23,6 +24,10 @@ export function normalizeNavixaVoiceText(value: string): string {
     .replace(/ة/g, "ه")
     .replace(/ؤ/g, "و")
     .replace(/ئ/g, "ي")
+    .replace(/[گڨ]/g, "ك")
+    .replace(/چ/g, "ج")
+    .replace(/پ/g, "ب")
+    .replace(/ڤ/g, "ف")
     .replace(NON_WORD, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -78,12 +83,19 @@ const latinPhoneticSkeleton = (value: string): string => value
   .replace(/[^a-z0-9]/g, "")
   .replace(/(.)\1+/g, "$1");
 
+// Some non-native English accents add a light aspiration after stop consonants
+// (for example, "Sulthan" for "Sultan"). Keep this as an alternate skeleton,
+// not the primary one, so normal English digraphs remain conservative.
+const latinAspiratedSkeleton = (value: string): string => latinPhoneticSkeleton(
+  value.replace(/([bdgkpt])h/g, "$1"),
+);
+
 const arabicPhoneticSkeleton = (value: string): string => value
   .replace(/[اويء]/g, "")
   .replace(/[بپ]/g, "b")
   .replace(/[تطدض]/g, "t")
   .replace(/[ثسصزذظ]/g, "s")
-  .replace(/[جقكغ]/g, "k")
+  .replace(/[جچقكگڨغ]/g, "k")
   .replace(/[حخهع]/g, "h")
   .replace(/ش/g, "x")
   .replace(/[فڤ]/g, "f")
@@ -94,11 +106,16 @@ const arabicPhoneticSkeleton = (value: string): string => value
   .replace(/[^a-z0-9]/g, "")
   .replace(/(.)\1+/g, "$1");
 
-export function navixaVoicePhoneticSkeleton(value: string): string {
+const phoneticSkeletons = (value: string): string[] => {
   const normalized = normalizeNavixaVoiceText(value).replace(/\s+/g, "");
-  if (!normalized) return "";
-  if (LATIN.test(normalized)) return latinPhoneticSkeleton(normalized);
-  return arabicPhoneticSkeleton(normalized);
+  if (!normalized) return [];
+  if (!LATIN.test(normalized)) return [arabicPhoneticSkeleton(normalized)].filter(Boolean);
+  const skeletons = [latinPhoneticSkeleton(normalized), latinAspiratedSkeleton(normalized)];
+  return [...new Set(skeletons.filter(Boolean))];
+};
+
+export function navixaVoicePhoneticSkeleton(value: string): string {
+  return phoneticSkeletons(value)[0] || "";
 }
 
 const editDistance = (left: string, right: string): number => {
@@ -143,6 +160,23 @@ const candidateWindows = (tokens: string[]): string[] => {
   return windows;
 };
 
+const scriptsCompatibleForPhoneticMatch = (candidate: string, term: string): boolean => {
+  const compactCandidate = candidate.replace(/\s+/g, "");
+  const compactTerm = term.replace(/\s+/g, "");
+  const candidateLatin = LATIN.test(compactCandidate);
+  const termLatin = LATIN.test(compactTerm);
+  const candidateArabic = ARABIC.test(compactCandidate);
+  const termArabic = ARABIC.test(compactTerm);
+
+  // Cross-script Arabic/Latin matching is intentional for names such as محمد/Mohammed.
+  if ((candidateLatin && termArabic) || (candidateArabic && termLatin)) return true;
+
+  // Same-script Latin phonetic matching stays conservative: do not let broad
+  // consonant grouping turn a different initial into a name alert.
+  if (candidateLatin && termLatin) return compactCandidate[0] === compactTerm[0];
+  return true;
+};
+
 export function findNavixaVoiceTerm(text: string, terms: string[]): NavixaVoiceMatch | null {
   const normalizedText = normalizeNavixaVoiceText(text);
   if (!normalizedText) return null;
@@ -162,14 +196,16 @@ export function findNavixaVoiceTerm(text: string, terms: string[]): NavixaVoiceM
       return { term: rawTerm, normalizedTerm, candidate: normalizedTerm, method: "exact", score: 1 };
     }
 
-    const termSkeleton = navixaVoicePhoneticSkeleton(normalizedTerm);
+    const termSkeletons = phoneticSkeletons(normalizedTerm);
     for (const candidate of windows) {
       const fuzzyScore = safeFuzzyLatinScore(candidate, normalizedTerm);
       if (fuzzyScore !== null) {
         return { term: rawTerm, normalizedTerm, candidate, method: "fuzzy", score: fuzzyScore };
       }
-      const candidateSkeleton = navixaVoicePhoneticSkeleton(candidate);
-      if (termSkeleton.length >= 4 && candidateSkeleton === termSkeleton) {
+      if (!scriptsCompatibleForPhoneticMatch(candidate, normalizedTerm)) continue;
+      const candidateSkeletons = phoneticSkeletons(candidate);
+      const sharedSkeleton = termSkeletons.find((skeleton) => skeleton.length >= 4 && candidateSkeletons.includes(skeleton));
+      if (sharedSkeleton) {
         return { term: rawTerm, normalizedTerm, candidate, method: "phonetic", score: 0.9 };
       }
     }
