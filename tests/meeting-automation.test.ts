@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   listMeetingSummaryAutomationRuns,
   summarizeMeetingTranscript,
 } from "../app/meetings/meetingAutomation.ts";
 import { buildLocalSummary } from "../app/meetings/meetingSummary.ts";
+
+const root = new URL("../", import.meta.url);
 
 test("meeting summary automation preserves the existing local summary result", async () => {
   const transcript = "قرر الفريق اعتماد الخطة الجديدة اليوم. يجب مراجعة المهام غدًا. هل نرسل التقرير بعد المراجعة؟";
@@ -45,4 +48,18 @@ test("meeting summary automation keeps concurrent local requests isolated", asyn
   const runs = await listMeetingSummaryAutomationRuns();
   assert.ok(runs.some((run) => run.metadata?.partId === "part-a" && run.status === "succeeded"));
   assert.ok(runs.some((run) => run.metadata?.partId === "part-b" && run.status === "succeeded"));
+});
+
+test("automatic transcription completion uses the automation core with a direct local fallback", async () => {
+  const [studio, adapter] = await Promise.all([
+    readFile(new URL("app/meetings/MeetingStudio.tsx", root), "utf8"),
+    readFile(new URL("app/meetings/meetingAutomation.ts", root), "utf8"),
+  ]);
+
+  assert.match(studio, /import \{ summarizeMeetingTranscript \} from "\.\/meetingAutomation"/);
+  assert.match(studio, /worker\.onmessage = async/);
+  assert.match(studio, /await summarizeMeetingTranscript\(correctedTranscript/);
+  assert.match(studio, /\.catch\(\(\) => buildLocalSummary\(correctedTranscript\)\)/);
+  assert.doesNotMatch(adapter, /fetch\(/);
+  assert.match(adapter, /Keep transcript and generated summary out of generic run history/);
 });
