@@ -90,3 +90,41 @@ test("supports academic watch keywords without special casing", () => {
     assert.equal(findNavixaVoiceTerm(`عندك ${keyword} غدا`, [keyword])?.normalizedTerm, keyword);
   }
 });
+
+test("passes a broad accent-transcript hypothesis matrix without nearby-name false positives", () => {
+  const positives = [
+    { text: "Please call Sultan now", term: "sultan" },
+    { text: "Please call Soltan now", term: "sultan" },
+    { text: "Please call Sultaan now", term: "sultan" },
+    { text: "Please call Sulthan now", term: "sultan" },
+    { text: "Please call Sooltan now", term: "sultan" },
+    { text: "Please call Soul Tan now", term: "sultan" },
+    { text: "يا Sultan لو سمحت", term: "سلطان" },
+    { text: "سلطاان جاوب على السؤال", term: "سلطان" },
+    { text: "Please ask Mohammed to answer", term: "محمد" },
+    { text: "Please ask Mohammad to answer", term: "محمد" },
+    { text: "Please ask Mohamed to answer", term: "محمد" },
+    { text: "Please ask Muhammed to answer", term: "محمد" },
+    { text: "Next is Alharbi", term: "الحربي" },
+    { text: "Next is Al Harbi", term: "الحربي" },
+    { text: "Next is El Harbi", term: "الحربي" },
+    { text: "Next is Alharby", term: "الحربي" },
+  ];
+  const negatives = [
+    { text: "Please ask Salman now", term: "sultan" },
+    { text: "Please ask Salim now", term: "sultan" },
+    { text: "Please ask Zoltan now", term: "sultan" },
+    { text: "Please ask Shelton now", term: "sultan" },
+    { text: "The sultanate announced a change", term: "sultan" },
+    { text: "Please ask Sullivan now", term: "sultan" },
+    { text: "Next is Al Hardy", term: "الحربي" },
+    { text: "Please ask Mahmoud", term: "محمد" },
+  ];
+
+  for (const sample of positives) {
+    assert.ok(findNavixaVoiceTerm(sample.text, [sample.term]), `expected match: ${sample.text} -> ${sample.term}`);
+  }
+  for (const sample of negatives) {
+    assert.equal(findNavixaVoiceTerm(sample.text, [sample.term]), null, `unexpected match: ${sample.text} -> ${sample.term}`);
+  }
+});
