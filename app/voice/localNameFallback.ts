@@ -19,8 +19,8 @@ type LocalWorkerMessage = {
 type AudioContextConstructor = new () => AudioContext;
 
 const TARGET_SAMPLE_RATE = 16_000;
-const DEFAULT_WINDOW_SECONDS = 10;
-const DEFAULT_OVERLAP_SECONDS = 2;
+const DEFAULT_WINDOW_SECONDS = 5;
+const DEFAULT_OVERLAP_SECONDS = 1.5;
 const MAX_BUFFER_SECONDS = 18;
 
 export function resampleNavixaVoiceAudio(input: Float32Array, sourceRate: number, targetRate = TARGET_SAMPLE_RATE): Float32Array {
@@ -37,6 +37,41 @@ export function resampleNavixaVoiceAudio(input: Float32Array, sourceRate: number
     output[index] = input[left] * (1 - weight) + input[right] * weight;
   }
   return output;
+}
+
+export function hasNavixaVoiceActivity(
+  input: Float32Array,
+  sampleRate = TARGET_SAMPLE_RATE,
+  frameMs = 20,
+  rmsThreshold = 0.0035,
+  minSpeechMs = 80,
+): boolean {
+  if (!input.length || !Number.isFinite(sampleRate) || sampleRate <= 0) return false;
+  if (!Number.isFinite(frameMs) || frameMs <= 0 || !Number.isFinite(rmsThreshold) || rmsThreshold <= 0) return false;
+  if (!Number.isFinite(minSpeechMs) || minSpeechMs <= 0) return false;
+
+  const frameSamples = Math.max(1, Math.round(sampleRate * frameMs / 1000));
+  const requiredFrames = Math.max(1, Math.ceil(minSpeechMs / frameMs));
+  let consecutiveActiveFrames = 0;
+
+  for (let offset = 0; offset < input.length; offset += frameSamples) {
+    const end = Math.min(input.length, offset + frameSamples);
+    let sumSquares = 0;
+    let peak = 0;
+    for (let index = offset; index < end; index += 1) {
+      const raw = input[index];
+      const sample = Number.isFinite(raw) ? raw : 0;
+      const absolute = Math.abs(sample);
+      sumSquares += sample * sample;
+      if (absolute > peak) peak = absolute;
+    }
+    const count = Math.max(1, end - offset);
+    const rms = Math.sqrt(sumSquares / count);
+    const activeFrame = rms >= rmsThreshold || (peak >= 0.018 && rms >= rmsThreshold * 0.55);
+    consecutiveActiveFrames = activeFrame ? consecutiveActiveFrames + 1 : 0;
+    if (consecutiveActiveFrames >= requiredFrames) return true;
+  }
+  return false;
 }
 
 export function trimNavixaVoiceBuffer(chunks: Float32Array[], sampleRate: number, maxSeconds = MAX_BUFFER_SECONDS): Float32Array[] {
@@ -142,6 +177,11 @@ export function createNavixaLocalNameFallback({
     const audio = resampleNavixaVoiceAudio(combined, sampleRate, TARGET_SAMPLE_RATE);
     combined.fill(0);
     if (!audio.length) return;
+    if (!hasNavixaVoiceActivity(audio, TARGET_SAMPLE_RATE)) {
+      audio.fill(0);
+      return;
+    }
+
     busy = true;
     sequence += 1;
     ensureWorker().postMessage({
