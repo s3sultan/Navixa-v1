@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  conditionNavixaVoiceAudio,
   hasNavixaVoiceActivity,
   resampleNavixaVoiceAudio,
   trimNavixaVoiceBuffer,
@@ -47,6 +48,40 @@ test("keeps the voice gate sensitive to quiet sustained speech", () => {
     quietSpeech[index] = Math.sin(2 * Math.PI * 140 * index / sampleRate) * 0.0055;
   }
   assert.equal(hasNavixaVoiceActivity(quietSpeech, sampleRate), true);
+});
+
+test("conditions quiet speech without clipping it", () => {
+  const sampleRate = 16_000;
+  const quietSpeech = new Float32Array(sampleRate / 2);
+  for (let index = 0; index < quietSpeech.length; index += 1) {
+    quietSpeech[index] = Math.sin(2 * Math.PI * 170 * index / sampleRate) * 0.008;
+  }
+  const conditioned = conditionNavixaVoiceAudio(quietSpeech);
+  const inputPeak = Math.max(...quietSpeech.map((sample) => Math.abs(sample)));
+  const outputPeak = Math.max(...conditioned.map((sample) => Math.abs(sample)));
+  assert.equal(conditioned.length, quietSpeech.length);
+  assert.ok(outputPeak > inputPeak);
+  assert.ok(outputPeak <= 0.96);
+});
+
+test("removes DC offset before local transcription", () => {
+  const sampleRate = 16_000;
+  const biased = new Float32Array(sampleRate / 4);
+  for (let index = 0; index < biased.length; index += 1) {
+    biased[index] = 0.18 + Math.sin(2 * Math.PI * 190 * index / sampleRate) * 0.03;
+  }
+  const conditioned = conditionNavixaVoiceAudio(biased);
+  const mean = conditioned.reduce((sum, sample) => sum + sample, 0) / conditioned.length;
+  assert.ok(Math.abs(mean) < 0.001);
+  assert.ok(conditioned.some((sample) => Math.abs(sample) > 0.02));
+});
+
+test("returns clean silence instead of amplifying numerical noise", () => {
+  const input = new Float32Array(2_000);
+  input[100] = Number.NaN;
+  const conditioned = conditionNavixaVoiceAudio(input);
+  assert.equal(conditioned.length, input.length);
+  assert.ok(conditioned.every((sample) => sample === 0));
 });
 
 test("caps the in-memory rolling buffer instead of growing with lecture length", () => {
