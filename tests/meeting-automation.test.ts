@@ -50,7 +50,7 @@ test("meeting summary automation keeps concurrent local requests isolated", asyn
   assert.ok(runs.some((run) => run.metadata?.partId === "part-b" && run.status === "succeeded"));
 });
 
-test("automatic transcription completion uses the automation core with a direct local fallback", async () => {
+test("automatic transcription completion uses automation core and privacy-safe persistent history", async () => {
   const [studio, adapter] = await Promise.all([
     readFile(new URL("app/meetings/MeetingStudio.tsx", root), "utf8"),
     readFile(new URL("app/meetings/meetingAutomation.ts", root), "utf8"),
@@ -60,6 +60,15 @@ test("automatic transcription completion uses the automation core with a direct 
   assert.match(studio, /worker\.onmessage = async/);
   assert.match(studio, /await summarizeMeetingTranscript\(correctedTranscript/);
   assert.match(studio, /\.catch\(\(\) => buildLocalSummary\(correctedTranscript\)\)/);
-  assert.doesNotMatch(adapter, /fetch\(/);
+  assert.match(adapter, /PERSISTENT_RUN_HISTORY_URL = "\/api\/automation-runs"/);
+  assert.match(adapter, /keepalive: true/);
+  assert.match(adapter, /credentials: "same-origin"/);
+  assert.match(adapter, /Persistent history is observational only; it must never break local automation/);
   assert.match(adapter, /Keep transcript and generated summary out of generic run history/);
+
+  const payloadStart = adapter.indexOf("function persistencePayload");
+  const payloadEnd = adapter.indexOf("function persistRunBestEffort");
+  const payload = adapter.slice(payloadStart, payloadEnd);
+  assert.ok(payloadStart >= 0 && payloadEnd > payloadStart);
+  assert.doesNotMatch(payload, /\binput\s*:|\boutput\s*:|\berror\s*:|\btranscript\s*:|\bsummary\s*:/);
 });
