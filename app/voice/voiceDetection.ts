@@ -160,6 +160,27 @@ const candidateWindows = (tokens: string[]): string[] => {
   return windows;
 };
 
+const crossScriptLongVowelsCompatible = (candidate: string, term: string): boolean => {
+  const compactCandidate = candidate.replace(/\s+/g, "");
+  const compactTerm = term.replace(/\s+/g, "");
+  const candidateLatin = LATIN.test(compactCandidate);
+  const termLatin = LATIN.test(compactTerm);
+  const candidateArabic = ARABIC.test(compactCandidate);
+  const termArabic = ARABIC.test(compactTerm);
+  if (!((candidateLatin && termArabic) || (candidateArabic && termLatin))) return true;
+
+  const latin = candidateLatin ? compactCandidate : compactTerm;
+  const arabic = candidateArabic ? compactCandidate : compactTerm;
+
+  // Long Latin vowel spellings normally correspond to an explicit Arabic long-vowel letter.
+  // This rejects collisions such as محمود/Mahmoud being mistaken for محمد/Mohammed,
+  // while keeping short-vowel transliterations such as Mohamed/Mohammad/Muhammed valid.
+  if (/(?:ou|oo)/.test(latin) && !arabic.includes("و")) return false;
+  if (/(?:ee|ii)/.test(latin) && !arabic.includes("ي")) return false;
+  if (/aa/.test(latin) && !arabic.includes("ا")) return false;
+  return true;
+};
+
 const scriptsCompatibleForPhoneticMatch = (candidate: string, term: string): boolean => {
   const compactCandidate = candidate.replace(/\s+/g, "");
   const compactTerm = term.replace(/\s+/g, "");
@@ -168,8 +189,11 @@ const scriptsCompatibleForPhoneticMatch = (candidate: string, term: string): boo
   const candidateArabic = ARABIC.test(compactCandidate);
   const termArabic = ARABIC.test(compactTerm);
 
-  // Cross-script Arabic/Latin matching is intentional for names such as محمد/Mohammed.
-  if ((candidateLatin && termArabic) || (candidateArabic && termLatin)) return true;
+  // Cross-script Arabic/Latin matching is intentional for names such as محمد/Mohammed,
+  // but long-vowel evidence must not contradict the Arabic spelling.
+  if ((candidateLatin && termArabic) || (candidateArabic && termLatin)) {
+    return crossScriptLongVowelsCompatible(candidate, term);
+  }
 
   // Same-script Latin phonetic matching stays conservative: do not let broad
   // consonant grouping turn a different initial into a name alert.
