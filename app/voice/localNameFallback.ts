@@ -5,10 +5,13 @@ export type NavixaLocalNameFallback = {
   destroy: () => void;
 };
 
+export type NavixaLocalSpeechLanguage = "auto" | "ar" | "en";
+
 type LocalNameFallbackOptions = {
   onTranscript: (text: string) => void;
   windowSeconds?: number;
   overlapSeconds?: number;
+  getLanguageHint?: () => NavixaLocalSpeechLanguage;
 };
 
 type LocalWorkerMessage = {
@@ -74,6 +77,48 @@ export function hasNavixaVoiceActivity(
   return false;
 }
 
+export function conditionNavixaVoiceAudio(
+  input: Float32Array,
+  targetRms = 0.06,
+  maxGain = 3,
+  peakLimit = 0.96,
+): Float32Array {
+  if (!input.length) return new Float32Array();
+  if (!Number.isFinite(targetRms) || targetRms <= 0 || !Number.isFinite(maxGain) || maxGain <= 0) {
+    return new Float32Array(input);
+  }
+
+  let sum = 0;
+  let validCount = 0;
+  for (const raw of input) {
+    if (!Number.isFinite(raw)) continue;
+    sum += raw;
+    validCount += 1;
+  }
+  const mean = validCount ? sum / validCount : 0;
+
+  let sumSquares = 0;
+  let peak = 0;
+  for (const raw of input) {
+    const sample = (Number.isFinite(raw) ? raw : 0) - mean;
+    sumSquares += sample * sample;
+    peak = Math.max(peak, Math.abs(sample));
+  }
+  const rms = Math.sqrt(sumSquares / input.length);
+  if (!Number.isFinite(rms) || rms < 1e-6 || peak < 1e-6) return new Float32Array(input.length);
+
+  const requestedGain = targetRms / rms;
+  let gain = Math.min(maxGain, Math.max(0.35, requestedGain));
+  if (peak * gain > peakLimit) gain = peakLimit / peak;
+
+  const output = new Float32Array(input.length);
+  for (let index = 0; index < input.length; index += 1) {
+    const raw = Number.isFinite(input[index]) ? input[index] : 0;
+    output[index] = Math.max(-peakLimit, Math.min(peakLimit, (raw - mean) * gain));
+  }
+  return output;
+}
+
 export function trimNavixaVoiceBuffer(chunks: Float32Array[], sampleRate: number, maxSeconds = MAX_BUFFER_SECONDS): Float32Array[] {
   const maxSamples = Math.max(1, Math.round(sampleRate * maxSeconds));
   let total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -104,10 +149,15 @@ const getAudioContextConstructor = (): AudioContextConstructor | null => {
   return window.AudioContext || browserWindow.webkitAudioContext || null;
 };
 
+const safeLanguageHint = (value: unknown): NavixaLocalSpeechLanguage => (
+  value === "ar" || value === "en" ? value : "auto"
+);
+
 export function createNavixaLocalNameFallback({
   onTranscript,
   windowSeconds = DEFAULT_WINDOW_SECONDS,
   overlapSeconds = DEFAULT_OVERLAP_SECONDS,
+  getLanguageHint,
 }: LocalNameFallbackOptions): NavixaLocalNameFallback {
   const AudioContextClass = getAudioContextConstructor();
   const supported = Boolean(
@@ -174,22 +224,32 @@ export function createNavixaLocalNameFallback({
       bufferedSamples = retained.length;
     }
 
-    const audio = resampleNavixaVoiceAudio(combined, sampleRate, TARGET_SAMPLE_RATE);
+    const resampled = resampleNavixaVoiceAudio(combined, sampleRate, TARGET_SAMPLE_RATE);
     combined.fill(0);
-    if (!audio.length) return;
-    if (!hasNavixaVoiceActivity(audio, TARGET_SAMPLE_RATE)) {
-      audio.fill(0);
+    if (!resampled.length) return;
+    if (!hasNavixaVoiceActivity(resampled, TARGET_SAMPLE_RATE)) {
+      resampled.fill(0);
       return;
     }
 
+    const audio = conditionNavixaVoiceAudio(resampled);
+    resampled.fill(0);
+    if (!audio.length) return;
+
     busy = true;
     sequence += 1;
+    let language: NavixaLocalSpeechLanguage = "auto";
+    try {
+      language = safeLanguageHint(getLanguageHint?.());
+    } catch {
+      language = "auto";
+    }
     ensureWorker().postMessage({
       type: "transcribe",
       partId: `name-fallback-${sequence}`,
       audio,
       model: "tiny",
-      language: "auto",
+      language,
     }, [audio.buffer]);
   };
 
