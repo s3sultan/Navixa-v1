@@ -9,6 +9,12 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  "r2_buckets": [
+    {
+      "binding": "STATE",
+      "bucket_name": "navixa-plan-b-state"
+    }
+  ],
   "triggers": {
     "crons": ["* * * * *"]
   },
