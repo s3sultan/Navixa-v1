@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   conditionNavixaVoiceAudio,
+  getNavixaVoiceFlushReason,
   hasNavixaVoiceActivity,
   resampleNavixaVoiceAudio,
   trimNavixaVoiceBuffer,
@@ -82,6 +83,23 @@ test("returns clean silence instead of amplifying numerical noise", () => {
   const conditioned = conditionNavixaVoiceAudio(input);
   assert.equal(conditioned.length, input.length);
   assert.ok(conditioned.every((sample) => sample === 0));
+});
+
+test("flushes after speech ends instead of always waiting for the five-second window", () => {
+  const sampleRate = 48_000;
+  assert.equal(getNavixaVoiceFlushReason(sampleRate * 0.9, sampleRate, true, sampleRate * 0.5), null);
+  assert.equal(getNavixaVoiceFlushReason(sampleRate * 1.2, sampleRate, true, sampleRate * 0.4), "endpoint");
+});
+
+test("keeps continuous speech until the bounded fallback window", () => {
+  const sampleRate = 48_000;
+  assert.equal(getNavixaVoiceFlushReason(sampleRate * 4.9, sampleRate, true, 0), null);
+  assert.equal(getNavixaVoiceFlushReason(sampleRate * 5, sampleRate, true, 0), "window");
+});
+
+test("never flushes a silent buffer just because time elapsed", () => {
+  const sampleRate = 48_000;
+  assert.equal(getNavixaVoiceFlushReason(sampleRate * 8, sampleRate, false, sampleRate * 8), null);
 });
 
 test("caps the in-memory rolling buffer instead of growing with lecture length", () => {
