@@ -4,10 +4,10 @@
 
 ## حالة العمل
 
-- الوكيل النشط: لا يوجد
-- المهمة الحالية: لا توجد مهمة محجوزة؛ سجل التشغيل الدائم جاهز داخل PR #175 بعد نجاح بوابات التحقق
-- الحالة: جاهز للدمج
-- الملفات المحجوزة: لا يوجد
+- الوكيل النشط: ChatGPT
+- المهمة الحالية: نقل حفظ التذكير الأكاديمي المحلي إلى Skill/Automation مع توحيد عميل Run History والحفاظ على السلوك الحالي والخصوصية
+- الحالة: يعمل على فرع معزول
+- الملفات المحجوزة: `app/automationRunHistoryClient.ts`, `app/academicReminderAutomation.ts`, `app/meetings/meetingAutomation.ts`, `app/meetings/MeetingStudio.tsx`, `tests/academic-reminder-automation.test.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
