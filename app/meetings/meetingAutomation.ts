@@ -4,7 +4,7 @@ import {
   SkillRegistry,
   type AutomationRun,
 } from "../../lib/navixa-core/index.ts";
-import { buildLocalSummary } from "./meetingSummary";
+import { buildLocalSummary } from "./meetingSummary.ts";
 
 const MEETING_SUMMARY_SKILL_ID = "meeting.summary.local";
 const MEETING_SUMMARY_AUTOMATION_ID = "meeting.summary.after-transcription";
