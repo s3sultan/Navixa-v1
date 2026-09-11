@@ -4,6 +4,16 @@
 
 ## 2026-09-11 — ChatGPT
 
+- أضاف سجل تشغيل دائم وآمن للأتمتة عبر D1 في migration `0051_automation_run_history.sql` مع ملكية مركبة حسب المستخدم وفهارس للزمن والمهارة.
+- أضاف API محمي `/api/automation-runs` يشتق ملكية السجل من جلسة NAVIXA على الخادم، ويشترط same-origin للكتابة ويعزل القراءة حسب المستخدم.
+- منع تخزين أو استقبال `input`, `output`, `error`, `transcript`, `summary`, `metadata`, `credentials`, و`stack`؛ السجل الدائم يحتفظ ببيانات تشغيل محدودة فقط.
+- ربط تلخيص الاجتماعات بحفظ best-effort باستخدام `keepalive` مع إبقاء التلخيص والسجل المحلي يعملان حتى عند فشل الشبكة أو D1، ودمج القراءة الدائمة مع المحلية عند توفر المتصفح.
+- أضاف اختبارات لعقد migration والخصوصية والجلسة وsame-origin وعزل المستخدمين وعدم تسريب المحتوى الحساس، وحدّث اختبار تكامل الاجتماعات.
+- التحقق: نجح `Verify NAVIXA Pull Request` و`NAVIXA Pre-Launch Gate` و`Release gate` على PR #175، شاملًا فحص الأسرار وGitHub Actions وتدقيق اعتماديات الإنتاج وlint والاختبارات وUI smoke وبناء الإنتاج.
+- الملفات: `migrations/0051_automation_run_history.sql`, `app/api/automation-runs/route.ts`, `app/meetings/meetingAutomation.ts`, `tests/automation-run-history.test.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
+## 2026-09-11 — ChatGPT
+
 - ربط التلخيص المحلي التلقائي بعد اكتمال تفريغ كل جزء اجتماع بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع إبقاء خوارزمية `buildLocalSummary` الحالية والواجهة دون تغيير.
 - حافظ على الخصوصية بعدم تخزين النص المفرغ أو الملخص داخل Run History، وأبقى البيانات الحساسة في ذاكرة مؤقتة محلية مع تنظيفها بعد التنفيذ، دون إضافة أي اتصال شبكة.
 - أضاف fallback مباشر إلى التلخيص المحلي القديم إذا تعطل مسار Automation، واختبارات لتطابق النتائج، عزل الطلبات المتزامنة، عدم تسريب النص للسجل، وربط `MeetingStudio` بالمحرك.
