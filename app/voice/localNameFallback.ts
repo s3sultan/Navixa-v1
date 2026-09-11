@@ -6,6 +6,7 @@ export type NavixaLocalNameFallback = {
 };
 
 export type NavixaLocalSpeechLanguage = "auto" | "ar" | "en";
+export type NavixaVoiceFlushReason = "endpoint" | "window";
 
 type LocalNameFallbackOptions = {
   onTranscript: (text: string) => void;
@@ -24,6 +25,8 @@ type AudioContextConstructor = new () => AudioContext;
 const TARGET_SAMPLE_RATE = 16_000;
 const DEFAULT_WINDOW_SECONDS = 5;
 const DEFAULT_OVERLAP_SECONDS = 1.5;
+const DEFAULT_MIN_ENDPOINT_SECONDS = 1;
+const DEFAULT_ENDPOINT_SILENCE_SECONDS = 0.4;
 const MAX_BUFFER_SECONDS = 18;
 
 export function resampleNavixaVoiceAudio(input: Float32Array, sourceRate: number, targetRate = TARGET_SAMPLE_RATE): Float32Array {
@@ -119,6 +122,24 @@ export function conditionNavixaVoiceAudio(
   return output;
 }
 
+export function getNavixaVoiceFlushReason(
+  bufferedSamples: number,
+  sampleRate: number,
+  speechSeen: boolean,
+  trailingSilenceSamples: number,
+  maxWindowSeconds = DEFAULT_WINDOW_SECONDS,
+  minEndpointSeconds = DEFAULT_MIN_ENDPOINT_SECONDS,
+  endpointSilenceSeconds = DEFAULT_ENDPOINT_SILENCE_SECONDS,
+): NavixaVoiceFlushReason | null {
+  if (!Number.isFinite(bufferedSamples) || bufferedSamples <= 0 || !Number.isFinite(sampleRate) || sampleRate <= 0) return null;
+  if (!speechSeen) return null;
+  const endpointReady = bufferedSamples >= sampleRate * minEndpointSeconds
+    && trailingSilenceSamples >= sampleRate * endpointSilenceSeconds;
+  if (endpointReady) return "endpoint";
+  if (bufferedSamples >= sampleRate * maxWindowSeconds) return "window";
+  return null;
+}
+
 export function trimNavixaVoiceBuffer(chunks: Float32Array[], sampleRate: number, maxSeconds = MAX_BUFFER_SECONDS): Float32Array[] {
   const maxSamples = Math.max(1, Math.round(sampleRate * maxSeconds));
   let total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -179,11 +200,19 @@ export function createNavixaLocalNameFallback({
   let chunks: Float32Array[] = [];
   let bufferedSamples = 0;
   let sequence = 0;
+  let speechSeen = false;
+  let trailingSilenceSamples = 0;
+
+  const resetActivity = () => {
+    speechSeen = false;
+    trailingSilenceSamples = 0;
+  };
 
   const resetBuffer = () => {
     for (const chunk of chunks) chunk.fill(0);
     chunks = [];
     bufferedSamples = 0;
+    resetActivity();
   };
 
   const refreshBufferedSamples = () => {
@@ -212,11 +241,25 @@ export function createNavixaLocalNameFallback({
   const flushIfReady = () => {
     if (destroyed || !active || busy || !context) return;
     const sampleRate = context.sampleRate;
-    const requiredSamples = Math.max(1, Math.round(sampleRate * windowSeconds));
-    if (bufferedSamples < requiredSamples) return;
+    const hardWindowSamples = Math.max(1, Math.round(sampleRate * windowSeconds));
+    if (!speechSeen && bufferedSamples >= hardWindowSamples) {
+      resetBuffer();
+      return;
+    }
+
+    const flushReason = getNavixaVoiceFlushReason(
+      bufferedSamples,
+      sampleRate,
+      speechSeen,
+      trailingSilenceSamples,
+      windowSeconds,
+    );
+    if (!flushReason) return;
 
     const combined = flattenChunks(chunks);
-    const overlapSamples = Math.min(combined.length, Math.max(0, Math.round(sampleRate * overlapSeconds)));
+    const overlapSamples = flushReason === "window"
+      ? Math.min(combined.length, Math.max(0, Math.round(sampleRate * overlapSeconds)))
+      : 0;
     const retained = overlapSamples ? combined.slice(combined.length - overlapSamples) : new Float32Array();
     resetBuffer();
     if (retained.length) {
@@ -298,6 +341,13 @@ export function createNavixaLocalNameFallback({
           if (!active || destroyed || !context) return;
           const input = event.inputBuffer.getChannelData(0);
           const copy = new Float32Array(input);
+          const chunkHasVoice = hasNavixaVoiceActivity(copy, context.sampleRate, 20, 0.0035, 60);
+          if (chunkHasVoice) {
+            speechSeen = true;
+            trailingSilenceSamples = 0;
+          } else if (speechSeen) {
+            trailingSilenceSamples += copy.length;
+          }
           chunks.push(copy);
           bufferedSamples += copy.length;
           trimNavixaVoiceBuffer(chunks, context.sampleRate, MAX_BUFFER_SECONDS);
