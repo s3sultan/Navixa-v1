@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: إضافة سجل تشغيل دائم وآمن عبر D1 خلف API محمي وربط تلخيص الاجتماعات به دون تعطيل المسار المحلي
 - الحالة: يعمل على فرع معزول
-- الملفات المحجوزة: `migrations/0051_automation_run_history.sql`, `app/api/automation-runs/route.ts`, `app/meetings/meetingAutomation.ts`, `tests/automation-run-history.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الملفات المحجوزة: `migrations/0051_automation_run_history.sql`, `app/api/automation-runs/route.ts`, `app/meetings/meetingAutomation.ts`, `tests/automation-run-history.test.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
