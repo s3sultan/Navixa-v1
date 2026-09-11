@@ -3,6 +3,11 @@ const decoder = new TextDecoder();
 const MAX_GRANT_SECONDS = 15 * 60;
 const MAX_TOKEN_LENGTH = 4096;
 const PLAN_B_HOST = "backup.navixasa.com";
+const PRIMARY_HEALTH_URL = "https://navixasa.com/api/healthz";
+const PRIMARY_ORIGIN_HEALTH_URL = "https://navixa.s2shug.workers.dev/api/healthz";
+const MONITOR_STATE_KEY = "monitor/state-v1.json";
+const FAILURE_THRESHOLD = 3;
+const RECOVERY_THRESHOLD = 3;
 
 const html = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -178,12 +183,128 @@ function sameOrigin(request) {
   return origin === `https://${PLAN_B_HOST}`;
 }
 
+function defaultMonitorState() {
+  return {
+    version: 1,
+    state: "healthy",
+    incidentId: "",
+    consecutiveFailures: 0,
+    consecutiveSuccesses: 0,
+    canonicalHealthy: null,
+    originHealthy: null,
+    lastCheckedAt: "",
+    outageStartedAt: "",
+    recoveryStartedAt: "",
+  };
+}
+
+async function readMonitorState(env) {
+  if (!env?.STATE) return null;
+  try {
+    const object = await env.STATE.get(MONITOR_STATE_KEY);
+    if (!object) return defaultMonitorState();
+    const parsed = JSON.parse(await object.text());
+    if (parsed?.version !== 1 || typeof parsed.state !== "string") return defaultMonitorState();
+    return { ...defaultMonitorState(), ...parsed };
+  } catch {
+    return defaultMonitorState();
+  }
+}
+
+async function writeMonitorState(env, state) {
+  if (!env?.STATE) throw new Error("state_store_not_ready");
+  await env.STATE.put(MONITOR_STATE_KEY, JSON.stringify(state), {
+    httpMetadata: { contentType: "application/json" },
+  });
+}
+
+async function probeHealth(url, fetchImpl) {
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      headers: { "Accept": "application/json", "Cache-Control": "no-cache" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return false;
+    const body = await response.json().catch(() => null);
+    return body?.ok === true && body?.service === "navixa-primary";
+  } catch {
+    return false;
+  }
+}
+
+export async function runIndependentMonitor(env, options = {}) {
+  if (!env?.STATE) return { ok: false, error: "state_store_not_ready" };
+  const now = options.now instanceof Date ? options.now : new Date();
+  const fetchImpl = options.fetchImpl || fetch;
+  const previous = await readMonitorState(env) || defaultMonitorState();
+  const [canonicalHealthy, originHealthy] = await Promise.all([
+    probeHealth(PRIMARY_HEALTH_URL, fetchImpl),
+    probeHealth(PRIMARY_ORIGIN_HEALTH_URL, fetchImpl),
+  ]);
+
+  const next = { ...previous, canonicalHealthy, originHealthy, lastCheckedAt: now.toISOString() };
+  if (canonicalHealthy) {
+    next.consecutiveFailures = 0;
+    next.consecutiveSuccesses = Number(previous.consecutiveSuccesses || 0) + 1;
+    if (previous.state === "outage" && next.consecutiveSuccesses >= RECOVERY_THRESHOLD) {
+      next.state = "recovery";
+      next.recoveryStartedAt = now.toISOString();
+    } else if (previous.state === "recovery") {
+      next.state = "healthy";
+      next.incidentId = "";
+      next.outageStartedAt = "";
+      next.recoveryStartedAt = "";
+      next.consecutiveSuccesses = 0;
+    } else if (previous.state === "degraded" && next.consecutiveSuccesses >= RECOVERY_THRESHOLD) {
+      next.state = "healthy";
+      next.incidentId = "";
+      next.consecutiveSuccesses = 0;
+    }
+  } else {
+    next.consecutiveSuccesses = 0;
+    next.consecutiveFailures = Number(previous.consecutiveFailures || 0) + 1;
+    if (next.consecutiveFailures >= FAILURE_THRESHOLD) {
+      if (previous.state !== "outage") {
+        next.incidentId = previous.incidentId || crypto.randomUUID();
+        next.outageStartedAt = now.toISOString();
+      }
+      next.state = "outage";
+      next.recoveryStartedAt = "";
+    } else if (previous.state === "healthy") {
+      next.state = "degraded";
+      next.incidentId = previous.incidentId || crypto.randomUUID();
+    }
+  }
+
+  await writeMonitorState(env, next);
+  return { ok: true, ...next };
+}
+
 export async function handlePlanBRequest(request, env) {
   const url = new URL(request.url);
   if (url.hostname !== PLAN_B_HOST && !url.hostname.endsWith(".workers.dev")) return new Response("Not found", { status: 404 });
 
   if (url.pathname === "/healthz") {
-    return json({ ok: true, service: "navixa-plan-b", mode: "standby", verifierReady: Boolean(env?.NAVIXA_PLAN_B_SIGNING_SECRET?.length >= 32) });
+    return json({
+      ok: true,
+      service: "navixa-plan-b",
+      mode: "standby",
+      verifierReady: Boolean(env?.NAVIXA_PLAN_B_SIGNING_SECRET?.length >= 32),
+      stateStoreReady: Boolean(env?.STATE),
+    });
+  }
+
+  if (url.pathname === "/monitor/status") {
+    const state = await readMonitorState(env);
+    if (!state) return json({ ok: false, error: "state_store_not_ready" }, 503);
+    return json({
+      ok: true,
+      state: state.state,
+      lastCheckedAt: state.lastCheckedAt,
+      canonicalHealthy: state.canonicalHealthy,
+      originHealthy: state.originHealthy,
+    });
   }
 
   if (url.pathname === "/api/verify") {
@@ -208,4 +329,9 @@ export async function handlePlanBRequest(request, env) {
   return new Response("Not found", { status: 404, headers: securityHeaders("text/plain; charset=utf-8") });
 }
 
-export default { fetch: handlePlanBRequest };
+export default {
+  fetch: handlePlanBRequest,
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(runIndependentMonitor(env));
+  },
+};

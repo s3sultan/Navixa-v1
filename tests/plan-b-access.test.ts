@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { issuePlanBGrant, planBMayOpen, resolvePlanBUrl, verifyPlanBGrant } from "../worker/planBAccess.ts";
 import { emergencyEntitlementKey, type EmergencyEntitlementSnapshot } from "../worker/emergencyEntitlements.ts";
-import { handlePlanBRequest, verifyPlanBGrantToken } from "../plan-b/worker.mjs";
+import { handlePlanBRequest, runIndependentMonitor, verifyPlanBGrantToken } from "../plan-b/worker.mjs";
 
 const entitlementSecret = "entitlement-secret-for-tests-123456";
 const signingSecret = "signing-secret-for-tests-123456789";
@@ -112,9 +112,61 @@ test("independent Plan B worker verifies grants without D1 and redacts entitleme
     body: JSON.stringify({ token }),
   }), { NAVIXA_PLAN_B_SIGNING_SECRET: signingSecret });
   assert.equal(wrongOrigin.status, 403);
+});
 
-  const wrangler = await readFile(new URL("../plan-b/wrangler.jsonc", import.meta.url), "utf8");
+test("independent monitor confirms repeated outage and recovery using R2 state only", async () => {
+  const objects = new Map<string, string>();
+  const STATE = {
+    async get(key: string) {
+      const value = objects.get(key);
+      return value === undefined ? null : { text: async () => value };
+    },
+    async put(key: string, value: string) { objects.set(key, value); },
+  };
+  const fetchFor = (canonicalHealthy: boolean, originHealthy = true) => async (input: string | URL | Request) => {
+    const url = String(input);
+    const healthy = url.includes("navixasa.com/api/healthz") ? canonicalHealthy : originHealthy;
+    return new Response(JSON.stringify({ ok: healthy, service: "navixa-primary" }), {
+      status: healthy ? 200 : 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  const first = await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(false), now: new Date("2026-09-10T18:00:00Z") });
+  assert.equal(first.state, "degraded");
+  const second = await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(false), now: new Date("2026-09-10T18:01:00Z") });
+  assert.equal(second.state, "degraded");
+  const third = await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(false), now: new Date("2026-09-10T18:02:00Z") });
+  assert.equal(third.state, "outage");
+  assert.ok(third.incidentId);
+
+  await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(true), now: new Date("2026-09-10T18:03:00Z") });
+  await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(true), now: new Date("2026-09-10T18:04:00Z") });
+  const recovery = await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(true), now: new Date("2026-09-10T18:05:00Z") });
+  assert.equal(recovery.state, "recovery");
+  assert.equal(recovery.incidentId, third.incidentId);
+  const healthy = await runIndependentMonitor({ STATE }, { fetchImpl: fetchFor(true), now: new Date("2026-09-10T18:06:00Z") });
+  assert.equal(healthy.state, "healthy");
+  assert.equal(healthy.incidentId, "");
+
+  const noStore = await runIndependentMonitor({}, { fetchImpl: fetchFor(false), now });
+  assert.deepEqual(noStore, { ok: false, error: "state_store_not_ready" });
+});
+
+test("Plan B monitor uses a separate R2 bucket and primary exposes a D1-backed no-store probe", async () => {
+  const [wrangler, healthRoute] = await Promise.all([
+    readFile(new URL("../plan-b/wrangler.jsonc", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/healthz/route.ts", import.meta.url), "utf8"),
+  ]);
   assert.match(wrangler, /backup\.navixasa\.com/);
   assert.match(wrangler, /"custom_domain": true/);
-  assert.doesNotMatch(wrangler, /d1_databases|navixa-db|DB/);
+  assert.match(wrangler, /"binding": "STATE"/);
+  assert.match(wrangler, /"bucket_name": "navixa-plan-b-state"/);
+  assert.match(wrangler, /"crons": \["\* \* \* \* \*"\]/);
+  assert.doesNotMatch(wrangler, /d1_databases|navixa-db|"DB"/);
+
+  assert.match(healthRoute, /SELECT 1 AS ok/);
+  assert.match(healthRoute, /navixa-primary/);
+  assert.match(healthRoute, /no-store/);
+  assert.doesNotMatch(healthRoute, /ADMIN_JWT_SECRET|RESEND|TELEGRAM|email|subscriber|payment/i);
 });
