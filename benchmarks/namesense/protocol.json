@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "evidenceMode": "human",
+  "requiredAccents": [
+    {"id": "en-IN", "label": "Indian English"},
+    {"id": "en-PH", "label": "Filipino English"},
+    {"id": "en-US", "label": "American English"},
+    {"id": "en-GB", "label": "British English"},
+    {"id": "ar-GULF", "label": "Gulf Arabic"},
+    {"id": "ar-EG", "label": "Egyptian Arabic"},
+    {"id": "ar-SY", "label": "Syrian Arabic"},
+    {"id": "ar-MA", "label": "Moroccan Arabic"},
+    {"id": "ar-DZ", "label": "Algerian Arabic"}
+  ],
+  "minimums": {
+    "speakersPerAccent": 25,
+    "positiveTrialsPerAccent": 200,
+    "negativeTrialsPerAccent": 200,
+    "deviceClassesPerAccent": 3,
+    "browsersPerAccent": 2,
+    "noiseConditionsPerAccent": 3,
+    "latencyCoverage": 0.95,
+    "maxSpeakerShare": 0.10
+  },
+  "thresholds": {
+    "overallRecall": 0.97,
+    "perAccentRecall": 0.95,
+    "overallFalsePositiveRate": 0.005,
+    "perAccentFalsePositiveRate": 0.01,
+    "p95LatencyMs": 1500
+  }
+}

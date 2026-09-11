@@ -1,0 +1,5 @@
+[
+  {"id":"demo-human-1","mode":"human","accent":"en-IN","speakerId":"anon-001","deviceClass":"laptop-built-in","browser":"chrome-desktop","noise":"clean","expected":"hit","detected":true,"latencyMs":910},
+  {"id":"demo-human-2","mode":"human","accent":"en-IN","speakerId":"anon-001","deviceClass":"laptop-built-in","browser":"chrome-desktop","noise":"clean","expected":"miss","detected":false},
+  {"id":"demo-synthetic-1","mode":"synthetic","accent":"en-IN","speakerId":"synthetic","deviceClass":"virtual","browser":"offline","noise":"clean","expected":"hit","detected":true,"latencyMs":700}
+]

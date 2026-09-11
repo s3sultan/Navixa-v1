@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "watchedNames": [
+    {"id":"sultan","arabic":"سلطان","latin":"Sultan"},
+    {"id":"mohammed","arabic":"محمد","latin":"Mohammed"},
+    {"id":"alharbi","arabic":"الحربي","latin":"Alharbi"}
+  ],
+  "positiveTemplates": [
+    {"id":"name-only","textAr":"{name}","textEn":"{name}","tags":["short"]},
+    {"id":"direct-question-ar","textAr":"يا {name} تسمعني؟","textEn":"{name}, can you hear me?","tags":["direct","question"]},
+    {"id":"direct-answer-en","textAr":"{name} جاوب على السؤال","textEn":"{name}, answer the question please","tags":["direct","classroom"]},
+    {"id":"mid-sentence-ar","textAr":"السؤال الجاي عند {name} وبعده نكمل","textEn":"The next question is for {name}, then we continue","tags":["mid-sentence","classroom"]},
+    {"id":"end-sentence-en","textAr":"نحتاج إجابتك الآن يا {name}","textEn":"We need your answer now, {name}","tags":["end-sentence"]},
+    {"id":"code-switch-ar-en","textAr":"يا {latinName} are you with us?","textEn":"{latinName} جاوب لو سمحت","tags":["code-switch"]},
+    {"id":"title-name","textAr":"الأستاذ {name} موجود؟","textEn":"Mr {name}, are you there?","tags":["title"]},
+    {"id":"repeat-name","textAr":"{name}، {name}، تسمعني؟","textEn":"{name}, {name}, can you hear me?","tags":["repeat"]}
+  ],
+  "negativePrompts": [
+    {"id":"near-sultan-salman","text":"Please ask Salman now","confusableFor":"sultan"},
+    {"id":"near-sultan-salim","text":"Please ask Salim now","confusableFor":"sultan"},
+    {"id":"near-sultan-zoltan","text":"Please ask Zoltan now","confusableFor":"sultan"},
+    {"id":"near-sultan-shelton","text":"Please ask Shelton now","confusableFor":"sultan"},
+    {"id":"near-sultan-sullivan","text":"Please ask Sullivan now","confusableFor":"sultan"},
+    {"id":"substring-sultanate","text":"The sultanate announced a change","confusableFor":"sultan"},
+    {"id":"near-mohammed-mahmoud-en","text":"Please ask Mahmoud to answer","confusableFor":"mohammed"},
+    {"id":"near-mohammed-mahmoud-ar","text":"يا محمود جاوب على السؤال","confusableFor":"mohammed"},
+    {"id":"near-alharbi-alhardy","text":"Next is Al Hardy","confusableFor":"alharbi"},
+    {"id":"ordinary-ar","text":"السؤال واضح ونكمل بعد قليل","confusableFor":"all"},
+    {"id":"ordinary-en","text":"Let's continue with the next slide","confusableFor":"all"}
+  ],
+  "deliveryConditions": [
+    "normal",
+    "fast",
+    "quiet",
+    "clean",
+    "office-background",
+    "lecture-echo"
+  ]
+}
