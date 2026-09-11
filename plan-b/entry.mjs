@@ -50,8 +50,13 @@ function withIndependentState(env) {
 }
 
 export default {
-  fetch(request, env) {
-    return handlePlanBRequest(request, withIndependentState(env));
+  async fetch(request, env) {
+    const isolatedEnv = withIndependentState(env);
+    const url = new URL(request.url);
+    if (url.pathname === "/monitor/status" && isolatedEnv?.STATE) {
+      await runIndependentMonitor(isolatedEnv);
+    }
+    return handlePlanBRequest(request, isolatedEnv);
   },
   scheduled(_controller, env, ctx) {
     ctx.waitUntil(runIndependentMonitor(withIndependentState(env)));
