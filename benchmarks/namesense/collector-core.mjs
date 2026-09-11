@@ -58,8 +58,10 @@ export function createControlledLiveNameSenseTrial({
   protocol,
   trial,
 }) {
-  const quality = analyzeNameSenseSignal(audio, sampleRate, protocol.signalQuality);
-  if (!quality.passed) throw new Error("signal-quality-check-failed");
+  // The analyzer returns the current protocol-threshold verdict as `passed`.
+  // Keep the object name explicit so this cannot be confused with a stale external quality flag.
+  const signalQuality = analyzeNameSenseSignal(audio, sampleRate, protocol.signalQuality);
+  if (!signalQuality.passed) throw new Error("signal-quality-check-failed");
   if (!trial?.consent) throw new Error("benchmark-consent-required");
   return {
     ...trial,
@@ -68,8 +70,8 @@ export function createControlledLiveNameSenseTrial({
     captureMethod: protocol.requiredCaptureMethod,
     rawAudioRetained: false,
     signalQualityPassed: true,
-    vadSpeechConfirmed: quality.vadSpeechConfirmed,
-    signalRms: quality.rms,
-    signalVariance: quality.variance,
+    vadSpeechConfirmed: signalQuality.vadSpeechConfirmed,
+    signalRms: signalQuality.rms,
+    signalVariance: signalQuality.variance,
   };
 }

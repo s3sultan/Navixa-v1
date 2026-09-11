@@ -38,3 +38,19 @@ test("client-side signal validation accepts sustained speech-like energy and dis
   assert.ok(record.signalRms >= protocol.signalQuality.minRms);
   assert.equal("audio" in record, false);
 });
+
+test("collector uses the current protocol thresholds rather than any stale quality verdict", () => {
+  const audio = makeSpeech();
+  const strictProtocol = {
+    ...protocol,
+    signalQuality: { ...protocol.signalQuality, minRms: 0.05 }
+  };
+  const quality = analyzeNameSenseSignal(audio, 16_000, strictProtocol.signalQuality);
+  assert.equal(quality.passed, false);
+  assert.throws(() => createControlledLiveNameSenseTrial({
+    audio,
+    sampleRate: 16_000,
+    protocol: strictProtocol,
+    trial: { id: "strict-threshold", consent: true, expected: "hit", detected: false }
+  }), /signal-quality-check-failed/);
+});
