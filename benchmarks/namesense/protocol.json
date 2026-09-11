@@ -1,6 +1,9 @@
 {
-  "version": 1,
+  "version": 2,
   "evidenceMode": "human",
+  "releaseSplit": "holdout",
+  "requiredProvenance": "controlled-live",
+  "requiredCaptureMethod": "live-microphone",
   "requiredAccents": [
     {"id": "en-IN", "label": "Indian English"},
     {"id": "en-PH", "label": "Filipino English"},
@@ -14,19 +17,48 @@
   ],
   "minimums": {
     "speakersPerAccent": 25,
-    "positiveTrialsPerAccent": 200,
-    "negativeTrialsPerAccent": 200,
-    "deviceClassesPerAccent": 3,
-    "browsersPerAccent": 2,
-    "noiseConditionsPerAccent": 3,
-    "latencyCoverage": 0.95,
-    "maxSpeakerShare": 0.10
+    "positiveTrialsPerAccent": 500,
+    "negativeTrialsPerAccent": 500,
+    "minTrialsPerSpeakerPerAccent": 24,
+    "minPositiveTrialsPerSpeakerPerAccent": 10,
+    "minNegativeTrialsPerSpeakerPerAccent": 10,
+    "latencyEligiblePositiveShare": 0.25,
+    "latencyCoverage": 0.98,
+    "maxSpeakerSharePerAccent": 0.06,
+    "requiredCategoryShares": {
+      "deviceClass": {
+        "laptop-built-in": 0.20,
+        "headset": 0.20,
+        "phone": 0.20
+      },
+      "browser": {
+        "desktop-chromium": 0.25,
+        "ios-safari": 0.25
+      },
+      "noise": {
+        "clean": 0.20,
+        "office-background": 0.20,
+        "lecture-echo": 0.20
+      }
+    }
   },
   "thresholds": {
-    "overallRecall": 0.97,
-    "perAccentRecall": 0.95,
+    "overallRecall": 0.98,
+    "overallRecallLower95": 0.97,
+    "perAccentRecall": 0.97,
+    "perAccentRecallLower95": 0.95,
     "overallFalsePositiveRate": 0.005,
+    "overallFalsePositiveUpper95": 0.0075,
     "perAccentFalsePositiveRate": 0.01,
+    "perAccentFalsePositiveUpper95": 0.02,
     "p95LatencyMs": 1500
+  },
+  "latency": {
+    "boundary": "client-vad-name-end-to-alert",
+    "clock": "performance.now",
+    "eligiblePrompts": "name-only-or-name-final",
+    "includesRecognitionRuntime": true,
+    "includesUiAlertDispatch": true,
+    "excludesSetupAndPermissionTime": true
   }
 }

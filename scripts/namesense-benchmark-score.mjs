@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const REQUIRED_TRIAL_FIELDS = ["id", "mode", "accent", "speakerId", "deviceClass", "browser", "noise", "expected", "detected"];
+const REQUIRED_TRIAL_FIELDS = [
+  "id", "mode", "split", "provenance", "captureMethod", "consent", "rawAudioRetained",
+  "accent", "speakerId", "deviceClass", "browser", "noise", "expected", "detected", "latencyEligible"
+];
 
 const ratio = (numerator, denominator) => denominator ? numerator / denominator : null;
 
@@ -26,10 +29,12 @@ function validateProtocol(protocol) {
   if (!protocol || !Array.isArray(protocol.requiredAccents) || !protocol.requiredAccents.length) {
     throw new Error("protocol.requiredAccents must be a non-empty array");
   }
-  if (!protocol.minimums || !protocol.thresholds) throw new Error("protocol minimums/thresholds are required");
+  if (!protocol.minimums || !protocol.thresholds || !protocol.latency?.boundary) {
+    throw new Error("protocol minimums/thresholds/latency boundary are required");
+  }
 }
 
-function validateTrials(trials) {
+function validateTrials(trials, protocol) {
   if (!Array.isArray(trials)) throw new Error("results must be an array of benchmark trials");
   const ids = new Set();
   for (const [index, trial] of trials.entries()) {
@@ -39,12 +44,31 @@ function validateTrials(trials) {
     if (ids.has(trial.id)) throw new Error(`duplicate trial id: ${trial.id}`);
     ids.add(trial.id);
     if (trial.mode !== "human" && trial.mode !== "synthetic") throw new Error(`invalid mode for ${trial.id}`);
+    if (typeof trial.consent !== "boolean" || typeof trial.rawAudioRetained !== "boolean") throw new Error(`invalid consent/rawAudioRetained flags for ${trial.id}`);
+    if (typeof trial.latencyEligible !== "boolean") throw new Error(`latencyEligible must be boolean for ${trial.id}`);
     if (trial.expected !== "hit" && trial.expected !== "miss") throw new Error(`invalid expected value for ${trial.id}`);
     if (typeof trial.detected !== "boolean") throw new Error(`detected must be boolean for ${trial.id}`);
     if (trial.latencyMs != null && (!Number.isFinite(trial.latencyMs) || trial.latencyMs < 0)) {
       throw new Error(`latencyMs must be a non-negative number for ${trial.id}`);
     }
+    if (trial.latencyMs != null && trial.latencyBoundary !== protocol.latency.boundary) {
+      throw new Error(`latencyBoundary mismatch for ${trial.id}`);
+    }
   }
+}
+
+function countBy(trials, field) {
+  const counts = new Map();
+  for (const trial of trials) counts.set(trial[field], (counts.get(trial[field]) || 0) + 1);
+  return counts;
+}
+
+function categoryCounts(trials) {
+  return {
+    deviceClass: countBy(trials, "deviceClass"),
+    browser: countBy(trials, "browser"),
+    noise: countBy(trials, "noise")
+  };
 }
 
 function summarizeTrials(trials) {
@@ -54,11 +78,14 @@ function summarizeTrials(trials) {
   const falseNegatives = positives.length - truePositives.length;
   const falsePositives = negatives.filter((trial) => trial.detected).length;
   const trueNegatives = negatives.length - falsePositives;
-  const latencies = truePositives
+  const latencyEligiblePositives = positives.filter((trial) => trial.latencyEligible);
+  const latencyEligibleTruePositives = latencyEligiblePositives.filter((trial) => trial.detected);
+  const latencies = latencyEligibleTruePositives
     .map((trial) => trial.latencyMs)
     .filter((value) => Number.isFinite(value));
-  const speakerCounts = new Map();
-  for (const trial of trials) speakerCounts.set(trial.speakerId, (speakerCounts.get(trial.speakerId) || 0) + 1);
+  const speakerCounts = countBy(trials, "speakerId");
+  const speakerPositiveCounts = countBy(positives, "speakerId");
+  const speakerNegativeCounts = countBy(negatives, "speakerId");
   const maxSpeakerTrials = Math.max(0, ...speakerCounts.values());
 
   return {
@@ -73,15 +100,31 @@ function summarizeTrials(trials) {
     recall95: wilsonInterval(truePositives.length, positives.length),
     falsePositiveRate: ratio(falsePositives, negatives.length),
     falsePositiveRate95: wilsonInterval(falsePositives, negatives.length),
+    latencyEligiblePositives: latencyEligiblePositives.length,
+    latencyEligibleTruePositives: latencyEligibleTruePositives.length,
+    latencyEligiblePositiveShare: ratio(latencyEligiblePositives.length, positives.length),
     p50LatencyMs: percentile(latencies, 0.5),
     p95LatencyMs: percentile(latencies, 0.95),
-    latencyCoverage: ratio(latencies.length, truePositives.length),
+    latencyCoverage: ratio(latencies.length, latencyEligibleTruePositives.length),
     speakers: speakerCounts.size,
-    devices: new Set(trials.map((trial) => trial.deviceClass)).size,
-    browsers: new Set(trials.map((trial) => trial.browser)).size,
-    noiseConditions: new Set(trials.map((trial) => trial.noise)).size,
+    speakerCounts,
+    speakerPositiveCounts,
+    speakerNegativeCounts,
+    categoryCountsAll: categoryCounts(trials),
+    categoryCountsPositive: categoryCounts(positives),
+    categoryCountsNegative: categoryCounts(negatives),
     maxSpeakerShare: ratio(maxSpeakerTrials, trials.length)
   };
+}
+
+function checkCategoryShares(countsByField, denominator, requiredCategoryShares, prefix, reasons) {
+  for (const [field, categories] of Object.entries(requiredCategoryShares || {})) {
+    const counts = countsByField[field] || new Map();
+    for (const [category, minimumShare] of Object.entries(categories)) {
+      const share = ratio(counts.get(category) || 0, denominator) || 0;
+      if (share < minimumShare) reasons.push(`${prefix} ${field} ${category} share ${share.toFixed(3)} < ${minimumShare}`);
+    }
+  }
 }
 
 function checkAccentGate(summary, protocol) {
@@ -90,23 +133,54 @@ function checkAccentGate(summary, protocol) {
   if (summary.speakers < minimums.speakersPerAccent) reasons.push(`speakers ${summary.speakers}/${minimums.speakersPerAccent}`);
   if (summary.positives < minimums.positiveTrialsPerAccent) reasons.push(`positive trials ${summary.positives}/${minimums.positiveTrialsPerAccent}`);
   if (summary.negatives < minimums.negativeTrialsPerAccent) reasons.push(`negative trials ${summary.negatives}/${minimums.negativeTrialsPerAccent}`);
-  if (summary.devices < minimums.deviceClassesPerAccent) reasons.push(`device classes ${summary.devices}/${minimums.deviceClassesPerAccent}`);
-  if (summary.browsers < minimums.browsersPerAccent) reasons.push(`browsers ${summary.browsers}/${minimums.browsersPerAccent}`);
-  if (summary.noiseConditions < minimums.noiseConditionsPerAccent) reasons.push(`noise conditions ${summary.noiseConditions}/${minimums.noiseConditionsPerAccent}`);
-  if (summary.truePositives > 0 && (summary.latencyCoverage ?? 0) < minimums.latencyCoverage) reasons.push(`latency coverage ${(summary.latencyCoverage ?? 0).toFixed(3)} < ${minimums.latencyCoverage}`);
-  if (summary.trials > 0 && (summary.maxSpeakerShare ?? 0) > minimums.maxSpeakerShare) reasons.push(`speaker dominance ${(summary.maxSpeakerShare ?? 0).toFixed(3)} > ${minimums.maxSpeakerShare}`);
+  for (const speakerId of summary.speakerCounts.keys()) {
+    const total = summary.speakerCounts.get(speakerId) || 0;
+    const positive = summary.speakerPositiveCounts.get(speakerId) || 0;
+    const negative = summary.speakerNegativeCounts.get(speakerId) || 0;
+    if (total < minimums.minTrialsPerSpeakerPerAccent) reasons.push(`speaker ${speakerId} trials ${total}/${minimums.minTrialsPerSpeakerPerAccent}`);
+    if (positive < minimums.minPositiveTrialsPerSpeakerPerAccent) reasons.push(`speaker ${speakerId} positive ${positive}/${minimums.minPositiveTrialsPerSpeakerPerAccent}`);
+    if (negative < minimums.minNegativeTrialsPerSpeakerPerAccent) reasons.push(`speaker ${speakerId} negative ${negative}/${minimums.minNegativeTrialsPerSpeakerPerAccent}`);
+  }
+  if ((summary.latencyEligiblePositiveShare ?? 0) < minimums.latencyEligiblePositiveShare) {
+    reasons.push(`latency-eligible positive share ${(summary.latencyEligiblePositiveShare ?? 0).toFixed(3)} < ${minimums.latencyEligiblePositiveShare}`);
+  }
+  if (summary.latencyEligibleTruePositives > 0 && (summary.latencyCoverage ?? 0) < minimums.latencyCoverage) {
+    reasons.push(`latency coverage ${(summary.latencyCoverage ?? 0).toFixed(3)} < ${minimums.latencyCoverage}`);
+  }
+  if (summary.trials > 0 && (summary.maxSpeakerShare ?? 0) > minimums.maxSpeakerSharePerAccent) {
+    reasons.push(`speaker dominance ${(summary.maxSpeakerShare ?? 0).toFixed(3)} > ${minimums.maxSpeakerSharePerAccent}`);
+  }
+  checkCategoryShares(summary.categoryCountsAll, summary.trials, minimums.requiredCategoryShares, "all", reasons);
+  checkCategoryShares(summary.categoryCountsPositive, summary.positives, minimums.requiredCategoryShares, "positive", reasons);
+  checkCategoryShares(summary.categoryCountsNegative, summary.negatives, minimums.requiredCategoryShares, "negative", reasons);
   if (summary.positives > 0 && (summary.recall ?? 0) < thresholds.perAccentRecall) reasons.push(`recall ${(summary.recall ?? 0).toFixed(4)} < ${thresholds.perAccentRecall}`);
+  if (summary.positives > 0 && (summary.recall95.lower ?? 0) < thresholds.perAccentRecallLower95) reasons.push(`recall lower95 ${(summary.recall95.lower ?? 0).toFixed(4)} < ${thresholds.perAccentRecallLower95}`);
   if (summary.negatives > 0 && (summary.falsePositiveRate ?? 0) > thresholds.perAccentFalsePositiveRate) reasons.push(`FPR ${(summary.falsePositiveRate ?? 0).toFixed(4)} > ${thresholds.perAccentFalsePositiveRate}`);
-  if (summary.truePositives > 0 && (summary.p95LatencyMs == null || summary.p95LatencyMs > thresholds.p95LatencyMs)) reasons.push(`p95 latency ${summary.p95LatencyMs ?? "n/a"}ms > ${thresholds.p95LatencyMs}ms`);
+  if (summary.negatives > 0 && (summary.falsePositiveRate95.upper ?? 1) > thresholds.perAccentFalsePositiveUpper95) reasons.push(`FPR upper95 ${(summary.falsePositiveRate95.upper ?? 1).toFixed(4)} > ${thresholds.perAccentFalsePositiveUpper95}`);
+  if (summary.latencyEligibleTruePositives > 0 && (summary.p95LatencyMs == null || summary.p95LatencyMs > thresholds.p95LatencyMs)) reasons.push(`p95 latency ${summary.p95LatencyMs ?? "n/a"}ms > ${thresholds.p95LatencyMs}ms`);
   return { pass: reasons.length === 0, reasons };
 }
 
 export function scoreNameSenseBenchmark(protocol, rawTrials) {
   validateProtocol(protocol);
-  validateTrials(rawTrials);
+  validateTrials(rawTrials, protocol);
   const requiredAccentIds = protocol.requiredAccents.map((item) => item.id);
-  const humanTrials = rawTrials.filter((trial) => trial.mode === protocol.evidenceMode && requiredAccentIds.includes(trial.accent));
+  const humanTrials = rawTrials.filter((trial) =>
+    trial.mode === protocol.evidenceMode
+    && trial.split === protocol.releaseSplit
+    && trial.provenance === protocol.requiredProvenance
+    && trial.captureMethod === protocol.requiredCaptureMethod
+    && trial.consent === true
+    && trial.rawAudioRetained === false
+    && requiredAccentIds.includes(trial.accent)
+  );
   const syntheticTrials = rawTrials.filter((trial) => trial.mode === "synthetic");
+  const rejectedHumanTrials = rawTrials.filter((trial) => trial.mode === "human" && !humanTrials.includes(trial));
+  const developmentHumanSpeakerIds = new Set(rawTrials
+    .filter((trial) => trial.mode === "human" && trial.split !== protocol.releaseSplit)
+    .map((trial) => trial.speakerId));
+  const holdoutSpeakerIds = new Set(humanTrials.map((trial) => trial.speakerId));
+  const leakedSpeakerIds = [...holdoutSpeakerIds].filter((speakerId) => developmentHumanSpeakerIds.has(speakerId));
   const byAccent = {};
 
   for (const accent of protocol.requiredAccents) {
@@ -116,11 +190,18 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
 
   const overall = summarizeTrials(humanTrials);
   const overallReasons = [];
-  if (overall.positives === 0) overallReasons.push("no human positive trials");
-  else if ((overall.recall ?? 0) < protocol.thresholds.overallRecall) overallReasons.push(`overall recall ${(overall.recall ?? 0).toFixed(4)} < ${protocol.thresholds.overallRecall}`);
-  if (overall.negatives === 0) overallReasons.push("no human negative trials");
-  else if ((overall.falsePositiveRate ?? 0) > protocol.thresholds.overallFalsePositiveRate) overallReasons.push(`overall FPR ${(overall.falsePositiveRate ?? 0).toFixed(4)} > ${protocol.thresholds.overallFalsePositiveRate}`);
-  if (overall.truePositives === 0) overallReasons.push("no true-positive latency evidence");
+  if (leakedSpeakerIds.length) overallReasons.push(`holdout speaker leakage: ${leakedSpeakerIds.length} speaker(s)`);
+  if (overall.positives === 0) overallReasons.push("no eligible human positive trials");
+  else {
+    if ((overall.recall ?? 0) < protocol.thresholds.overallRecall) overallReasons.push(`overall recall ${(overall.recall ?? 0).toFixed(4)} < ${protocol.thresholds.overallRecall}`);
+    if ((overall.recall95.lower ?? 0) < protocol.thresholds.overallRecallLower95) overallReasons.push(`overall recall lower95 ${(overall.recall95.lower ?? 0).toFixed(4)} < ${protocol.thresholds.overallRecallLower95}`);
+  }
+  if (overall.negatives === 0) overallReasons.push("no eligible human negative trials");
+  else {
+    if ((overall.falsePositiveRate ?? 0) > protocol.thresholds.overallFalsePositiveRate) overallReasons.push(`overall FPR ${(overall.falsePositiveRate ?? 0).toFixed(4)} > ${protocol.thresholds.overallFalsePositiveRate}`);
+    if ((overall.falsePositiveRate95.upper ?? 1) > protocol.thresholds.overallFalsePositiveUpper95) overallReasons.push(`overall FPR upper95 ${(overall.falsePositiveRate95.upper ?? 1).toFixed(4)} > ${protocol.thresholds.overallFalsePositiveUpper95}`);
+  }
+  if (overall.latencyEligibleTruePositives === 0) overallReasons.push("no latency-eligible true-positive evidence");
   else if (overall.p95LatencyMs == null || overall.p95LatencyMs > protocol.thresholds.p95LatencyMs) overallReasons.push(`overall p95 latency ${overall.p95LatencyMs ?? "n/a"}ms > ${protocol.thresholds.p95LatencyMs}ms`);
   const failedAccents = Object.entries(byAccent).filter(([, value]) => !value.gate.pass).map(([accent]) => accent);
   if (failedAccents.length) overallReasons.push(`accent gates not ready: ${failedAccents.join(", ")}`);
@@ -129,7 +210,9 @@ export function scoreNameSenseBenchmark(protocol, rawTrials) {
     protocolVersion: protocol.version,
     evidenceMode: protocol.evidenceMode,
     humanTrials: humanTrials.length,
+    rejectedHumanTrials: rejectedHumanTrials.length,
     syntheticTrialsExcludedFromReleaseEvidence: syntheticTrials.length,
+    holdoutSpeakerLeakageCount: leakedSpeakerIds.length,
     overall: { ...overall, gate: { pass: overallReasons.length === 0, reasons: overallReasons } },
     byAccent,
     releaseReady: overallReasons.length === 0
@@ -140,8 +223,10 @@ export function formatNameSenseBenchmarkReport(report) {
   const percent = (value) => value == null ? "n/a" : `${(value * 100).toFixed(2)}%`;
   const lines = [
     `NameSense benchmark: ${report.releaseReady ? "PASS" : "NOT READY"}`,
-    `Human trials: ${report.humanTrials}`,
+    `Eligible human holdout trials: ${report.humanTrials}`,
+    `Rejected human-labelled trials: ${report.rejectedHumanTrials}`,
     `Synthetic trials excluded from release evidence: ${report.syntheticTrialsExcludedFromReleaseEvidence}`,
+    `Holdout speaker leakage: ${report.holdoutSpeakerLeakageCount}`,
     `Overall recall: ${percent(report.overall.recall)} (95% CI ${percent(report.overall.recall95.lower)}-${percent(report.overall.recall95.upper)})`,
     `Overall false-positive rate: ${percent(report.overall.falsePositiveRate)} (95% CI ${percent(report.overall.falsePositiveRate95.lower)}-${percent(report.overall.falsePositiveRate95.upper)})`,
     `Overall p95 latency: ${report.overall.p95LatencyMs ?? "n/a"} ms`
