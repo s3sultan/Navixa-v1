@@ -20,14 +20,18 @@ const normalizeError = (error: unknown): AutomationRunError => {
 };
 
 export class AutomationEngine {
+  private readonly skills: SkillRegistry;
+  private readonly history: RunHistoryStore;
   private readonly now: () => Date;
   private readonly createId: () => string;
 
   constructor(
-    private readonly skills: SkillRegistry,
-    private readonly history: RunHistoryStore,
+    skills: SkillRegistry,
+    history: RunHistoryStore,
     options: AutomationEngineOptions = {},
   ) {
+    this.skills = skills;
+    this.history = history;
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? (() => globalThis.crypto.randomUUID());
   }
