@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { findNavixaVoiceTerm } from "../app/voice/voiceDetection.ts";
-import { createNavixaBrowserVoiceEngine } from "../app/voice/voiceEngine.ts";
+import { createNavixaBrowserVoiceEngine, navixaVoiceLanguageFamily } from "../app/voice/voiceEngine.ts";
 import { readNavixaLearnedVoiceAliases, rememberNavixaVoiceMatch } from "../app/voice/voiceLearning.ts";
 
 type FakeAlternative = { transcript: string; confidence: number };
@@ -329,5 +329,86 @@ test("rotates language early after a very low-confidence final result", () => {
     engine.destroy();
   } finally {
     clearFakeWindow();
+  }
+});
+
+test("rotates within English accents after English has been identified", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "ar-SA",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onresult && recognition.onend && recognition.onnomatch);
+    assert.equal(engine.start(), true);
+    recognition.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "please call sultan now", confidence: 0.9 }, isFinal: true }],
+    });
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-IN");
+    recognition.onnomatch();
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "en-US");
+    engine.destroy();
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("rotates within Arabic dialect profiles after Arabic has been identified", () => {
+  setFakeWindow();
+  try {
+    const engine = createNavixaBrowserVoiceEngine({
+      language: "ar-SA",
+      localAccuracyFallback: false,
+      handlers: { onTranscript: () => undefined },
+    });
+    const recognition = FakeRecognition.latest;
+    assert.ok(recognition?.onresult && recognition.onend && recognition.onnomatch);
+    assert.equal(engine.start(), true);
+    recognition.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "يا سلطان جاوب", confidence: 0.92 }, isFinal: true }],
+    });
+    recognition.onnomatch();
+    recognition.onend();
+    assert.equal(engine.start(), true);
+    assert.equal(recognition.lang, "ar-EG");
+    engine.destroy();
+  } finally {
+    clearFakeWindow();
+  }
+});
+
+test("accepts stored British and Filipino English profile hints", () => {
+  for (const language of ["en-GB", "en-PH"] as const) {
+    const store = setFakeWindow();
+    try {
+      store.set("navixa-voice-language-hint", language);
+      const engine = createNavixaBrowserVoiceEngine({
+        localAccuracyFallback: false,
+        handlers: { onTranscript: () => undefined },
+      });
+      const recognition = FakeRecognition.latest;
+      assert.ok(recognition);
+      assert.equal(recognition.lang, language);
+      engine.destroy();
+    } finally {
+      clearFakeWindow();
+    }
+  }
+});
+
+test("maps Gulf, Egyptian, Syrian, Maghrebi and English profiles to the right family", () => {
+  for (const language of ["ar-SA", "ar-EG", "ar-SY", "ar-MA", "ar-DZ"] as const) {
+    assert.equal(navixaVoiceLanguageFamily(language), "ar");
+  }
+  for (const language of ["en-IN", "en-US", "en-GB", "en-PH"] as const) {
+    assert.equal(navixaVoiceLanguageFamily(language), "en");
   }
 });

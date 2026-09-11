@@ -5,10 +5,14 @@ export type NavixaLocalNameFallback = {
   destroy: () => void;
 };
 
+export type NavixaLocalSpeechLanguage = "auto" | "ar" | "en";
+export type NavixaVoiceFlushReason = "endpoint" | "window";
+
 type LocalNameFallbackOptions = {
   onTranscript: (text: string) => void;
   windowSeconds?: number;
   overlapSeconds?: number;
+  getLanguageHint?: () => NavixaLocalSpeechLanguage;
 };
 
 type LocalWorkerMessage = {
@@ -19,8 +23,10 @@ type LocalWorkerMessage = {
 type AudioContextConstructor = new () => AudioContext;
 
 const TARGET_SAMPLE_RATE = 16_000;
-const DEFAULT_WINDOW_SECONDS = 10;
-const DEFAULT_OVERLAP_SECONDS = 2;
+const DEFAULT_WINDOW_SECONDS = 5;
+const DEFAULT_OVERLAP_SECONDS = 1.5;
+const DEFAULT_MIN_ENDPOINT_SECONDS = 1;
+const DEFAULT_ENDPOINT_SILENCE_SECONDS = 0.4;
 const MAX_BUFFER_SECONDS = 18;
 
 export function resampleNavixaVoiceAudio(input: Float32Array, sourceRate: number, targetRate = TARGET_SAMPLE_RATE): Float32Array {
@@ -37,6 +43,101 @@ export function resampleNavixaVoiceAudio(input: Float32Array, sourceRate: number
     output[index] = input[left] * (1 - weight) + input[right] * weight;
   }
   return output;
+}
+
+export function hasNavixaVoiceActivity(
+  input: Float32Array,
+  sampleRate = TARGET_SAMPLE_RATE,
+  frameMs = 20,
+  rmsThreshold = 0.0035,
+  minSpeechMs = 80,
+): boolean {
+  if (!input.length || !Number.isFinite(sampleRate) || sampleRate <= 0) return false;
+  if (!Number.isFinite(frameMs) || frameMs <= 0 || !Number.isFinite(rmsThreshold) || rmsThreshold <= 0) return false;
+  if (!Number.isFinite(minSpeechMs) || minSpeechMs <= 0) return false;
+
+  const frameSamples = Math.max(1, Math.round(sampleRate * frameMs / 1000));
+  const requiredFrames = Math.max(1, Math.ceil(minSpeechMs / frameMs));
+  let consecutiveActiveFrames = 0;
+
+  for (let offset = 0; offset < input.length; offset += frameSamples) {
+    const end = Math.min(input.length, offset + frameSamples);
+    let sumSquares = 0;
+    let peak = 0;
+    for (let index = offset; index < end; index += 1) {
+      const raw = input[index];
+      const sample = Number.isFinite(raw) ? raw : 0;
+      const absolute = Math.abs(sample);
+      sumSquares += sample * sample;
+      if (absolute > peak) peak = absolute;
+    }
+    const count = Math.max(1, end - offset);
+    const rms = Math.sqrt(sumSquares / count);
+    const activeFrame = rms >= rmsThreshold || (peak >= 0.018 && rms >= rmsThreshold * 0.55);
+    consecutiveActiveFrames = activeFrame ? consecutiveActiveFrames + 1 : 0;
+    if (consecutiveActiveFrames >= requiredFrames) return true;
+  }
+  return false;
+}
+
+export function conditionNavixaVoiceAudio(
+  input: Float32Array,
+  targetRms = 0.06,
+  maxGain = 3,
+  peakLimit = 0.96,
+): Float32Array {
+  if (!input.length) return new Float32Array();
+  if (!Number.isFinite(targetRms) || targetRms <= 0 || !Number.isFinite(maxGain) || maxGain <= 0) {
+    return new Float32Array(input);
+  }
+
+  let sum = 0;
+  let validCount = 0;
+  for (const raw of input) {
+    if (!Number.isFinite(raw)) continue;
+    sum += raw;
+    validCount += 1;
+  }
+  const mean = validCount ? sum / validCount : 0;
+
+  let sumSquares = 0;
+  let peak = 0;
+  for (const raw of input) {
+    const sample = (Number.isFinite(raw) ? raw : 0) - mean;
+    sumSquares += sample * sample;
+    peak = Math.max(peak, Math.abs(sample));
+  }
+  const rms = Math.sqrt(sumSquares / input.length);
+  if (!Number.isFinite(rms) || rms < 1e-6 || peak < 1e-6) return new Float32Array(input.length);
+
+  const requestedGain = targetRms / rms;
+  let gain = Math.min(maxGain, Math.max(0.35, requestedGain));
+  if (peak * gain > peakLimit) gain = peakLimit / peak;
+
+  const output = new Float32Array(input.length);
+  for (let index = 0; index < input.length; index += 1) {
+    const raw = Number.isFinite(input[index]) ? input[index] : 0;
+    output[index] = Math.max(-peakLimit, Math.min(peakLimit, (raw - mean) * gain));
+  }
+  return output;
+}
+
+export function getNavixaVoiceFlushReason(
+  bufferedSamples: number,
+  sampleRate: number,
+  speechSeen: boolean,
+  trailingSilenceSamples: number,
+  maxWindowSeconds = DEFAULT_WINDOW_SECONDS,
+  minEndpointSeconds = DEFAULT_MIN_ENDPOINT_SECONDS,
+  endpointSilenceSeconds = DEFAULT_ENDPOINT_SILENCE_SECONDS,
+): NavixaVoiceFlushReason | null {
+  if (!Number.isFinite(bufferedSamples) || bufferedSamples <= 0 || !Number.isFinite(sampleRate) || sampleRate <= 0) return null;
+  if (!speechSeen) return null;
+  const endpointReady = bufferedSamples >= sampleRate * minEndpointSeconds
+    && trailingSilenceSamples >= sampleRate * endpointSilenceSeconds;
+  if (endpointReady) return "endpoint";
+  if (bufferedSamples >= sampleRate * maxWindowSeconds) return "window";
+  return null;
 }
 
 export function trimNavixaVoiceBuffer(chunks: Float32Array[], sampleRate: number, maxSeconds = MAX_BUFFER_SECONDS): Float32Array[] {
@@ -69,10 +170,15 @@ const getAudioContextConstructor = (): AudioContextConstructor | null => {
   return window.AudioContext || browserWindow.webkitAudioContext || null;
 };
 
+const safeLanguageHint = (value: unknown): NavixaLocalSpeechLanguage => (
+  value === "ar" || value === "en" ? value : "auto"
+);
+
 export function createNavixaLocalNameFallback({
   onTranscript,
   windowSeconds = DEFAULT_WINDOW_SECONDS,
   overlapSeconds = DEFAULT_OVERLAP_SECONDS,
+  getLanguageHint,
 }: LocalNameFallbackOptions): NavixaLocalNameFallback {
   const AudioContextClass = getAudioContextConstructor();
   const supported = Boolean(
@@ -94,11 +200,19 @@ export function createNavixaLocalNameFallback({
   let chunks: Float32Array[] = [];
   let bufferedSamples = 0;
   let sequence = 0;
+  let speechSeen = false;
+  let trailingSilenceSamples = 0;
+
+  const resetActivity = () => {
+    speechSeen = false;
+    trailingSilenceSamples = 0;
+  };
 
   const resetBuffer = () => {
     for (const chunk of chunks) chunk.fill(0);
     chunks = [];
     bufferedSamples = 0;
+    resetActivity();
   };
 
   const refreshBufferedSamples = () => {
@@ -127,11 +241,25 @@ export function createNavixaLocalNameFallback({
   const flushIfReady = () => {
     if (destroyed || !active || busy || !context) return;
     const sampleRate = context.sampleRate;
-    const requiredSamples = Math.max(1, Math.round(sampleRate * windowSeconds));
-    if (bufferedSamples < requiredSamples) return;
+    const hardWindowSamples = Math.max(1, Math.round(sampleRate * windowSeconds));
+    if (!speechSeen && bufferedSamples >= hardWindowSamples) {
+      resetBuffer();
+      return;
+    }
+
+    const flushReason = getNavixaVoiceFlushReason(
+      bufferedSamples,
+      sampleRate,
+      speechSeen,
+      trailingSilenceSamples,
+      windowSeconds,
+    );
+    if (!flushReason) return;
 
     const combined = flattenChunks(chunks);
-    const overlapSamples = Math.min(combined.length, Math.max(0, Math.round(sampleRate * overlapSeconds)));
+    const overlapSamples = flushReason === "window"
+      ? Math.min(combined.length, Math.max(0, Math.round(sampleRate * overlapSeconds)))
+      : 0;
     const retained = overlapSamples ? combined.slice(combined.length - overlapSamples) : new Float32Array();
     resetBuffer();
     if (retained.length) {
@@ -139,17 +267,32 @@ export function createNavixaLocalNameFallback({
       bufferedSamples = retained.length;
     }
 
-    const audio = resampleNavixaVoiceAudio(combined, sampleRate, TARGET_SAMPLE_RATE);
+    const resampled = resampleNavixaVoiceAudio(combined, sampleRate, TARGET_SAMPLE_RATE);
     combined.fill(0);
+    if (!resampled.length) return;
+    if (!hasNavixaVoiceActivity(resampled, TARGET_SAMPLE_RATE)) {
+      resampled.fill(0);
+      return;
+    }
+
+    const audio = conditionNavixaVoiceAudio(resampled);
+    resampled.fill(0);
     if (!audio.length) return;
+
     busy = true;
     sequence += 1;
+    let language: NavixaLocalSpeechLanguage = "auto";
+    try {
+      language = safeLanguageHint(getLanguageHint?.());
+    } catch {
+      language = "auto";
+    }
     ensureWorker().postMessage({
       type: "transcribe",
       partId: `name-fallback-${sequence}`,
       audio,
       model: "tiny",
-      language: "auto",
+      language,
     }, [audio.buffer]);
   };
 
@@ -198,6 +341,13 @@ export function createNavixaLocalNameFallback({
           if (!active || destroyed || !context) return;
           const input = event.inputBuffer.getChannelData(0);
           const copy = new Float32Array(input);
+          const chunkHasVoice = hasNavixaVoiceActivity(copy, context.sampleRate, 20, 0.0035, 60);
+          if (chunkHasVoice) {
+            speechSeen = true;
+            trailingSilenceSamples = 0;
+          } else if (speechSeen) {
+            trailingSilenceSamples += copy.length;
+          }
           chunks.push(copy);
           bufferedSamples += copy.length;
           trimNavixaVoiceBuffer(chunks, context.sampleRate, MAX_BUFFER_SECONDS);

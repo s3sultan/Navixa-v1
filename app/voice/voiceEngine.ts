@@ -1,8 +1,19 @@
 import { buildNavixaVoiceBiasPhrases } from "./voiceDetection.ts";
-import { createNavixaLocalNameFallback } from "./localNameFallback.ts";
+import { createNavixaLocalNameFallback, type NavixaLocalSpeechLanguage } from "./localNameFallback.ts";
 import { buildNavixaVoiceBiasInput, learnNavixaVoiceTranscript, type NavixaVoiceAliasSource } from "./voiceLearning.ts";
 
-export type NavixaVoiceLanguage = "ar-SA" | "en-US" | "en-IN";
+export type NavixaVoiceLanguage =
+  | "ar-SA"
+  | "ar-EG"
+  | "ar-SY"
+  | "ar-MA"
+  | "ar-DZ"
+  | "en-IN"
+  | "en-US"
+  | "en-GB"
+  | "en-PH";
+
+export type NavixaVoiceLanguageFamily = "ar" | "en";
 
 export type NavixaVoiceTranscript = {
   text: string;
@@ -76,11 +87,31 @@ type BrowserVoiceEngineOptions = {
   handlers: NavixaVoiceEngineHandlers;
 };
 
-const ADAPTIVE_LANGUAGES: NavixaVoiceLanguage[] = ["ar-SA", "en-IN", "en-US"];
+const ARABIC_LANGUAGES: NavixaVoiceLanguage[] = ["ar-SA", "ar-EG", "ar-SY", "ar-MA", "ar-DZ"];
+const ENGLISH_LANGUAGES: NavixaVoiceLanguage[] = ["en-IN", "en-US", "en-GB", "en-PH"];
+const ADAPTIVE_LANGUAGES: NavixaVoiceLanguage[] = [
+  "ar-SA",
+  "en-IN",
+  "ar-EG",
+  "en-US",
+  "ar-SY",
+  "en-GB",
+  "ar-MA",
+  "en-PH",
+  "ar-DZ",
+];
 const LANGUAGE_HINT_STORAGE_KEY = "navixa-voice-language-hint";
 const INITIAL_LANGUAGE_PROBE_MS = 12_000;
 const ACTIVE_LANGUAGE_PROBE_MS = 18_000;
 const LOW_CONFIDENCE_PROBE_MS = 6_000;
+
+export const navixaVoiceLanguageFamily = (language: NavixaVoiceLanguage): NavixaVoiceLanguageFamily => (
+  language.startsWith("ar-") ? "ar" : "en"
+);
+
+const familyLanguages = (family: NavixaVoiceLanguageFamily) => (
+  family === "ar" ? ARABIC_LANGUAGES : ENGLISH_LANGUAGES
+);
 
 const getRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
   if (typeof window === "undefined") return null;
@@ -144,7 +175,7 @@ const rememberLanguageHint = (language: NavixaVoiceLanguage) => {
   }
 };
 
-const detectTranscriptScript = (text: string): "ar" | "en" | null => {
+const detectTranscriptScript = (text: string): NavixaVoiceLanguageFamily | null => {
   const arabic = (text.match(/[\u0600-\u06FF]/g) || []).length;
   const latin = (text.match(/[A-Za-z]/g) || []).length;
   if (arabic >= 2 && arabic > latin * 1.25) return "ar";
@@ -174,6 +205,7 @@ export function createNavixaBrowserVoiceEngine({
   const recognition = new Recognition();
   const initialLanguage = adaptiveLanguage ? readStoredLanguageHint() || language : language;
   let languageIndex = Math.max(0, ADAPTIVE_LANGUAGES.indexOf(initialLanguage));
+  let lastDetectedFamily: NavixaVoiceLanguageFamily | null = null;
   const currentLanguage = () => adaptiveLanguage ? ADAPTIVE_LANGUAGES[languageIndex] : language;
   recognition.lang = currentLanguage();
   recognition.continuous = continuous;
@@ -186,9 +218,28 @@ export function createNavixaBrowserVoiceEngine({
     handlers.onTranscript(transcript);
   };
 
+  const setLanguage = (next: NavixaVoiceLanguage) => {
+    const index = ADAPTIVE_LANGUAGES.indexOf(next);
+    if (index >= 0) languageIndex = index;
+  };
+
+  const advanceLanguage = () => {
+    if (!adaptiveLanguage) return;
+    if (!lastDetectedFamily) {
+      languageIndex = (languageIndex + 1) % ADAPTIVE_LANGUAGES.length;
+      return;
+    }
+    const candidates = familyLanguages(lastDetectedFamily);
+    const active = currentLanguage();
+    const familyIndex = candidates.indexOf(active);
+    setLanguage(candidates[(familyIndex + 1 + candidates.length) % candidates.length]);
+  };
+
+  const localLanguageHint = (): NavixaLocalSpeechLanguage => lastDetectedFamily || "auto";
   const localFallback = localAccuracyFallback
     ? createNavixaLocalNameFallback({
       onTranscript: (text) => emitTranscript({ text, interim: true }, "local"),
+      getLanguageHint: localLanguageHint,
     })
     : null;
 
@@ -199,16 +250,6 @@ export function createNavixaBrowserVoiceEngine({
   const clearLanguageProbe = () => {
     if (languageProbeTimer) clearTimeout(languageProbeTimer);
     languageProbeTimer = null;
-  };
-
-  const setLanguage = (next: NavixaVoiceLanguage) => {
-    const index = ADAPTIVE_LANGUAGES.indexOf(next);
-    if (index >= 0) languageIndex = index;
-  };
-
-  const advanceLanguage = () => {
-    if (!adaptiveLanguage) return;
-    languageIndex = (languageIndex + 1) % ADAPTIVE_LANGUAGES.length;
   };
 
   const requestLanguageRestart = (next?: NavixaVoiceLanguage) => {
@@ -277,19 +318,21 @@ export function createNavixaBrowserVoiceEngine({
     }
 
     if (!adaptiveLanguage || !finalPrimaryText) return;
-    if (typeof finalPrimaryConfidence === "number" && finalPrimaryConfidence > 0 && finalPrimaryConfidence < 0.35) {
-      requestLanguageRestart();
-      return;
-    }
-
     const script = detectTranscriptScript(finalPrimaryText);
+    if (script) lastDetectedFamily = script;
+
     const activeLanguage = currentLanguage();
-    if (script === "ar" && activeLanguage !== "ar-SA") {
+    if (script === "ar" && navixaVoiceLanguageFamily(activeLanguage) !== "ar") {
       requestLanguageRestart("ar-SA");
       return;
     }
-    if (script === "en" && activeLanguage === "ar-SA") {
+    if (script === "en" && navixaVoiceLanguageFamily(activeLanguage) !== "en") {
       requestLanguageRestart("en-IN");
+      return;
+    }
+
+    if (typeof finalPrimaryConfidence === "number" && finalPrimaryConfidence > 0 && finalPrimaryConfidence < 0.35) {
+      requestLanguageRestart();
       return;
     }
     if (typeof finalPrimaryConfidence === "number" && finalPrimaryConfidence > 0 && finalPrimaryConfidence < 0.5) {

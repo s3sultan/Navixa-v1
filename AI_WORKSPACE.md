@@ -5,12 +5,13 @@
 ## حالة العمل
 
 - الوكيل النشط: لا يوجد
-- المهمة الحالية: لا توجد مهمة محجوزة؛ سجل التشغيل الدائم جاهز داخل PR #175 بعد نجاح بوابات التحقق
-- الحالة: جاهز للدمج
+- المهمة الحالية: لا توجد مهمة محجوزة؛ المرحلة الأولى من NAVIXA NameSense جاهزة داخل PR #176 بعد نجاح بوابات التحقق
+- الحالة: جاهز للمراجعة
 - الملفات المحجوزة: لا يوجد
 
 ## آخر ما اكتمل
 
+- جهز ChatGPT PR #176 لتقوية NAVIXA NameSense دون اعتماديات خارجية: مطابقة صوتية محافظة لاختلافات النطق والكتابة، دعم أفضل للـcode-switch العربي/الإنجليزي، خفض نافذة fallback المحلية من 10 ثوانٍ إلى 5 ثوانٍ، وبوابة طاقة صوتية خفيفة لتجنب تشغيل Whisper Tiny على الصمت. نجح Verify NAVIXA Pull Request رقم 394 وNAVIXA Pre-Launch Gate رقم 274 كاملين؛ PR بقي Draft ولم يُدمج أو يُنشر.
 - جهز ChatGPT PR #175 لإضافة سجل تشغيل دائم وآمن عبر D1 خلف API محمي؛ الملكية مشتقة من جلسة NAVIXA، والكتابة same-origin، والقراءة معزولة حسب المستخدم، والحقول الحساسة مرفوضة ولا توجد لها أعمدة. ربط تلخيص الاجتماعات بالحفظ best-effort مع إبقاء المسار المحلي fallback. نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate وRelease Gate كاملين.
 - ربط ChatGPT التلخيص المحلي بعد اكتمال تفريغ أجزاء الاجتماعات بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع الحفاظ على نفس `buildLocalSummary` كخوارزمية وfallback؛ لا يُخزن النص أو الملخص في Run History. دُمج PR #173 ونُشر على الإنتاج بنجاح عبر Deploy NAVIXA Auto رقم `34554029198` شاملًا D1 وCloudflare وsmoke test و`/api/sync` وترويسات الأمان.
 - دمج PR #171 لإضافة Automation Engine وRun History وSkills Registry إلى `master`؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate ثم نجح Deploy NAVIXA Auto رقم `34552604334` شاملًا فحص الإنتاج و`/api/sync` وترويسات الأمان.
@@ -57,7 +58,7 @@
 
 ## التالي المقترح
 
-- بعد دمج ونشر PR #175: نقل ميزة ثانية منخفضة المخاطر إلى Skills/Automation تدريجيًا، ثم إضافة واجهة إدارية لسجل التشغيل عند الحاجة.
+- بعد اعتماد المستخدم ودمج PR #176: بناء benchmark صوتي حقيقي لـNameSense يغطي اللهجات العربية والإنجليزية والـcode-switch والضوضاء، وقياس Recall وFalse Positives قبل أي ادعاء بنسبة دقة أو إدخال نموذج صوتي أثقل.
 
 ## بروتوكول التنسيق
 
