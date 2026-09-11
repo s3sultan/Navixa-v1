@@ -51,7 +51,7 @@ const registry = new SkillRegistry().register({
 });
 
 const history = new InMemoryRunHistoryStore();
-const engine = new AutomationEngine(registry, history);
+const engine = new AutomationEngine(registry, history, { createId: createRequestId });
 
 export async function summarizeMeetingTranscript(
   transcript: string,
