@@ -59,30 +59,35 @@ const history = new InMemoryRunHistoryStore();
 const engine = new AutomationEngine(registry, history, { createId: createRequestId });
 
 export async function saveReviewedAcademicReminder(input: AcademicReminderInput): Promise<AcademicReminder> {
+  const normalized = validateInput(input);
   const requestId = createRequestId();
-  pendingInputs.set(requestId, validateInput(input));
+  pendingInputs.set(requestId, normalized);
 
   try {
-    const run = await engine.run(
-      {
-        id: ACADEMIC_REMINDER_AUTOMATION_ID,
-        name: "Save reviewed academic reminder",
-        skillId: ACADEMIC_REMINDER_SKILL_ID,
-        enabled: true,
-        trigger: { type: "manual" },
-        input: { requestId },
-      },
-      { source: "manual" },
-    );
+    try {
+      const run = await engine.run(
+        {
+          id: ACADEMIC_REMINDER_AUTOMATION_ID,
+          name: "Save reviewed academic reminder",
+          skillId: ACADEMIC_REMINDER_SKILL_ID,
+          enabled: true,
+          trigger: { type: "manual" },
+          input: { requestId },
+        },
+        { source: "manual" },
+      );
 
-    persistAutomationRunBestEffort(run);
+      persistAutomationRunBestEffort(run);
 
-    if (run.status !== "succeeded") {
-      throw new Error(run.error?.message || "Academic reminder automation failed");
+      if (run.status === "succeeded") {
+        const reminder = pendingResults.get(requestId);
+        if (reminder) return reminder;
+      }
+    } catch {
+      // Fall through to the existing direct local save path.
     }
-    const reminder = pendingResults.get(requestId);
-    if (!reminder) throw new Error("Academic reminder automation returned no result");
-    return reminder;
+
+    return saveAcademicReminder(normalized);
   } finally {
     pendingInputs.delete(requestId);
     pendingResults.delete(requestId);
