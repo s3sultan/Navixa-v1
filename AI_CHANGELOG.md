@@ -2,6 +2,15 @@
 
 لا تُعدّل السجلات السابقة. أضف السجل الأحدث في الأعلى تحت هذا السطر.
 
+## 2026-09-11 — ChatGPT
+
+- ربط التلخيص المحلي التلقائي بعد اكتمال تفريغ كل جزء اجتماع بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع إبقاء خوارزمية `buildLocalSummary` الحالية والواجهة دون تغيير.
+- حافظ على الخصوصية بعدم تخزين النص المفرغ أو الملخص داخل Run History، وأبقى البيانات الحساسة في ذاكرة مؤقتة محلية مع تنظيفها بعد التنفيذ، دون إضافة أي اتصال شبكة.
+- أضاف fallback مباشر إلى التلخيص المحلي القديم إذا تعطل مسار Automation، واختبارات لتطابق النتائج، عزل الطلبات المتزامنة، عدم تسريب النص للسجل، وربط `MeetingStudio` بالمحرك.
+- زامن الفرع مع أحدث `master` بعد تقدم تغييرات Plan B دون تعارض أو فقد تغييرات الآخرين.
+- التحقق: نجح `Verify NAVIXA Pull Request` و`NAVIXA Pre-Launch Gate` على PR #173 بعد إصلاح امتداد import المطلوب لاختبارات Node ESM.
+- الملفات: `app/meetings/MeetingStudio.tsx`, `app/meetings/meetingAutomation.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
 ## 2026-09-09 — ChatGPT
 
 - أنشأ المرحلة الأولى لمحرك تنبيهات تعليق الدراسة الرسمي على الفرع `feat/study-suspension-alerts-20260909` وربطه بمحركي Web Push وTelegram الحاليين دون تعديل الواجهة أو النشر الإنتاجي.
@@ -66,7 +75,7 @@
 
 ## 2026-08-12 — Codex
 
-- أنشأ جسر GitHub Actions محكومًا لتوزيع Issues المعتمدة على Manus API v2 وإعادة التقرير إلى نفس المهمة دون تطبيق أو دمج أو نشر.
+- أنشأ جسر GitHub Actions محكومًا لتوزيع Issues المعتمدة على Manus API v2 وإعادة التقرير إلى نفس المهمة دون تطبيق patch أو دمج أو نشر.
 - أضاف حراسة مالك المستودع، أقل صلاحيات GitHub، معالجة آمنة للمخرجات غير الموثوقة، واختبارًا معزولًا ناجحًا لمسار التنفيذ الكامل.
 - الملفات: `.github/workflows/manus-task.yml`, `scripts/manus-task-runner.mjs`, `tests/manus-task-runner.test.mjs`, `AI_AGENT_REGISTRY.md`, `PROJECT_MEMORY.md`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
 

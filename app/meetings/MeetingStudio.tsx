@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { deleteMeetingSession, listMeetingSessions, saveMeetingSession, type MeetingPart, type MeetingSession, type TranscriptSegment } from "./meetingStore";
 import { buildLocalSummary, mergeMeetingParts, pendingMeetingParts } from "./meetingSummary";
+import { summarizeMeetingTranscript } from "./meetingAutomation";
 import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, mergeGlossaries, parseGlossaryInput, type GlossaryTerm } from "./meetingGlossary";
 import { academicSuggestions, type AcademicSuggestion } from "./academicSuggestions";
 import { saveAcademicReminder } from "../academicReminders";
@@ -309,7 +310,7 @@ export default function MeetingStudio() {
   const ensureWorker = () => {
     if (workerRef.current) return workerRef.current;
     const worker = new Worker(new URL("./transcription.worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+    worker.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       const data = event.data;
       if (data.type === "progress") { setProgress(typeof data.percentage === "number" ? data.percentage : null); return; }
       if (data.type === "state") { setNotice(data.message || "جارٍ التحضير…"); return; }
@@ -324,7 +325,11 @@ export default function MeetingStudio() {
       if (data.type === "complete") {
         const glossary = mergeGlossaries(globalGlossary, normalized.glossary || []);
         const correctedTranscript = applyGlossary(data.transcript || "", glossary);
-        const local = buildLocalSummary(correctedTranscript);
+        const local = await summarizeMeetingTranscript(correctedTranscript, {
+          sessionId: normalized.id,
+          partId: data.partId,
+          source: "transcription",
+        }).catch(() => buildLocalSummary(correctedTranscript));
         const nextWithPart = { ...normalized, parts: (normalized.parts || []).map((part) => part.id === data.partId ? { ...part, status: "complete" as const, transcript: correctedTranscript, segments: (data.segments || []).map((segment) => ({ ...segment, text: applyGlossary(segment.text, glossary) })), summary: local.summary, decisions: local.decisions, tasks: local.tasks, questions: local.questions, model: currentModelRef.current, error: undefined } : part) };
         const merged = mergeMeetingParts(nextWithPart.parts || []);
         const repeated = extractFrequentTerms(merged.transcript);

@@ -1,16 +1,18 @@
 # NAVIXA — مساحة العمل المشتركة
 
-آخر تحديث: 2026-09-10
+آخر تحديث: 2026-09-11
 
 ## حالة العمل
 
-- الوكيل النشط: ChatGPT
-- المهمة الحالية: ربط المزامنة بجلسة OTP الحالية دون تغيير تسجيل الدخول مع إبقاء المزامنة القديمة كمسار توافق مؤقت
-- الحالة: جاهز لنشر Staging بعد اعتماد المالك
-- الملفات المحجوزة: `app/api/sync/route.ts`, `app/page.tsx`, `app/account/page.tsx`, `app/account/AccountSync.tsx`, `tests/sync-security.test.ts`, `migrations/0049_account_bound_sync.sql`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الوكيل النشط: لا يوجد
+- المهمة الحالية: لا توجد مهمة محجوزة؛ ربط التلخيص المحلي بمحرك Automation مكتمل ومتحقق داخل PR #173
+- الحالة: جاهز لاعتماد المالك قبل الدمج
+- الملفات المحجوزة: لا يوجد
 
 ## آخر ما اكتمل
 
+- ربط ChatGPT التلخيص المحلي بعد اكتمال تفريغ أجزاء الاجتماعات بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع الحفاظ على نفس `buildLocalSummary` كخوارزمية وfallback؛ لا يُخزن النص أو الملخص في Run History ولا أضيفت اتصالات شبكة. نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على PR #173 بعد مزامنة أحدث `master`.
+- دمج PR #171 لإضافة Automation Engine وRun History وSkills Registry إلى `master`؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate ثم نجح Deploy NAVIXA Auto رقم `34552604334` شاملًا فحص الإنتاج و`/api/sync` وترويسات الأمان.
 - جهز ChatGPT PR #157 لربط المزامنة بجلسة NAVIXA الحالية مع بطاقة مزامنة حساب مشفرة؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على آخر head، وبقي الاختبار الحي على Staging قبل أي دمج أو إنتاج.
 - أنشأ ChatGPT المرحلة الأولى لمحرك تنبيهات تعليق الدراسة الرسمي على الفرع `feat/study-suspension-alerts-20260909` وربطه بمحركي Telegram وWeb Push الحاليين خلف بوابة استهداف محافظة ووضع TEST مغلق افتراضيًا ومنع تكرار ذري؛ PR #149 بقي Draft دون دمج أو نشر، ونجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate كاملين.
 - أصلح اختلاف Hydration في تحية الصفحة الرئيسية بجعل التهيئة ثابتة بين الخادم والمتصفح ثم تحديثها بعد التركيب.
@@ -54,7 +56,7 @@
 
 ## التالي المقترح
 
-- المرحلة التالية لمحرك تعليق الدراسة: إضافة سجل D1 فعلي لمنع التكرار، ربط ملفات المستخدم التعليمية بالمستلمين، ثم موصل التقاط المنشورات الرسمية من X في وضع TEST قبل أي تفعيل عام.
+- بعد اعتماد ودمج PR #173: إضافة تخزين دائم لسجل التشغيل عبر D1/Drizzle ببيانات تشغيل غير حساسة، ثم نقل ميزة أخرى منخفضة المخاطر إلى Skills تدريجيًا.
 
 ## بروتوكول التنسيق
 
