@@ -1,16 +1,17 @@
 # NAVIXA — مساحة العمل المشتركة
 
-آخر تحديث: 2026-09-10
+آخر تحديث: 2026-09-11
 
 ## حالة العمل
 
 - الوكيل النشط: ChatGPT
-- المهمة الحالية: ربط المزامنة بجلسة OTP الحالية دون تغيير تسجيل الدخول مع إبقاء المزامنة القديمة كمسار توافق مؤقت
-- الحالة: جاهز لنشر Staging بعد اعتماد المالك
-- الملفات المحجوزة: `app/api/sync/route.ts`, `app/page.tsx`, `app/account/page.tsx`, `app/account/AccountSync.tsx`, `tests/sync-security.test.ts`, `migrations/0049_account_bound_sync.sql`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- المهمة الحالية: ربط التلخيص المحلي للاجتماعات بمحرك NAVIXA Automation الجديد دون تغيير الخوارزمية أو الخصوصية أو الواجهة
+- الحالة: يعمل على فرع معزول
+- الملفات المحجوزة: `app/meetings/MeetingStudio.tsx`, `app/meetings/meetingAutomation.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
+- دمج PR #171 لإضافة Automation Engine وRun History وSkills Registry إلى `master`؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate ثم نجح Deploy NAVIXA Auto رقم `34552604334` شاملًا فحص الإنتاج و`/api/sync` وترويسات الأمان.
 - جهز ChatGPT PR #157 لربط المزامنة بجلسة NAVIXA الحالية مع بطاقة مزامنة حساب مشفرة؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على آخر head، وبقي الاختبار الحي على Staging قبل أي دمج أو إنتاج.
 - أنشأ ChatGPT المرحلة الأولى لمحرك تنبيهات تعليق الدراسة الرسمي على الفرع `feat/study-suspension-alerts-20260909` وربطه بمحركي Telegram وWeb Push الحاليين خلف بوابة استهداف محافظة ووضع TEST مغلق افتراضيًا ومنع تكرار ذري؛ PR #149 بقي Draft دون دمج أو نشر، ونجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate كاملين.
 - أصلح اختلاف Hydration في تحية الصفحة الرئيسية بجعل التهيئة ثابتة بين الخادم والمتصفح ثم تحديثها بعد التركيب.
@@ -54,7 +55,7 @@
 
 ## التالي المقترح
 
-- المرحلة التالية لمحرك تعليق الدراسة: إضافة سجل D1 فعلي لمنع التكرار، ربط ملفات المستخدم التعليمية بالمستلمين، ثم موصل التقاط المنشورات الرسمية من X في وضع TEST قبل أي تفعيل عام.
+- بعد التحقق من ربط التلخيص المحلي بالمحرك الجديد: إضافة تخزين دائم لسجل التشغيل عبر D1/Drizzle ثم نقل ميزة أخرى منخفضة المخاطر إلى Skills تدريجيًا.
 
 ## بروتوكول التنسيق
 
