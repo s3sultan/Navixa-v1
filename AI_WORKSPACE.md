@@ -4,13 +4,14 @@
 
 ## حالة العمل
 
-- الوكيل النشط: ChatGPT
-- المهمة الحالية: ربط التلخيص المحلي للاجتماعات بمحرك NAVIXA Automation الجديد دون تغيير الخوارزمية أو الخصوصية أو الواجهة
-- الحالة: يعمل على فرع معزول
-- الملفات المحجوزة: `app/meetings/MeetingStudio.tsx`, `app/meetings/meetingAutomation.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الوكيل النشط: لا يوجد
+- المهمة الحالية: لا توجد مهمة محجوزة؛ ربط التلخيص المحلي بمحرك Automation مكتمل ومتحقق داخل PR #173
+- الحالة: جاهز لاعتماد المالك قبل الدمج
+- الملفات المحجوزة: لا يوجد
 
 ## آخر ما اكتمل
 
+- ربط ChatGPT التلخيص المحلي بعد اكتمال تفريغ أجزاء الاجتماعات بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع الحفاظ على نفس `buildLocalSummary` كخوارزمية وfallback؛ لا يُخزن النص أو الملخص في Run History ولا أضيفت اتصالات شبكة. نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على PR #173 بعد مزامنة أحدث `master`.
 - دمج PR #171 لإضافة Automation Engine وRun History وSkills Registry إلى `master`؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate ثم نجح Deploy NAVIXA Auto رقم `34552604334` شاملًا فحص الإنتاج و`/api/sync` وترويسات الأمان.
 - جهز ChatGPT PR #157 لربط المزامنة بجلسة NAVIXA الحالية مع بطاقة مزامنة حساب مشفرة؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على آخر head، وبقي الاختبار الحي على Staging قبل أي دمج أو إنتاج.
 - أنشأ ChatGPT المرحلة الأولى لمحرك تنبيهات تعليق الدراسة الرسمي على الفرع `feat/study-suspension-alerts-20260909` وربطه بمحركي Telegram وWeb Push الحاليين خلف بوابة استهداف محافظة ووضع TEST مغلق افتراضيًا ومنع تكرار ذري؛ PR #149 بقي Draft دون دمج أو نشر، ونجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate كاملين.
@@ -55,7 +56,7 @@
 
 ## التالي المقترح
 
-- بعد التحقق من ربط التلخيص المحلي بالمحرك الجديد: إضافة تخزين دائم لسجل التشغيل عبر D1/Drizzle ثم نقل ميزة أخرى منخفضة المخاطر إلى Skills تدريجيًا.
+- بعد اعتماد ودمج PR #173: إضافة تخزين دائم لسجل التشغيل عبر D1/Drizzle ببيانات تشغيل غير حساسة، ثم نقل ميزة أخرى منخفضة المخاطر إلى Skills تدريجيًا.
 
 ## بروتوكول التنسيق
 
