@@ -11,6 +11,7 @@ import {
 test("normalizes Arabic diacritics, tatweel, punctuation, and letter variants", () => {
   assert.equal(normalizeNavixaVoiceText("  سُــلْطَان، الحَرْبِي! "), "سلطان الحربي");
   assert.equal(normalizeNavixaVoiceText("إبراهيم مؤيد"), "ابراهيم مويد");
+  assert.equal(normalizeNavixaVoiceText("گ چ پ ڤ"), "ك ج ب ف");
 });
 
 test("splits and de-duplicates multiple watched terms", () => {
@@ -53,6 +54,14 @@ test("matches safe Latin accent and segmentation variants", () => {
   assert.equal(findNavixaVoiceTerm("Please ask Sultaan now", ["sultan"])?.normalizedTerm, "sultan");
   assert.equal(findNavixaVoiceTerm("Please ask soul tan now", ["sultan"])?.normalizedTerm, "sultan");
   assert.equal(findNavixaVoiceTerm("Doctor called Soltan", ["sultan"])?.normalizedTerm, "sultan");
+  assert.equal(findNavixaVoiceTerm("Please ask Sulthan now", ["sultan"])?.normalizedTerm, "sultan");
+  assert.equal(findNavixaVoiceTerm("Please ask Soolthan now", ["sultan"])?.normalizedTerm, "sultan");
+});
+
+test("matches Arabic/English code switching and common cross-script name renderings", () => {
+  assert.equal(findNavixaVoiceTerm("يا Sultan انت موجود", ["سلطان"])?.normalizedTerm, "سلطان");
+  assert.equal(findNavixaVoiceTerm("Sultan جاوب على السؤال", ["سلطان"])?.normalizedTerm, "سلطان");
+  assert.equal(findNavixaVoiceTerm("Next is El Harbi", ["الحربي"])?.normalizedTerm, "الحربي");
 });
 
 test("matches common Arabic and Latin renderings by a conservative phonetic skeleton", () => {
@@ -66,6 +75,8 @@ test("matches common Arabic and Latin renderings by a conservative phonetic skel
 test("does not turn loose phonetic similarity into a name alert", () => {
   assert.equal(findNavixaVoiceTerm("Please ask Salman now", ["sultan"]), null);
   assert.equal(findNavixaVoiceTerm("Please ask Salim now", ["sultan"]), null);
+  assert.equal(findNavixaVoiceTerm("Please ask Zoltan now", ["sultan"]), null);
+  assert.equal(findNavixaVoiceTerm("Please ask Shelton now", ["sultan"]), null);
   assert.equal(findNavixaVoiceTerm("علي موجود", ["عمر"]), null);
 });
 
