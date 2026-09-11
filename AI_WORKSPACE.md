@@ -4,14 +4,15 @@
 
 ## حالة العمل
 
-- الوكيل النشط: ChatGPT
-- المهمة الحالية: إضافة سجل تشغيل دائم وآمن عبر D1 خلف API محمي وربط تلخيص الاجتماعات به دون تعطيل المسار المحلي
-- الحالة: يعمل على فرع معزول
-- الملفات المحجوزة: `migrations/0051_automation_run_history.sql`, `app/api/automation-runs/route.ts`, `app/meetings/meetingAutomation.ts`, `tests/automation-run-history.test.ts`, `tests/meeting-automation.test.ts`, `package.json`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الوكيل النشط: لا يوجد
+- المهمة الحالية: لا توجد مهمة محجوزة؛ سجل التشغيل الدائم جاهز داخل PR #175 بعد نجاح بوابات التحقق
+- الحالة: جاهز للدمج
+- الملفات المحجوزة: لا يوجد
 
 ## آخر ما اكتمل
 
-- ربط ChatGPT التلخيص المحلي بعد اكتمال تفريغ أجزاء الاجتماعات بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع الحفاظ على نفس `buildLocalSummary` كخوارزمية وfallback؛ لا يُخزن النص أو الملخص في Run History ولا أضيفت اتصالات شبكة. نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على PR #173 بعد مزامنة أحدث `master`.
+- جهز ChatGPT PR #175 لإضافة سجل تشغيل دائم وآمن عبر D1 خلف API محمي؛ الملكية مشتقة من جلسة NAVIXA، والكتابة same-origin، والقراءة معزولة حسب المستخدم، والحقول الحساسة مرفوضة ولا توجد لها أعمدة. ربط تلخيص الاجتماعات بالحفظ best-effort مع إبقاء المسار المحلي fallback. نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate وRelease Gate كاملين.
+- ربط ChatGPT التلخيص المحلي بعد اكتمال تفريغ أجزاء الاجتماعات بمحرك NAVIXA Automation عبر Skill باسم `meeting.summary.local` مع الحفاظ على نفس `buildLocalSummary` كخوارزمية وfallback؛ لا يُخزن النص أو الملخص في Run History. دُمج PR #173 ونُشر على الإنتاج بنجاح عبر Deploy NAVIXA Auto رقم `34554029198` شاملًا D1 وCloudflare وsmoke test و`/api/sync` وترويسات الأمان.
 - دمج PR #171 لإضافة Automation Engine وRun History وSkills Registry إلى `master`؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate ثم نجح Deploy NAVIXA Auto رقم `34552604334` شاملًا فحص الإنتاج و`/api/sync` وترويسات الأمان.
 - جهز ChatGPT PR #157 لربط المزامنة بجلسة NAVIXA الحالية مع بطاقة مزامنة حساب مشفرة؛ نجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate على آخر head، وبقي الاختبار الحي على Staging قبل أي دمج أو إنتاج.
 - أنشأ ChatGPT المرحلة الأولى لمحرك تنبيهات تعليق الدراسة الرسمي على الفرع `feat/study-suspension-alerts-20260909` وربطه بمحركي Telegram وWeb Push الحاليين خلف بوابة استهداف محافظة ووضع TEST مغلق افتراضيًا ومنع تكرار ذري؛ PR #149 بقي Draft دون دمج أو نشر، ونجح Verify NAVIXA Pull Request وNAVIXA Pre-Launch Gate كاملين.
@@ -20,7 +21,7 @@
 - جعل أوامر Vinext واختبار UI تعمل بثبات على Windows، مع انتظار جاهزية المستند وتنظيف عمليات الخادم والمتصفح بعد الاختبار.
 - صحح بوابة staging لتطلب تجربة CSP المشددة من الفرع الأمني المخصص فقط، مع اختبار انحدار، بعد أن كشفها أول نشر staging للفرع.
 - حدّث مرجع الإنتاج الرسمي إلى `https://navixasa.com`، واستثنى مجلدات المعاينة المولدة من ESLint.
-- آخر تحقق: نجح `npm run test:verify` شاملًا lint و115 اختبارًا وUI smoke وبناء الإنتاج، ونجحت فحوص PR وبوابة الإصدار وstaging رقم `33978081612`؛ كما نجحت المراجعة البصرية المحلية والمنشورة على 390×844 و1440×1000 دون أخطاء Console.
+- آخر تحقق سابق: نجح `npm run test:verify` شاملًا lint و115 اختبارًا وUI smoke وبناء الإنتاج، ونجحت فحوص PR وبوابة الإصدار وstaging رقم `33978081612`؛ كما نجحت المراجعة البصرية المحلية والمنشورة على 390×844 و1440×1000 دون أخطاء Console.
 - تحرير حجز Codex القديم الخاص باعتماد شعار NAVIXA وملفات الواجهة بعد تأكيد مالك المشروع أن الحجز قديم، دون تعديل ملفات المنتج المحجوزة سابقًا.
 - تحديث إجراء قراءة المصدر في جسري Manus وGemini من `actions/checkout@v4` إلى `v6` دون تغيير الصلاحيات أو الأسرار أو منطق إرسال المهام.
 - آخر تحقق: نجح `git diff --check` واختبارات مشغلي Manus وGemini المعزولة؛ التحقق الحي النهائي بعد الدمج.
@@ -56,7 +57,7 @@
 
 ## التالي المقترح
 
-- بعد اعتماد ودمج PR #173: إضافة تخزين دائم لسجل التشغيل عبر D1/Drizzle ببيانات تشغيل غير حساسة، ثم نقل ميزة أخرى منخفضة المخاطر إلى Skills تدريجيًا.
+- بعد دمج ونشر PR #175: نقل ميزة ثانية منخفضة المخاطر إلى Skills/Automation تدريجيًا، ثم إضافة واجهة إدارية لسجل التشغيل عند الحاجة.
 
 ## بروتوكول التنسيق
 
