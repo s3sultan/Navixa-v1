@@ -69,29 +69,39 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
 
-      - name: Ensure independent monitor state bucket
+      - name: Ensure independent Plan B D1 state database
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
-          endpoint="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets"
-          list_response="$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            "${endpoint}?name=navixa-plan-b-state")"
-          if printf '%s' "$list_response" | jq -e '.success == true and any(.result.buckets[]?; .name == "navixa-plan-b-state")' >/dev/null; then
-            echo "PASS Plan B R2 state bucket exists"
-          else
-            create_response="$(curl --fail-with-body --silent --show-error \
-              --request POST \
-              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              --header 'Content-Type: application/json' \
-              --data '{"name":"navixa-plan-b-state"}' \
-              "$endpoint")"
-            printf '%s' "$create_response" | jq -e '.success == true and .result.name == "navixa-plan-b-state"' >/dev/null
-            echo "PASS Plan B R2 state bucket created"
+          db_name='navixa-plan-b-state'
+          dbs="$(npx --no-install wrangler d1 list --json)"
+          db_id="$(printf '%s' "$dbs" | jq -r --arg name "$db_name" '.[] | select(.name == $name) | (.uuid // .id // empty)' | head -n1)"
+          if [ -z "$db_id" ]; then
+            npx --no-install wrangler d1 create "$db_name" >/dev/null
+            dbs="$(npx --no-install wrangler d1 list --json)"
+            db_id="$(printf '%s' "$dbs" | jq -r --arg name "$db_name" '.[] | select(.name == $name) | (.uuid // .id // empty)' | head -n1)"
           fi
+          test -n "$db_id" || { echo "Unable to resolve Plan B D1 database id"; exit 1; }
+          printf 'PLAN_B_STATE_DB_ID=%s\n' "$db_id" >> "$GITHUB_ENV"
+          echo "PASS independent Plan B state database ready"
+
+      - name: Build isolated deployment config
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${PLAN_B_STATE_DB_ID:-}"
+          jq --arg db_id "$PLAN_B_STATE_DB_ID" '
+            .main = "entry.mjs"
+            | del(.r2_buckets)
+            | .d1_databases = [{
+                binding: "STATE_DB",
+                database_name: "navixa-plan-b-state",
+                database_id: $db_id
+              }]
+          ' plan-b/wrangler.jsonc > plan-b/wrangler.deploy.json
 
       - name: Derive isolated Plan B keys and deploy fallback
         env:
@@ -106,8 +116,8 @@ jobs:
           signing_secret="$(LABEL='navixa-plan-b-signing-v1' node -e "const c=require('node:crypto');process.stdout.write(c.createHmac('sha256',process.env.ADMIN_JWT_SECRET).update(process.env.LABEL).digest('base64url'))")"
           test "${#signing_secret}" -ge 32
           printf 'NAVIXA_PLAN_B_SIGNING_SECRET=%s\n' "$signing_secret" > "$plan_b_secret_file"
-          npx --no-install wrangler deploy --config plan-b/wrangler.jsonc --secrets-file "$plan_b_secret_file"
-          rm -f "$plan_b_secret_file"
+          npx --no-install wrangler deploy --config plan-b/wrangler.deploy.json --secrets-file "$plan_b_secret_file"
+          rm -f "$plan_b_secret_file" plan-b/wrangler.deploy.json
 
       - name: Verify independent fallback health
         shell: bash
@@ -140,21 +150,19 @@ jobs:
           import { emergencyEntitlementKey } from './worker/emergencyEntitlements.ts';
           const now = new Date();
           const email = 'plan-b-deployment-smoke@navixa.invalid';
-          const entitlementSecret = process.env.PLAN_B_ENTITLEMENT_SECRET;
-          const signingSecret = process.env.PLAN_B_SIGNING_SECRET;
           const snapshot = {
             version: 1,
             generatedAt: now.toISOString(),
             records: [{
-              entitlementKey: await emergencyEntitlementKey(email, entitlementSecret),
+              entitlementKey: await emergencyEntitlementKey(email, process.env.PLAN_B_ENTITLEMENT_SECRET),
               activeUntil: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
             }],
           };
           const token = await issuePlanBGrant({
             snapshot,
             email,
-            entitlementSecret,
-            signingSecret,
+            entitlementSecret: process.env.PLAN_B_ENTITLEMENT_SECRET,
+            signingSecret: process.env.PLAN_B_SIGNING_SECRET,
             emergencyState: 'outage',
             incidentId: 'deployment-smoke',
             now,
@@ -170,16 +178,8 @@ jobs:
             --header 'Content-Type: application/json' \
             --data "$(jq -cn --arg token "$smoke_grant" '{token:$token}')" \
             https://backup.navixasa.com/api/verify)"
-          if [ "$valid_status" != "200" ]; then
-            echo "Plan B valid-grant check failed: expected HTTP 200, got $valid_status"
-            jq -c '{ok,error}' "$valid_response" 2>/dev/null || echo 'Plan B returned a non-JSON error response'
-            exit 1
-          fi
-          if ! jq -e '.ok == true and .incident == "deployment-smoke" and (.expiresAt | type == "string") and (has("sub") | not)' "$valid_response" >/dev/null; then
-            echo "Plan B valid-grant response shape rejected"
-            jq -c '{ok,error,incident,expiresAt,hasSub:has("sub")}' "$valid_response" 2>/dev/null || true
-            exit 1
-          fi
+          test "$valid_status" = "200" || { echo "Plan B valid-grant check failed: HTTP $valid_status"; exit 1; }
+          jq -e '.ok == true and .incident == "deployment-smoke" and (.expiresAt | type == "string") and (has("sub") | not)' "$valid_response" >/dev/null
 
           invalid_response="$(mktemp)"
           invalid_status="$(curl --silent --show-error --max-time 15 -o "$invalid_response" -w '%{http_code}' \
@@ -188,16 +188,8 @@ jobs:
             --header 'Content-Type: application/json' \
             --data '{"token":"invalid"}' \
             https://backup.navixasa.com/api/verify)"
-          if [ "$invalid_status" != "401" ]; then
-            echo "Plan B invalid-grant check failed: expected HTTP 401, got $invalid_status"
-            jq -c '{ok,error}' "$invalid_response" 2>/dev/null || echo 'Plan B returned a non-JSON error response'
-            exit 1
-          fi
-          if ! jq -e '.ok == false and .error == "invalid_or_expired_grant"' "$invalid_response" >/dev/null; then
-            echo "Plan B invalid-grant response shape rejected"
-            jq -c '{ok,error}' "$invalid_response" 2>/dev/null || true
-            exit 1
-          fi
+          test "$invalid_status" = "401" || { echo "Plan B invalid-grant check failed: HTTP $invalid_status"; exit 1; }
+          jq -e '.ok == false and .error == "invalid_or_expired_grant"' "$invalid_response" >/dev/null
           echo "PASS Plan B signed-grant drill"
 
       - name: Wire verified Plan B into primary Worker
@@ -212,12 +204,12 @@ jobs:
           primary_secret_file="$RUNNER_TEMP/navixa-primary-plan-b-secrets.json"
           signing_secret="$(LABEL='navixa-plan-b-signing-v1' node -e "const c=require('node:crypto');process.stdout.write(c.createHmac('sha256',process.env.ADMIN_JWT_SECRET).update(process.env.LABEL).digest('base64url'))")"
           entitlement_secret="$(LABEL='navixa-plan-b-entitlement-v1' node -e "const c=require('node:crypto');process.stdout.write(c.createHmac('sha256',process.env.ADMIN_JWT_SECRET).update(process.env.LABEL).digest('base64url'))")"
-          PLAN_B_SIGNING_SECRET="$signing_secret" PLAN_B_ENTITLEMENT_SECRET="$entitlement_secret" PLAN_B_URL='https://backup.navixasa.com' PRIMARY_SECRET_FILE="$primary_secret_file" node <<'NODE'
+          PLAN_B_SIGNING_SECRET="$signing_secret" PLAN_B_ENTITLEMENT_SECRET="$entitlement_secret" PRIMARY_SECRET_FILE="$primary_secret_file" node <<'NODE'
           const fs = require('node:fs');
           fs.writeFileSync(process.env.PRIMARY_SECRET_FILE, JSON.stringify({
             NAVIXA_PLAN_B_SIGNING_SECRET: process.env.PLAN_B_SIGNING_SECRET,
             NAVIXA_EMERGENCY_ENTITLEMENT_SECRET: process.env.PLAN_B_ENTITLEMENT_SECRET,
-            NAVIXA_PLAN_B_URL: process.env.PLAN_B_URL,
+            NAVIXA_PLAN_B_URL: 'https://backup.navixasa.com',
           }));
           NODE
           npx --no-install wrangler secret bulk "$primary_secret_file" --name navixa
