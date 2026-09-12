@@ -20,6 +20,13 @@ type InviteRow = {
   revoked: number;
   created_at: string;
 };
+type CreatedInvite = {
+  inviteId: string;
+  accent: Accent;
+  maxTrials: number;
+  expiresAt: string;
+  invitePath: string;
+};
 
 async function db(): Promise<NameSenseDb | null> {
   try {
@@ -72,7 +79,7 @@ export async function GET(request: Request) {
     SELECT invite_id,speaker_id,accent,max_trials,used_trials,expires_at,revoked,created_at
     FROM navixa_namesense_study_invites
     ORDER BY created_at DESC
-    LIMIT 100
+    LIMIT 500
   `).all<InviteRow>();
   return NextResponse.json({ configured: true, invites: rows.results }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -81,47 +88,78 @@ export async function POST(request: Request) {
   if (!await allowed(request, true)) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
-  const body = await request.json().catch(() => null) as { accent?: unknown; maxTrials?: unknown; expiresHours?: unknown } | null;
+  const body = await request.json().catch(() => null) as { accent?: unknown; maxTrials?: unknown; expiresHours?: unknown; count?: unknown } | null;
   if (!body || !isAccent(body.accent)) {
     return NextResponse.json({ error: "اللهجة غير صالحة" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
   const maxTrials = Number(body.maxTrials ?? 40);
   const expiresHours = Number(body.expiresHours ?? 72);
+  const count = Number(body.count ?? 1);
   if (!Number.isInteger(maxTrials) || maxTrials < 10 || maxTrials > 60) {
     return NextResponse.json({ error: "عدد التجارب يجب أن يكون بين 10 و60" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
   if (!Number.isFinite(expiresHours) || expiresHours < 1 || expiresHours > 168) {
     return NextResponse.json({ error: "مدة الدعوة يجب أن تكون بين ساعة و7 أيام" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
+  if (!Number.isInteger(count) || count < 1 || count > 25) {
+    return NextResponse.json({ error: "حجم الدفعة يجب أن يكون بين 1 و25 مشاركًا" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
 
   const database = await db();
   if (!database) return NextResponse.json({ error: "قاعدة البيانات غير مهيأة" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   await ensureInviteSchema(database);
 
-  const token = randomToken();
-  const tokenHash = await hashToken(token);
-  const inviteId = `study-${crypto.randomUUID()}`;
-  const speakerId = `anon-study-${crypto.randomUUID()}`;
   const createdAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString();
+  const createdInvites: CreatedInvite[] = [];
+  const attemptedIds: string[] = [];
 
   try {
-    await database.prepare(`
-      INSERT INTO navixa_namesense_study_invites (
-        invite_id,token_hash,client_hash,speaker_id,accent,max_trials,used_trials,expires_at,revoked,created_at
-      ) VALUES (?,?,NULL,?,?,?,0,?,0,?)
-    `).bind(inviteId, tokenHash, speakerId, body.accent, maxTrials, expiresAt, createdAt).run();
+    for (let index = 0; index < count; index += 1) {
+      const token = randomToken();
+      const tokenHash = await hashToken(token);
+      const inviteId = `study-${crypto.randomUUID()}`;
+      const speakerId = `anon-study-${crypto.randomUUID()}`;
+      attemptedIds.push(inviteId);
+      await database.prepare(`
+        INSERT INTO navixa_namesense_study_invites (
+          invite_id,token_hash,client_hash,speaker_id,accent,max_trials,used_trials,expires_at,revoked,created_at
+        ) VALUES (?,?,NULL,?,?,?,0,?,0,?)
+      `).bind(inviteId, tokenHash, speakerId, body.accent, maxTrials, expiresAt, createdAt).run();
+      createdInvites.push({
+        inviteId,
+        accent: body.accent,
+        maxTrials,
+        expiresAt,
+        invitePath: `/namesense-study#invite=${token}`,
+      });
+    }
   } catch {
-    return NextResponse.json({ error: "تعذر إنشاء الدعوة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    for (const inviteId of attemptedIds) {
+      try {
+        await database.prepare("DELETE FROM navixa_namesense_study_invites WHERE invite_id=?").bind(inviteId).run();
+      } catch {
+        try {
+          await database.prepare("UPDATE navixa_namesense_study_invites SET revoked=1 WHERE invite_id=?").bind(inviteId).run();
+        } catch {}
+      }
+    }
+    return NextResponse.json({ error: "تعذر إنشاء الدفعة كاملة؛ لم تُعتمد دفعة جزئية" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
 
+  const first = createdInvites[0];
+  if (!first) {
+    return NextResponse.json({ error: "تعذر إنشاء الدفعة" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+  }
   return NextResponse.json({
     ok: true,
-    inviteId,
-    accent: body.accent,
-    maxTrials,
-    expiresAt,
-    invitePath: `/namesense-study#invite=${token}`,
+    count: createdInvites.length,
+    inviteId: first.inviteId,
+    accent: first.accent,
+    maxTrials: first.maxTrials,
+    expiresAt: first.expiresAt,
+    invitePath: first.invitePath,
+    invites: createdInvites,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
