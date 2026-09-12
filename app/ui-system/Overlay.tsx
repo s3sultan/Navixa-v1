@@ -105,7 +105,7 @@ export default function Overlay({
 
   return createPortal(
     <div
-      className={`${styles.overlayScope} ${styles.overlayBackdrop}`}
+      className={`${styles.systemRoot} ${styles.overlayBackdrop}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onOpenChange(false);
       }}
