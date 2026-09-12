@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { validateNameSenseBenchmarkTrial } from "../app/api/admin/namesense-benchmark/schema.ts";
+import {
+  nameSenseStudyPromptMatchesAssignment,
+  nextNameSenseStudyAssignment,
+} from "../benchmarks/namesense/study.ts";
 
 const base = {
   id: "trial-12345678-abcd",
@@ -75,4 +79,22 @@ test("rejects unsupported cohort labels and non-pseudonymous speaker ids", () =>
   assert.equal(validateNameSenseBenchmarkTrial({ ...base, browser: "unknown" }).ok, false);
   assert.equal(validateNameSenseBenchmarkTrial({ ...base, noise: "party" }).ok, false);
   assert.equal(validateNameSenseBenchmarkTrial({ ...base, speakerId: "Sultan Alharbi" }).ok, false);
+});
+
+test("study assignment alternates hit and miss while rotating names", () => {
+  assert.deepEqual(nextNameSenseStudyAssignment(0), { expected: "hit", nameId: "sultan" });
+  assert.deepEqual(nextNameSenseStudyAssignment(1), { expected: "miss", nameId: "mohammed" });
+  assert.deepEqual(nextNameSenseStudyAssignment(2), { expected: "hit", nameId: "alharbi" });
+  assert.deepEqual(nextNameSenseStudyAssignment(3), { expected: "miss", nameId: "sultan" });
+  assert.deepEqual(nextNameSenseStudyAssignment(-1), { expected: "hit", nameId: "sultan" });
+});
+
+test("study prompt must match the server-owned name and expected class", () => {
+  const positive = { expected: "hit" as const, nameId: "sultan" as const };
+  const negative = { expected: "miss" as const, nameId: "mohammed" as const };
+  assert.equal(nameSenseStudyPromptMatchesAssignment("name-only-sultan", positive), true);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("negative-sultan-1", positive), false);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("negative-mohammed-2", negative), true);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("direct-question-mohammed", negative), false);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("negative-sultan-2", negative), false);
 });
