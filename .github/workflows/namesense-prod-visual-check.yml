@@ -16,15 +16,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Verify production HTTP
+      - name: Verify production HTTP and admin protection
         run: |
           set -euo pipefail
           curl --retry 4 --retry-all-errors --fail --silent --show-error --location \
             --output home.html https://navixasa.com/
           curl --retry 4 --retry-all-errors --fail --silent --show-error --location \
             --output study.html https://navixasa.com/namesense-study
+          ADMIN_STATUS="$(curl --retry 4 --retry-all-errors --silent --show-error \
+            --output admin-invites.json --write-out '%{http_code}' \
+            https://navixasa.com/api/admin/namesense-benchmark/invites)"
           test -s home.html
           test -s study.html
+          test "$ADMIN_STATUS" = "401"
+          grep -q "غير مصرح" admin-invites.json
 
       - name: Capture production with Chrome
         run: |
@@ -64,6 +69,7 @@ jobs:
             namesense-study-dom.html
             namesense-fake-invite.png
             namesense-fake-invite-dom.html
+            admin-invites.json
             home.html
             study.html
           if-no-files-found: error
