@@ -1,6 +1,12 @@
 name: NAVIXA Live Security Validation
 
 on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/security-live.yml'
+      - 'security/**'
+      - 'NAVIXA_SECURITY_SCAN.md'
   workflow_run:
     workflows: ["Deploy NAVIXA Auto"]
     types: [completed]
@@ -13,7 +19,7 @@ permissions:
   security-events: write
 
 concurrency:
-  group: navixa-live-security
+  group: navixa-live-security-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
