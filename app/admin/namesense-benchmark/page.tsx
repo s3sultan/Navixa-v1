@@ -26,9 +26,6 @@ type BenchmarkProtocol = {
 };
 
 const protocol = protocolJson as BenchmarkProtocol;
-const WATCH_KEY = "navixa-watch-terms";
-const ALIASES_KEY = "navixa-voice-learned-aliases-v1";
-const LANGUAGE_HINT_KEY = "navixa-voice-language-hint";
 
 const ACCENTS: Array<{ id: Accent; label: string }> = [
   { id: "en-IN", label: "English · Indian" },
@@ -108,10 +105,14 @@ const flatten = (chunks: Float32Array[]) => {
   return output;
 };
 
-const restoreStorage = (snapshot: Record<string, string | null>) => {
-  for (const [key, value] of Object.entries(snapshot)) {
-    if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+const rmsOf = (input: Float32Array) => {
+  if (!input.length) return 0;
+  let sumSquares = 0;
+  for (const raw of input) {
+    const sample = Number.isFinite(raw) ? raw : 0;
+    sumSquares += sample * sample;
   }
+  return Math.sqrt(sumSquares / input.length);
 };
 
 export default function NameSenseBenchmarkCollector() {
@@ -168,15 +169,12 @@ export default function NameSenseBenchmarkCollector() {
 
     const trialAccent = accent, trialNameId = nameId, trialExpected = expected, trialPrompt = prompt, trialSpeaker = speakerId;
     const watchedTerm = trialAccent.startsWith("ar-") ? NAMES[trialNameId].ar : NAMES[trialNameId].en;
-    const storageSnapshot = { [WATCH_KEY]: localStorage.getItem(WATCH_KEY), [ALIASES_KEY]: localStorage.getItem(ALIASES_KEY), [LANGUAGE_HINT_KEY]: localStorage.getItem(LANGUAGE_HINT_KEY) };
-    localStorage.setItem(WATCH_KEY, watchedTerm);
-    localStorage.removeItem(ALIASES_KEY);
-    localStorage.removeItem(LANGUAGE_HINT_KEY);
 
     setRunning(true); setLastResult(""); setStatus("استمع الآن للجملة المعروضة…");
     let stream: MediaStream | null = null, context: AudioContext | null = null, source: MediaStreamAudioSourceNode | null = null, processor: ScriptProcessorNode | null = null, engine: NavixaVoiceEngine | null = null;
     let hardTimer: number | null = null, endpointTimer: number | null = null, finished = false, detectedAt: number | null = null, endpointAt: number | null = null, match: NavixaVoiceMatch | null = null;
     let bufferedSamples = 0, speechSeen = false, trailingSilenceSamples = 0;
+    let noiseFloorRms = protocol.signalQuality.minRms * 0.5, noiseFloorFrames = 0;
     const chunks: Float32Array[] = [];
 
     const cleanup = () => {
@@ -187,7 +185,6 @@ export default function NameSenseBenchmarkCollector() {
       if (source) { try { source.disconnect(); } catch {} }
       stream?.getTracks().forEach((track) => track.stop());
       if (context && context.state !== "closed") void context.close().catch(() => undefined);
-      restoreStorage(storageSnapshot);
     };
 
     const finish = async (reason: "endpoint" | "timeout" | "error") => {
@@ -235,7 +232,16 @@ export default function NameSenseBenchmarkCollector() {
       source = context.createMediaStreamSource(stream);
       processor = context.createScriptProcessor(4096, 1, 1);
       engine = createNavixaBrowserVoiceEngine({
-        language: accentLanguage(trialAccent), continuous: true, interimResults: true, localAccuracyFallback: true, adaptiveLanguage: true,
+        language: accentLanguage(trialAccent),
+        continuous: true,
+        interimResults: true,
+        localAccuracyFallback: true,
+        adaptiveLanguage: true,
+        mediaStream: stream,
+        contextualBiasTerms: watchedTerm,
+        learningEnabled: false,
+        useStoredLanguageHint: false,
+        persistLanguageHint: false,
         handlers: {
           onTranscript: ({ text }) => {
             if (detectedAt !== null) return;
@@ -251,7 +257,16 @@ export default function NameSenseBenchmarkCollector() {
         if (finished || !context) return;
         const input = new Float32Array(event.inputBuffer.getChannelData(0));
         chunks.push(input); bufferedSamples += input.length;
-        const hasVoice = hasNavixaVoiceActivity(input, context.sampleRate, 20, protocol.signalQuality.minRms, 60);
+        const frameRms = rmsOf(input);
+        if (!speechSeen && frameRms < 0.02 && noiseFloorFrames < 30) {
+          noiseFloorRms = (noiseFloorRms * noiseFloorFrames + frameRms) / (noiseFloorFrames + 1);
+          noiseFloorFrames += 1;
+        }
+        const adaptiveRmsThreshold = Math.max(
+          protocol.signalQuality.minRms,
+          Math.min(0.015, noiseFloorRms * 2.5),
+        );
+        const hasVoice = hasNavixaVoiceActivity(input, context.sampleRate, 20, adaptiveRmsThreshold, 60);
         if (hasVoice) { speechSeen = true; trailingSilenceSamples = 0; } else if (speechSeen) trailingSilenceSamples += input.length;
         for (let channel = 0; channel < event.outputBuffer.numberOfChannels; channel += 1) event.outputBuffer.getChannelData(channel).fill(0);
         if (endpointAt === null && speechSeen && bufferedSamples >= context.sampleRate * 0.8 && trailingSilenceSamples >= context.sampleRate * 0.4) {
