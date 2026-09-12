@@ -140,7 +140,6 @@ async function evaluate(cdp, expression) {
 
 async function navigate(cdp, url) {
   await cdp.call("Page.navigate", { url });
-  await sleep(250);
   const ready = await evaluate(cdp, `new Promise(resolve => {
     const deadline = performance.now() + 15_000;
     const inspect = () => {
@@ -179,6 +178,33 @@ async function inspectViewport(cdp, { width, height, mobile }) {
       cards: document.querySelectorAll('main section').length,
     };
   })()`);
+}
+
+async function openMobileDrawer(cdp) {
+  return evaluate(cdp, `new Promise(resolve => {
+    const deadline = performance.now() + 5_000;
+    let openedAt = 0;
+    const inspect = () => {
+      const element = document.getElementById('navixa-mobile-navigation');
+      if (element) {
+        if (!openedAt) openedAt = performance.now();
+        if (performance.now() - openedAt < 260) return setTimeout(inspect, 40);
+        const rect = element.getBoundingClientRect();
+        return resolve({
+          found: true,
+          role: element.getAttribute('role'),
+          modal: element.getAttribute('aria-modal'),
+          width: Math.round(rect.width),
+          bottomGap: Math.round(innerHeight - rect.bottom),
+        });
+      }
+
+      document.querySelector('button[aria-controls="navixa-mobile-navigation"]')?.click();
+      if (performance.now() >= deadline) return resolve({ found: false });
+      setTimeout(inspect, 100);
+    };
+    inspect();
+  })`);
 }
 
 async function main() {
@@ -225,20 +251,8 @@ async function main() {
     assert.notEqual(mobile.menuDisplay, "none", "يجب إظهار زر قائمة الجوال");
     assert.ok(mobile.cards >= 5, "يجب أن تظهر بطاقات المعاينة الأساسية على الجوال");
 
-    await evaluate(cdp, `document.querySelector('button[aria-controls="navixa-mobile-navigation"]')?.click()`);
-    await sleep(260);
-    const drawer = await evaluate(cdp, `(() => {
-      const element = document.getElementById('navixa-mobile-navigation');
-      const rect = element?.getBoundingClientRect();
-      return {
-        found: Boolean(element),
-        role: element?.getAttribute('role') || null,
-        modal: element?.getAttribute('aria-modal') || null,
-        width: rect ? Math.round(rect.width) : 0,
-        bottomGap: rect ? Math.round(innerHeight - rect.bottom) : null,
-      };
-    })()`);
-    assert.equal(drawer.found, true, "يجب أن يفتح Drawer الجوال");
+    const drawer = await openMobileDrawer(cdp);
+    assert.equal(drawer.found, true, "يجب أن يفتح Drawer الجوال بعد اكتمال Hydration");
     assert.equal(drawer.role, "dialog", "يجب أن يحمل Drawer دلالة dialog");
     assert.equal(drawer.modal, "true", "يجب أن يعلن Drawer أنه modal");
     assert.ok(drawer.width >= 380, `عرض Drawer غير متوقع: ${JSON.stringify(drawer)}`);
