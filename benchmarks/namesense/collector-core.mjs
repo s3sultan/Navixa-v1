@@ -1,3 +1,16 @@
+export function isNameSenseNoiseFloorCandidate(frameRms, minRms = 0.0035) {
+  if (!Number.isFinite(frameRms) || frameRms < 0 || !Number.isFinite(minRms) || minRms <= 0) return false;
+  const quietCeiling = Math.min(0.008, Math.max(minRms, minRms * 1.75));
+  return frameRms <= quietCeiling;
+}
+
+export function deriveNameSenseAdaptiveVadThreshold(noiseFloorRms, minRms = 0.0035) {
+  const safeMin = Number.isFinite(minRms) && minRms > 0 ? minRms : 0.0035;
+  const safeNoiseFloor = Number.isFinite(noiseFloorRms) && noiseFloorRms >= 0 ? noiseFloorRms : 0;
+  const upperBound = Math.max(safeMin, 0.01);
+  return Math.min(upperBound, Math.max(safeMin, safeNoiseFloor * 2.25));
+}
+
 export function analyzeNameSenseSignal(input, sampleRate, config = {}) {
   const minRms = Number.isFinite(config.minRms) ? config.minRms : 0.0035;
   const minVariance = Number.isFinite(config.minVariance) ? config.minVariance : 1e-6;
@@ -58,8 +71,6 @@ export function createControlledLiveNameSenseTrial({
   protocol,
   trial,
 }) {
-  // The analyzer returns the current protocol-threshold verdict as `passed`.
-  // Keep the object name explicit so this cannot be confused with a stale external quality flag.
   const signalQuality = analyzeNameSenseSignal(audio, sampleRate, protocol.signalQuality);
   if (!signalQuality.passed) throw new Error("signal-quality-check-failed");
   if (!trial?.consent) throw new Error("benchmark-consent-required");
