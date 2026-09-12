@@ -6,8 +6,8 @@
 
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: تجهيز إطلاق الجمع البشري الحقيقي لـNameSense عبر دفعات دعوات آمنة ومتوازنة بدل إنشاء 225 رابطًا يدويًا.
-- الحالة: قيد التنفيذ على فرع `feat/namesense-human-rollout-batches-20260912` بعد نشر PR #188 وPR #191 بنجاح.
-- الملفات المحجوزة: `app/api/admin/namesense-benchmark/invites/route.ts`, `app/admin/namesense-benchmark/invites/page.tsx`, `app/admin/namesense-benchmark/invites/invites.css`, `tests/namesense-benchmark-api.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+- الحالة: PR #192 مفتوح كـDraft على فرع `feat/namesense-human-rollout-batches-20260912` بانتظار Verify + Pre-Launch على آخر head.
+- الملفات المحجوزة: `app/api/admin/namesense-benchmark/invites/route.ts`, `app/admin/namesense-benchmark/invites/page.tsx`, `app/admin/namesense-benchmark/invites/invites.css`, `tests/namesense-study-batches.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
 
 ## آخر ما اكتمل
 
@@ -17,11 +17,11 @@
 - دُمج PR #191 ونُشر على الإنتاج لتحسين الحالة البصرية الآمنة للرابط المفقود/المنتهي دون تغيير منطق NameSense.
 - تم فحص الإنتاج فعليًا عبر Chromium بعد النشر: الصفحة الرئيسية ومسار الدراسة يعملان، ومسار token وهمي يصل إلى API/D1 ويرفض بأمان دون تسريب token في DOM.
 - الصوت الخام وtranscript لا يُخزنان ولا يُرسلان للخادم، ومسار الدراسة لا يعدّل حالة NameSense الإنتاجية أو تلميحات اللغة أو الكلمات المراقبة.
+- أضيف في PR #192 إنشاء دفعات من 1 إلى 25 رابطًا، cleanup لأي دفعة غير مكتملة، تصدير CSV محلي، ومصفوفة تجنيد للمجموعات التسع مقابل هدف 25 متحدثًا لكل مجموعة.
 
 ## التالي
 
-- إضافة batch creation محكوم بحد أقصى 25 دعوة لكل طلب مع rollback لأية دفعة غير مكتملة قبل إرجاع الروابط.
-- عرض حالة التجنيد لكل لهجة مقابل الحد الأدنى 25 متحدثًا، مع رفع حد قائمة metadata بما يكفي لرؤية خطة الإطلاق كاملة.
-- إضافة تصدير CSV محلي في المتصفح للروابط الخام التي تظهر مرة واحدة فقط ولا تُخزن في D1.
-- إضافة اختبارات عقد تمنع تخزين raw tokens وتثبت حدود batch وخطة 25 متحدثًا × 40 جولة.
-- تشغيل Verify + Pre-Launch، ثم دمج ونشر وفحص الإنتاج قبل بدء توزيع الروابط على المشاركين الحقيقيين.
+- تشغيل Verify + Pre-Launch على آخر head لـPR #192 وإصلاح أي فشل بدون تجاوز البوابات.
+- مراجعة أن batch API لا يعيد/يخزن raw token إلا لحظة الإنشاء، وأن CSV يبقى محليًا في المتصفح.
+- بعد النجاح: تحديث AI_CHANGELOG وتحرير الحجز، تحويل PR #192 إلى Ready ثم الدمج والنشر.
+- فحص production smoke وواجهة إدارة الدفعات بعد النشر قبل إنشاء أي دفعة بشرية حقيقية.
