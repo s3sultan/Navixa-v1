@@ -1,7 +1,15 @@
-# vinext-starter
+# NAVIXA
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
+> Canonical repository: `s3sultan/Navixa-v1`  
+> Production branch: `master`  
+> Production: Cloudflare Worker `navixa` → `https://navixasa.com`
+>
+> The repository `s3sultan/Navixa` and the existing Vercel project named `navixa` are legacy infrastructure and must not be used as production references.
+
+See [`docs/DEPLOYMENT_SOURCE_OF_TRUTH.md`](docs/DEPLOYMENT_SOURCE_OF_TRUTH.md) before changing deployment infrastructure.
+
+A clean full-stack application running on
+[vinext](https://github.com/cloudflare/vinext), with Cloudflare D1 and
 Drizzle support.
 
 ## Prerequisites
@@ -16,7 +24,7 @@ npm run dev
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+This project does not use `wrangler.jsonc`.
 
 ## Included Shape
 
