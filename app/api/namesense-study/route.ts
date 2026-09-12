@@ -13,6 +13,8 @@ import { validateNameSenseBenchmarkTrial } from "../admin/namesense-benchmark/sc
 
 type InviteRow = {
   invite_id: string;
+  token_hash: string;
+  client_hash: string | null;
   speaker_id: string;
   accent: string;
   max_trials: number;
@@ -34,6 +36,7 @@ async function ensureInviteSchema(database: NameSenseDb) {
     CREATE TABLE IF NOT EXISTS navixa_namesense_study_invites (
       invite_id TEXT PRIMARY KEY,
       token_hash TEXT NOT NULL UNIQUE,
+      client_hash TEXT,
       speaker_id TEXT NOT NULL UNIQUE,
       accent TEXT NOT NULL,
       max_trials INTEGER NOT NULL,
@@ -46,15 +49,14 @@ async function ensureInviteSchema(database: NameSenseDb) {
 }
 
 const hex = (bytes: Uint8Array) => Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
-const hashToken = async (token: string) => hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
+const hashValue = async (value: string) => hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 const tokenPattern = /^[a-f0-9]{64}$/i;
+const clientNoncePattern = /^[a-f0-9]{64}$/i;
 
-async function findInvite(database: NameSenseDb, token: string) {
-  if (!tokenPattern.test(token)) return null;
+async function findInviteByHash(database: NameSenseDb, tokenHash: string) {
   await ensureInviteSchema(database);
-  const tokenHash = await hashToken(token.toLowerCase());
   const rows = await database.prepare(`
-    SELECT invite_id,speaker_id,accent,max_trials,used_trials,expires_at,revoked
+    SELECT invite_id,token_hash,client_hash,speaker_id,accent,max_trials,used_trials,expires_at,revoked
     FROM navixa_namesense_study_invites
     WHERE token_hash=?
     LIMIT 1
@@ -71,22 +73,57 @@ function active(invite: InviteRow | null) {
   );
 }
 
-export async function GET(request: Request) {
-  const token = new URL(request.url).searchParams.get("invite")?.trim() || "";
+async function resolveBoundInvite(database: NameSenseDb, token: string, clientNonce: string) {
+  if (!tokenPattern.test(token) || !clientNoncePattern.test(clientNonce)) return { ok: false as const, status: 400, error: "بيانات المشاركة غير صالحة" };
+  const tokenHash = await hashValue(token.toLowerCase());
+  const clientHash = await hashValue(clientNonce.toLowerCase());
+  let invite = await findInviteByHash(database, tokenHash);
+  if (!active(invite)) return { ok: false as const, status: 410, error: "رابط المشاركة غير صالح أو انتهت صلاحيته" };
+
+  if (!invite!.client_hash) {
+    await database.prepare(`
+      UPDATE navixa_namesense_study_invites
+      SET client_hash=?
+      WHERE token_hash=? AND client_hash IS NULL AND revoked=0 AND expires_at>?
+    `).bind(clientHash, tokenHash, new Date().toISOString()).run();
+    invite = await findInviteByHash(database, tokenHash);
+  }
+
+  if (!invite || invite.client_hash !== clientHash) {
+    return { ok: false as const, status: 409, error: "هذه الدعوة مرتبطة بجلسة مشارك أخرى" };
+  }
+  if (!active(invite)) return { ok: false as const, status: 410, error: "رابط المشاركة غير صالح أو اكتملت محاولاته" };
+  return { ok: true as const, invite, tokenHash, clientHash };
+}
+
+function readCredentials(body: unknown) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const value = body as { invite?: unknown; clientNonce?: unknown; trial?: unknown };
+  const invite = typeof value.invite === "string" ? value.invite.trim().toLowerCase() : "";
+  const clientNonce = typeof value.clientNonce === "string" ? value.clientNonce.trim().toLowerCase() : "";
+  return { invite, clientNonce, trial: value.trial };
+}
+
+export async function PUT(request: Request) {
+  if (!isTrustedSameOriginRequest(request)) {
+    return NextResponse.json({ error: "مصدر الطلب غير موثوق" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  const credentials = readCredentials(await request.json().catch(() => null));
+  if (!credentials) return NextResponse.json({ error: "بيانات المشاركة غير صالحة" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+
   const database = await db();
   if (!database) return NextResponse.json({ error: "الدراسة غير متاحة الآن" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-  const invite = await findInvite(database, token);
-  if (!active(invite)) {
-    return NextResponse.json({ error: "رابط المشاركة غير صالح أو انتهت صلاحيته" }, { status: 410, headers: { "Cache-Control": "no-store" } });
-  }
-  const assignment = nextNameSenseStudyAssignment(invite!.used_trials);
+  const resolved = await resolveBoundInvite(database, credentials.invite, credentials.clientNonce);
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status, headers: { "Cache-Control": "no-store" } });
+
+  const assignment = nextNameSenseStudyAssignment(resolved.invite.used_trials);
   return NextResponse.json({
     ok: true,
-    accent: invite!.accent,
-    speakerId: invite!.speaker_id,
-    remainingTrials: Math.max(0, invite!.max_trials - invite!.used_trials),
-    maxTrials: invite!.max_trials,
-    expiresAt: invite!.expires_at,
+    accent: resolved.invite.accent,
+    speakerId: resolved.invite.speaker_id,
+    remainingTrials: Math.max(0, resolved.invite.max_trials - resolved.invite.used_trials),
+    maxTrials: resolved.invite.max_trials,
+    expiresAt: resolved.invite.expires_at,
     nextExpected: assignment.expected,
     nextNameId: assignment.nameId,
   }, { headers: { "Cache-Control": "private, no-store" } });
@@ -96,23 +133,18 @@ export async function POST(request: Request) {
   if (!isTrustedSameOriginRequest(request)) {
     return NextResponse.json({ error: "مصدر الطلب غير موثوق" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
-  const body = await request.json().catch(() => null) as { invite?: unknown; trial?: unknown } | null;
-  const token = typeof body?.invite === "string" ? body.invite.trim().toLowerCase() : "";
-  if (!tokenPattern.test(token)) {
-    return NextResponse.json({ error: "رمز المشاركة غير صالح" }, { status: 400, headers: { "Cache-Control": "no-store" } });
-  }
+  const credentials = readCredentials(await request.json().catch(() => null));
+  if (!credentials) return NextResponse.json({ error: "بيانات المشاركة غير صالحة" }, { status: 400, headers: { "Cache-Control": "no-store" } });
 
   const database = await db();
   if (!database) return NextResponse.json({ error: "الدراسة غير متاحة الآن" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   await ensureNameSenseBenchmarkSchema(database);
-  const invite = await findInvite(database, token);
-  if (!active(invite)) {
-    return NextResponse.json({ error: "رابط المشاركة غير صالح أو اكتملت محاولاته" }, { status: 410, headers: { "Cache-Control": "no-store" } });
-  }
+  const resolved = await resolveBoundInvite(database, credentials.invite, credentials.clientNonce);
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status, headers: { "Cache-Control": "no-store" } });
 
-  const assignment = nextNameSenseStudyAssignment(invite!.used_trials);
-  const rawTrial = body?.trial && typeof body.trial === "object" && !Array.isArray(body.trial)
-    ? body.trial as Record<string, unknown>
+  const assignment = nextNameSenseStudyAssignment(resolved.invite.used_trials);
+  const rawTrial = credentials.trial && typeof credentials.trial === "object" && !Array.isArray(credentials.trial)
+    ? credentials.trial as Record<string, unknown>
     : null;
   if (!rawTrial || !nameSenseStudyPromptMatchesAssignment(rawTrial.promptId, assignment)) {
     return NextResponse.json({ error: "الجملة لا تطابق الجولة الحالية؛ أعد تحميل الصفحة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
@@ -120,8 +152,8 @@ export async function POST(request: Request) {
 
   const trialInput = {
     ...rawTrial,
-    accent: invite!.accent,
-    speakerId: invite!.speaker_id,
+    accent: resolved.invite.accent,
+    speakerId: resolved.invite.speaker_id,
     expected: assignment.expected,
     watchedNameId: assignment.nameId,
   };
@@ -130,32 +162,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
-  const tokenHash = await hashToken(token);
   const claimed = await database.prepare(`
     UPDATE navixa_namesense_study_invites
     SET used_trials=used_trials+1
-    WHERE token_hash=? AND revoked=0 AND expires_at>? AND used_trials<max_trials AND used_trials=?
-  `).bind(tokenHash, new Date().toISOString(), invite!.used_trials).run();
+    WHERE token_hash=? AND client_hash=? AND revoked=0 AND expires_at>? AND used_trials<max_trials AND used_trials=?
+  `).bind(resolved.tokenHash, resolved.clientHash, new Date().toISOString(), resolved.invite.used_trials).run();
   if ((claimed.meta?.changes ?? 0) !== 1) {
     return NextResponse.json({ error: "تغيرت حالة الدعوة؛ أعد تحميل الصفحة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
 
   const stored = await storeNameSenseBenchmarkTrial(database, parsed.trial);
+  const usedTrials = resolved.invite.used_trials + 1;
+  const next = nextNameSenseStudyAssignment(usedTrials);
   if (!stored.ok) {
-    await database.prepare(
-      "UPDATE navixa_namesense_study_invites SET used_trials=CASE WHEN used_trials>0 THEN used_trials-1 ELSE 0 END WHERE token_hash=?",
-    ).bind(tokenHash).run().catch(() => undefined);
-    return NextResponse.json({ error: stored.error }, { status: stored.status, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({
+      error: "تعذر حفظ هذه الجولة؛ تم تجاوزها حفاظًا على نزاهة عداد الدراسة",
+      remainingTrials: Math.max(0, resolved.invite.max_trials - usedTrials),
+      nextExpected: next.expected,
+      nextNameId: next.nameId,
+      refreshRequired: true,
+    }, { status: stored.status, headers: { "Cache-Control": "no-store" } });
   }
 
-  const usedTrials = invite!.used_trials + 1;
-  const next = nextNameSenseStudyAssignment(usedTrials);
   return NextResponse.json({
     ok: true,
     trialId: stored.trialId,
-    remainingTrials: Math.max(0, invite!.max_trials - usedTrials),
+    remainingTrials: Math.max(0, resolved.invite.max_trials - usedTrials),
     nextExpected: next.expected,
     nextNameId: next.nameId,
-    completed: usedTrials >= invite!.max_trials,
+    completed: usedTrials >= resolved.invite.max_trials,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
