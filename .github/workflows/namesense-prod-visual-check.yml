@@ -30,6 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          FAKE_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
             --window-size=1440,1100 --virtual-time-budget=7000 \
             --screenshot=home.png https://navixasa.com/
@@ -38,9 +39,20 @@ jobs:
             --screenshot=namesense-study.png https://navixasa.com/namesense-study
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
             --virtual-time-budget=7000 --dump-dom https://navixasa.com/namesense-study > namesense-study-dom.html
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --window-size=1440,1100 --virtual-time-budget=9000 \
+            --screenshot=namesense-fake-invite.png "https://navixasa.com/namesense-study#invite=${FAKE_TOKEN}"
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --virtual-time-budget=9000 --dump-dom "https://navixasa.com/namesense-study#invite=${FAKE_TOKEN}" > namesense-fake-invite-dom.html
           test -s home.png
           test -s namesense-study.png
+          test -s namesense-fake-invite.png
           grep -q "NameSense\|مشاركة\|دعوة\|رابط" namesense-study-dom.html
+          grep -q "غير صالح\|انتهت صلاحيته\|تعذر فتح المشاركة" namesense-fake-invite-dom.html
+          if grep -q "${FAKE_TOKEN}" namesense-fake-invite-dom.html; then
+            echo "Fake token leaked into rendered DOM" >&2
+            exit 1
+          fi
 
       - name: Upload visual evidence
         uses: actions/upload-artifact@v4
@@ -50,6 +62,8 @@ jobs:
             home.png
             namesense-study.png
             namesense-study-dom.html
+            namesense-fake-invite.png
+            namesense-fake-invite-dom.html
             home.html
             study.html
           if-no-files-found: error
