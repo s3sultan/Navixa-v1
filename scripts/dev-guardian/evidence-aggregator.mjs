@@ -6,8 +6,18 @@ import { evaluateLiveExecution, readExecutionEvents } from "./event-ledger.mjs";
 const REVIEW_ORDER = Object.freeze({ CLEAR: 0, MINOR: 1, MAJOR: 2, BLOCKER: 3 });
 
 export function parseReviewVerdict(text = "") {
-  const matches = [...String(text).toUpperCase().matchAll(/\b(CLEAR|MINOR|MAJOR|BLOCKER)\b/g)];
-  return matches.length ? matches.at(-1)[1] : null;
+  const lines = String(text)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .reverse();
+  for (const line of lines) {
+    const exact = line.match(/^(CLEAR|MINOR|MAJOR|BLOCKER)[.!]?$/i);
+    if (exact) return exact[1].toUpperCase();
+    const explicit = line.match(/^(?:FINAL\s+)?VERDICT\s*:\s*(CLEAR|MINOR|MAJOR|BLOCKER)[.!]?$/i);
+    if (explicit) return explicit[1].toUpperCase();
+  }
+  return null;
 }
 
 function normalizeCheck(check = {}) {
@@ -39,21 +49,29 @@ function roleRequiresVerdict(role) {
 export function aggregateEvidence({ plan, checks = [], reviews = [], executionGuard = { allowed: true } } = {}) {
   const normalizedChecks = checks.map(normalizeCheck);
   const normalizedReviews = reviews.map(normalizeReview);
-  const requiredRoles = (plan?.review?.assignments || []).filter((item) => item.required).map((item) => item.role);
+  const requiredAssignments = (plan?.review?.assignments || [])
+    .filter((item) => item.required)
+    .map((item) => ({ role: String(item.role), agent: String(item.agent) }));
   const reasons = [];
 
   for (const check of normalizedChecks) {
     if (check.required && !check.passed) reasons.push(`check-failed:${check.name}:${check.status}`);
   }
 
-  for (const role of requiredRoles) {
-    const evidence = normalizedReviews.find((review) => review.role === role);
+  for (const assignment of requiredAssignments) {
+    const evidence = normalizedReviews.find(
+      (review) => review.role === assignment.role && review.agent === assignment.agent,
+    );
     if (!evidence) {
-      reasons.push(`missing-review:${role}`);
+      reasons.push(`missing-review:${assignment.role}:${assignment.agent}`);
       continue;
     }
-    if (evidence.status !== "success") reasons.push(`review-failed:${role}:${evidence.status}`);
-    if (roleRequiresVerdict(role) && !evidence.verdict) reasons.push(`missing-verdict:${role}`);
+    if (evidence.status !== "success") {
+      reasons.push(`review-failed:${assignment.role}:${assignment.agent}:${evidence.status}`);
+    }
+    if (roleRequiresVerdict(assignment.role) && !evidence.verdict) {
+      reasons.push(`missing-verdict:${assignment.role}:${assignment.agent}`);
+    }
   }
 
   for (const review of normalizedReviews) {
@@ -74,7 +92,8 @@ export function aggregateEvidence({ plan, checks = [], reviews = [], executionGu
     reasons: [...new Set(reasons)],
     checks: normalizedChecks,
     reviews: normalizedReviews,
-    requiredRoles,
+    requiredRoles: requiredAssignments.map((item) => item.role),
+    requiredReviewers: requiredAssignments,
   };
 }
 
