@@ -158,7 +158,7 @@ test("Plan B monitor uses a separate R2 bucket and primary exposes a D1-backed n
     readFile(new URL("../plan-b/wrangler.jsonc", import.meta.url), "utf8"),
     readFile(new URL("../app/api/healthz/route.ts", import.meta.url), "utf8"),
   ]);
-  assert.match(wrangler, /backup\.navixasa\.com/);
+  assert.ok(wrangler.includes("backup.navixasa.com"));
   assert.match(wrangler, /"custom_domain": true/);
   assert.match(wrangler, /"binding": "STATE"/);
   assert.match(wrangler, /"bucket_name": "navixa-plan-b-state"/);
