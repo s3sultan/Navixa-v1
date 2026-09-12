@@ -11,12 +11,15 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $reportPath = (Resolve-Path $ReportDir).Path
+$templateDir = Join-Path $reportPath "nuclei-templates"
+New-Item -ItemType Directory -Force -Path $templateDir | Out-Null
+$templatePath = (Resolve-Path $templateDir).Path
 
-Write-Host "[1/4] Pulling OWASP ZAP 2.17.0..."
+Write-Host "[1/5] Pulling OWASP ZAP 2.17.0..."
 docker pull ghcr.io/zaproxy/zaproxy:2.17.0
 if ($LASTEXITCODE -ne 0) { throw "Could not pull the ZAP image." }
 
-Write-Host "[2/4] Running passive ZAP baseline against $Target..."
+Write-Host "[2/5] Running passive ZAP baseline against $Target..."
 docker run --rm `
   --mount "type=bind,source=$reportPath,target=/zap/wrk" `
   ghcr.io/zaproxy/zaproxy:2.17.0 `
@@ -29,15 +32,25 @@ docker run --rm `
   -w navixa-zap.md
 $zapExit = $LASTEXITCODE
 
-Write-Host "[3/4] Pulling Nuclei 3.11.1..."
+Write-Host "[3/5] Pulling Nuclei 3.11.1..."
 docker pull projectdiscovery/nuclei:v3.11.1
 if ($LASTEXITCODE -ne 0) { throw "Could not pull the Nuclei image." }
 
-Write-Host "[4/4] Running controlled High/Critical Nuclei validation..."
+Write-Host "[4/5] Fetching official Nuclei templates..."
+docker run --rm `
+  --mount "type=bind,source=$templatePath,target=/templates" `
+  projectdiscovery/nuclei:v3.11.1 `
+  -ut `
+  -ud /templates
+if ($LASTEXITCODE -ne 0) { throw "Could not fetch official Nuclei templates." }
+
+Write-Host "[5/5] Running controlled High/Critical Nuclei validation..."
 docker run --rm `
   --mount "type=bind,source=$reportPath,target=/out" `
+  --mount "type=bind,source=$templatePath,target=/templates,readonly" `
   projectdiscovery/nuclei:v3.11.1 `
   -u $Target `
+  -t /templates `
   -severity high,critical `
   -etags fuzz,dos,bruteforce,intrusive `
   -dut `
