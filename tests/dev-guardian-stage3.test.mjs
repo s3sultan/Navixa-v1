@@ -113,6 +113,29 @@ test("evidence passes with AI Tester success and CLEAR independent review", () =
   });
   assert.equal(evidence.verdict, "PASS");
   assert.equal(evidence.mergeAllowed, true);
+  assert.deepEqual(evidence.requiredReviewers, [
+    { role: "ai-tester", agent: "Gemini API / AI Studio" },
+    { role: "independent-reviewer", agent: "Manus" },
+  ]);
+});
+
+test("evidence rejects a correct role reported by the wrong agent", () => {
+  const evidence = aggregateEvidence({
+    plan: planFixture(),
+    checks: [
+      { name: "guardian-plan", status: "success", required: true },
+      { name: "ai-tester-step", status: "success", required: true },
+      { name: "independent-reviewer-step", status: "success", required: true },
+    ],
+    reviews: [
+      { role: "ai-tester", agent: "Gemini API / AI Studio", status: "success" },
+      { role: "independent-reviewer", agent: "Claude Code", status: "success", verdict: "CLEAR" },
+    ],
+    executionGuard: { allowed: true, reasons: [] },
+  });
+  assert.equal(evidence.verdict, "BLOCK");
+  assert.equal(evidence.mergeAllowed, false);
+  assert.ok(evidence.reasons.includes("missing-review:independent-reviewer:Manus"));
 });
 
 test("evidence allows MINOR but blocks MAJOR or missing required reviewer", () => {
@@ -145,10 +168,13 @@ test("evidence allows MINOR but blocks MAJOR or missing required reviewer", () =
     reviews: [{ role: "ai-tester", agent: "Gemini API / AI Studio", status: "success" }],
   });
   assert.equal(missing.verdict, "BLOCK");
-  assert.ok(missing.reasons.includes("missing-review:independent-reviewer"));
+  assert.ok(missing.reasons.includes("missing-review:independent-reviewer:Manus"));
 });
 
-test("review verdict parser uses the final explicit verdict", () => {
-  assert.equal(parseReviewVerdict("Possible MINOR issue fixed. Final verdict: CLEAR"), "CLEAR");
+test("review verdict parser accepts only an explicit final verdict line", () => {
+  assert.equal(parseReviewVerdict("Possible MINOR issue fixed.\nCLEAR"), "CLEAR");
+  assert.equal(parseReviewVerdict("Final verdict: BLOCKER"), "BLOCKER");
+  assert.equal(parseReviewVerdict("The code mentions BLOCKER in a comment"), null);
+  assert.equal(parseReviewVerdict("Possible MINOR issue fixed. Final verdict: CLEAR"), null);
   assert.equal(parseReviewVerdict("No explicit decision"), null);
 });
