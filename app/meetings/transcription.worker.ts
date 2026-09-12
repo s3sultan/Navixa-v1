@@ -14,6 +14,7 @@ const MODELS: Record<"tiny" | "base", ModelChoice> = {
   tiny: { id: "Xenova/whisper-tiny", dtype: "q8" },
   base: { id: "Xenova/whisper-base", dtype: "q4" },
 };
+const LANGUAGES = new Set<WorkerRequest["language"]>(["auto", "ar", "en"]);
 
 let activeModelKey: "tiny" | "base" | null = null;
 let transcriber: ((audio: Float32Array, options: Record<string, unknown>) => Promise<unknown>) | null = null;
@@ -84,22 +85,28 @@ async function getTranscriber(model: "tiny" | "base") {
 }
 
 self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
-  if (event.data?.type !== "transcribe") return;
+  // DedicatedWorker messages are tied to the owning document. Some runtimes
+  // expose an empty MessageEvent.origin here, so reject only a present mismatch.
+  if (event.origin && event.origin !== self.location.origin) return;
+  const data = event.data;
+  if (data?.type !== "transcribe") return;
+  if (!(data.audio instanceof Float32Array)) return;
+  if (!Object.hasOwn(MODELS, data.model) || !LANGUAGES.has(data.language)) return;
   try {
-    const worker = await getTranscriber(event.data.model);
+    const worker = await getTranscriber(data.model);
     send({ type: "state", state: "transcribing", message: "جارٍ تحويل الصوت إلى نص داخل جهازك…" });
     const options: Record<string, unknown> = {
       task: "transcribe",
-      chunk_length_s: event.data.model === "base" ? 25 : 20,
+      chunk_length_s: data.model === "base" ? 25 : 20,
       stride_length_s: 4,
       return_timestamps: true,
       condition_on_prev_tokens: false,
       no_repeat_ngram_size: 3,
       repetition_penalty: 1.12,
     };
-    if (event.data.language === "ar") options.language = "arabic";
-    if (event.data.language === "en") options.language = "english";
-    const output = await worker(event.data.audio, options) as { text?: string; chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }> };
+    if (data.language === "ar") options.language = "arabic";
+    if (data.language === "en") options.language = "english";
+    const output = await worker(data.audio, options) as { text?: string; chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }> };
     const rawSegments = (output.chunks || []).map((chunk) => ({
       start: Number(chunk.timestamp?.[0] || 0),
       end: Number(chunk.timestamp?.[1] || chunk.timestamp?.[0] || 0),
@@ -108,9 +115,9 @@ self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
     const segments = collapseAdjacentDuplicateSegments(rawSegments);
     const transcriptFromSegments = segments.map((segment) => segment.text).join(" ");
     const transcript = normalizeArabicTranscript(transcriptFromSegments || String(output.text || ""));
-    send({ type: "complete", partId: event.data.partId, transcript, segments });
+    send({ type: "complete", partId: data.partId, transcript, segments });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";
-    send({ type: "error", partId: event.data.partId, message: "تعذر تشغيل التفريغ المحلي. تحقق من الاتصال لأول تنزيل للنموذج أو من ذاكرة الجهاز.", detail });
+    send({ type: "error", partId: data.partId, message: "تعذر تشغيل التفريغ المحلي. تحقق من الاتصال لأول تنزيل للنموذج أو من ذاكرة الجهاز.", detail });
   }
 });
