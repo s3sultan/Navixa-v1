@@ -25,6 +25,14 @@
 - الملفات المحجوزة: `.github/workflows/security-*.yml`, `.github/workflows/codeql*.yml`, `security/*`, `NAVIXA_SECURITY_SCAN.md`.
 - القيود: لا تعديل لـ`package.json` أو ملفات PR #193، وتكون اختبارات الموقع الخارجية غير مدمرة ومحدودة النطاق.
 
+## مهمة موازية غير متقاطعة — NAVIXA Watch Alerts Phase 1
+
+- الوكيل: ChatGPT.
+- المهمة: توسيع محرك Web Push الحالي لتنبيهات عالية الأولوية تصل إلى iPhone وApple Watch المقترنة، مع إجراءات سريعة كتحسين تدريجي وFallback آمن عند عدم دعم الأزرار.
+- الحالة: حجز فقط؛ التنفيذ على فرع معزول وPull Request Draft مستقل، دون دمج أو نشر إنتاجي قبل مراجعة المستخدم.
+- الملفات المحجوزة: `worker/generalPush.ts`, `public/navixa-push-sw.js`, `app/pushClient.ts`, `app/admin/settings/AdminPushLab.tsx`, `app/api/admin/push-lab/route.ts`, `tests/admin-push-lab.test.ts`.
+- القيود: لا لمس لملفات UI System أو `package.json`، ولا إنشاء Runtime أو اعتماد جديد، ولا ادعاء تطبيق watchOS أصلي؛ Apple Watch تعتمد في هذه المرحلة على إشعارات Web Push المنعكسة من iPhone.
+
 ## آخر ما اكتمل
 
 - دُمج PR #194 وبات NAVIXA Dev Guardian موجودًا على `master` والإنتاج، مع Repo Intelligence وTask Contract وGuards وEvidence Aggregator وDeveloper Bridge وPatch Producer محدود، ونجح Deploy NAVIXA Auto واختبارات الإنتاج.
