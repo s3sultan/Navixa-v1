@@ -7,5 +7,8 @@ export const metadata: Metadata = {
 };
 
 export default function UILabPage() {
-  return <UILabClient />;
+  return <>
+    <style>{`.navixa-splash{display:none!important}`}</style>
+    <UILabClient />
+  </>;
 }
