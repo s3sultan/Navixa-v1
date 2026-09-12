@@ -1,4 +1,5 @@
 import path from "node:path";
+import { evaluateScope, DEV_GUARDIAN_DEFAULTS } from "./guards.mjs";
 
 const SECTION_ALIASES = Object.freeze({
   objective: ["الهدف", "objective"],
@@ -111,11 +112,20 @@ function isConcretePath(value) {
   return !/[?*\[\]{}]/.test(value) && !value.endsWith("/");
 }
 
+function isPathInContractScope(candidate, contract) {
+  return evaluateScope({
+    files: [candidate],
+    allowed: contract?.allowedScope || [],
+    forbidden: [...DEV_GUARDIAN_DEFAULTS.forbiddenPaths, ...(contract?.forbiddenScope || [])],
+  }).allowed;
+}
+
 export function selectContextPaths({ contract, repoMap, maxFiles = 18 } = {}) {
   const knownFiles = new Set(Object.keys(repoMap?.dependencyGraph || {}));
   const selected = [];
   const add = (candidate) => {
     if (!candidate || selected.length >= maxFiles || !knownFiles.has(candidate) || selected.includes(candidate)) return;
+    if (!isPathInContractScope(candidate, contract)) return;
     selected.push(candidate);
   };
 
@@ -141,7 +151,10 @@ export function validateTaskContract(contract) {
   if (!Array.isArray(contract?.acceptance) || contract.acceptance.length === 0) errors.push("missing-acceptance");
   if (!Array.isArray(contract?.allowedScope) || contract.allowedScope.length === 0) errors.push("missing-allowed-scope");
   if (!clean(contract?.baseCommit)) errors.push("missing-base-commit");
-  if ((contract?.allowedScope || []).some((entry) => path.posix.isAbsolute(entry) || entry.startsWith("../"))) errors.push("unsafe-allowed-scope");
+  if ((contract?.allowedScope || []).some((entry) => path.posix.isAbsolute(entry) || entry.startsWith("../") || /^[A-Za-z]:[\\/]/.test(entry))) errors.push("unsafe-allowed-scope");
+  const requested = clean(contract?.requestedBaseCommit);
+  const effective = clean(contract?.baseCommit);
+  if (requested && requested !== "latest-master" && requested !== effective) errors.push("base-commit-mismatch");
   return { valid: errors.length === 0, errors };
 }
 
