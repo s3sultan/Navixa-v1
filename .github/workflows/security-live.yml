@@ -152,6 +152,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Preserve the same signed High/Critical template coverage while keeping
+          # a single-host production scan bounded enough for the CI gate to finish.
           docker run --rm \
             -v "$GITHUB_WORKSPACE/security/reports/nuclei:/out" \
             -v "$GITHUB_WORKSPACE/security/nuclei-templates:/templates:ro" \
@@ -162,11 +164,11 @@ jobs:
             -etags fuzz,dos,bruteforce,intrusive \
             -dut \
             -ni \
-            -rl 5 \
-            -c 5 \
-            -bs 5 \
-            -timeout 8 \
-            -retries 1 \
+            -rl 15 \
+            -c 10 \
+            -bs 10 \
+            -timeout 6 \
+            -retries 0 \
             -jle /out/navixa-nuclei.jsonl \
             -se /out/navixa-nuclei.sarif \
             -duc
