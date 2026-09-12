@@ -1,0 +1,6 @@
+/*
+  X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), display-capture=(), geolocation=(), microphone=(self), payment=(), usb=(), serial=(), bluetooth=()
