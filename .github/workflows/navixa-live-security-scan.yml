@@ -1,0 +1,158 @@
+name: NAVIXA Live Passive Security Scan
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/navixa-live-security-scan.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navixa-live-passive-security-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  passive-live-scan:
+    name: ZAP baseline + constrained Nuclei + headers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check HTTPS and security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/navixa-security"
+          mkdir -p "$work"
+
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --max-time 20 \
+            --user-agent 'NAVIXA-Authorized-Security-Scan/1.0' \
+            --dump-header "$work/headers.txt" \
+            --output /dev/null \
+            https://navixasa.com/
+
+          echo '=== Final response security headers ==='
+          tr -d '\r' < "$work/headers.txt" | tail -n 80
+
+          for header in \
+            strict-transport-security \
+            content-security-policy \
+            x-content-type-options \
+            referrer-policy \
+            permissions-policy; do
+            if ! grep -Eiq "^${header}:" "$work/headers.txt"; then
+              echo "::warning::Missing security header: ${header}"
+            fi
+          done
+
+          for path in /robots.txt /.well-known/security.txt; do
+            status="$(curl --proto '=https' --tlsv1.2 --silent --show-error --location \
+              --max-time 15 \
+              --user-agent 'NAVIXA-Authorized-Security-Scan/1.0' \
+              --output "$work/$(basename "$path").txt" \
+              --write-out '%{http_code}' \
+              "https://navixasa.com${path}")"
+            echo "${path} -> HTTP ${status}"
+          done
+
+      - name: OWASP ZAP baseline passive scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/navixa-security"
+          mkdir -p "$work"
+          chmod 777 "$work"
+
+          docker pull ghcr.io/zaproxy/zaproxy:stable
+          set +e
+          docker run --rm \
+            -v "$work:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t https://navixasa.com \
+            -m 1 \
+            -J zap-report.json \
+            -r zap-report.html \
+            -I
+          zap_rc=$?
+          set -e
+
+          echo "ZAP exit code: $zap_rc"
+          test -s "$work/zap-report.json" || { echo 'ZAP report missing'; exit 1; }
+
+          echo '=== ZAP alert summary ==='
+          python3 - "$work/zap-report.json" <<'PY'
+          import json, sys, collections
+          report = json.load(open(sys.argv[1], encoding='utf-8'))
+          alerts = []
+          for site in report.get('site', []):
+              alerts.extend(site.get('alerts', []))
+          counts = collections.Counter(a.get('riskdesc', 'Unknown').split(' ')[0] for a in alerts)
+          print('alerts_total=', len(alerts))
+          for key in ('High', 'Medium', 'Low', 'Informational', 'Unknown'):
+              if counts.get(key):
+                  print(f'{key}={counts[key]}')
+          for a in alerts:
+              print(f"[{a.get('riskdesc','Unknown')}] {a.get('alert','Unnamed alert')}")
+          PY
+
+      - name: Nuclei safe exposure and misconfiguration scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/navixa-security"
+          out="$work/nuclei.jsonl"
+
+          docker pull projectdiscovery/nuclei:latest
+          docker run --rm projectdiscovery/nuclei:latest \
+            -u https://navixasa.com \
+            -silent \
+            -jsonl \
+            -tags misconfig,exposure \
+            -exclude-tags cve,dos,fuzz,intrusive,bruteforce,headless,code \
+            -rate-limit 5 \
+            -concurrency 1 \
+            -bulk-size 1 \
+            -timeout 5 \
+            -retries 0 \
+            -H 'User-Agent: NAVIXA-Authorized-Security-Scan/1.0' \
+            > "$out"
+
+          echo '=== Nuclei findings ==='
+          if [[ -s "$out" ]]; then
+            python3 - "$out" <<'PY'
+          import json, sys, collections
+          rows=[]
+          for line in open(sys.argv[1], encoding='utf-8'):
+              line=line.strip()
+              if not line:
+                  continue
+              try:
+                  rows.append(json.loads(line))
+              except json.JSONDecodeError:
+                  pass
+          counts=collections.Counter((r.get('info') or {}).get('severity','unknown') for r in rows)
+          print('findings_total=', len(rows))
+          for sev in ('critical','high','medium','low','info','unknown'):
+              if counts.get(sev):
+                  print(f'{sev}={counts[sev]}')
+          for r in rows:
+              info=r.get('info') or {}
+              print(f"[{info.get('severity','unknown')}] {info.get('name', r.get('template-id','Unnamed finding'))}")
+          PY
+          else
+            echo 'findings_total=0'
+          fi
+
+      - name: Safety boundary statement
+        shell: bash
+        run: |
+          cat <<'EOF'
+          This workflow intentionally performs only authorized low-rate public-surface checks.
+          ZAP uses baseline/passive scanning only. Nuclei is restricted to exposure/misconfiguration
+          templates and explicitly excludes CVE, DoS, fuzzing, intrusive, brute-force, headless,
+          and code-execution categories. No authentication, POST mutation, credential guessing,
+          or destructive testing is performed.
+          EOF
