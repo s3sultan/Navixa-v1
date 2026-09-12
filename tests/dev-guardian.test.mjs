@@ -8,16 +8,27 @@ import { buildRepositoryMap } from "../scripts/dev-guardian/repo-intelligence.mj
 import { detectStuck, evaluateBudget, evaluateScope, guardAgentRun } from "../scripts/dev-guardian/guards.mjs";
 import { planAgentRoute } from "../scripts/dev-guardian/router.mjs";
 
-test("scope guard accepts allowed files and blocks forbidden files", () => {
+test("scope guard accepts allowed files and blocks forbidden or unsafe files", () => {
   const result = evaluateScope({
-    files: ["scripts/dev-guardian/router.mjs", "private/client.key"],
-    allowed: ["scripts/dev-guardian/**", "private/**"],
+    files: [
+      "scripts/dev-guardian/router.mjs",
+      "private/client.key",
+      "client.key",
+      "../outside.ts",
+      "/etc/passwd",
+    ],
+    allowed: ["**"],
     forbidden: ["**/*.key"],
   });
 
   assert.equal(result.allowed, false);
   assert.deepEqual(result.accepted, ["scripts/dev-guardian/router.mjs"]);
-  assert.deepEqual(result.blocked, [{ file: "private/client.key", reason: "forbidden-scope" }]);
+  assert.deepEqual(result.blocked, [
+    { file: "private/client.key", reason: "forbidden-scope" },
+    { file: "client.key", reason: "forbidden-scope" },
+    { file: "../outside.ts", reason: "unsafe-path" },
+    { file: "/etc/passwd", reason: "unsafe-path" },
+  ]);
 });
 
 test("budget guard stops at configured step, token, cost, and wall limits", () => {
