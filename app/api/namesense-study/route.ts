@@ -6,8 +6,9 @@ import {
   type NameSenseDb,
 } from "../../../benchmarks/namesense/storage.ts";
 import {
-  nameSenseStudyPromptMatchesAssignment,
+  getNameSenseStudyPrompt,
   nextNameSenseStudyAssignment,
+  type NameSenseStudyAccent,
 } from "../../../benchmarks/namesense/study.ts";
 import { validateNameSenseBenchmarkTrial } from "../admin/namesense-benchmark/schema.ts";
 
@@ -16,7 +17,7 @@ type InviteRow = {
   token_hash: string;
   client_hash: string | null;
   speaker_id: string;
-  accent: string;
+  accent: NameSenseStudyAccent;
   max_trials: number;
   used_trials: number;
   expires_at: string;
@@ -117,6 +118,7 @@ export async function PUT(request: Request) {
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status, headers: { "Cache-Control": "no-store" } });
 
   const assignment = nextNameSenseStudyAssignment(resolved.invite.used_trials);
+  const prompt = getNameSenseStudyPrompt(resolved.invite.used_trials, resolved.invite.accent, assignment);
   return NextResponse.json({
     ok: true,
     accent: resolved.invite.accent,
@@ -126,6 +128,7 @@ export async function PUT(request: Request) {
     expiresAt: resolved.invite.expires_at,
     nextExpected: assignment.expected,
     nextNameId: assignment.nameId,
+    prompt,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -143,10 +146,11 @@ export async function POST(request: Request) {
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status, headers: { "Cache-Control": "no-store" } });
 
   const assignment = nextNameSenseStudyAssignment(resolved.invite.used_trials);
+  const prompt = getNameSenseStudyPrompt(resolved.invite.used_trials, resolved.invite.accent, assignment);
   const rawTrial = credentials.trial && typeof credentials.trial === "object" && !Array.isArray(credentials.trial)
     ? credentials.trial as Record<string, unknown>
     : null;
-  if (!rawTrial || !nameSenseStudyPromptMatchesAssignment(rawTrial.promptId, assignment)) {
+  if (!rawTrial || rawTrial.promptId !== prompt.id) {
     return NextResponse.json({ error: "الجملة لا تطابق الجولة الحالية؛ أعد تحميل الصفحة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
 
@@ -156,6 +160,8 @@ export async function POST(request: Request) {
     speakerId: resolved.invite.speaker_id,
     expected: assignment.expected,
     watchedNameId: assignment.nameId,
+    promptId: prompt.id,
+    latencyEligible: prompt.latencyEligible,
   };
   const parsed = validateNameSenseBenchmarkTrial(trialInput);
   if (!parsed.ok) {
@@ -174,12 +180,14 @@ export async function POST(request: Request) {
   const stored = await storeNameSenseBenchmarkTrial(database, parsed.trial);
   const usedTrials = resolved.invite.used_trials + 1;
   const next = nextNameSenseStudyAssignment(usedTrials);
+  const nextPrompt = getNameSenseStudyPrompt(usedTrials, resolved.invite.accent, next);
   if (!stored.ok) {
     return NextResponse.json({
       error: "تعذر حفظ هذه الجولة؛ تم تجاوزها حفاظًا على نزاهة عداد الدراسة",
       remainingTrials: Math.max(0, resolved.invite.max_trials - usedTrials),
       nextExpected: next.expected,
       nextNameId: next.nameId,
+      prompt: nextPrompt,
       refreshRequired: true,
     }, { status: stored.status, headers: { "Cache-Control": "no-store" } });
   }
@@ -190,6 +198,7 @@ export async function POST(request: Request) {
     remainingTrials: Math.max(0, resolved.invite.max_trials - usedTrials),
     nextExpected: next.expected,
     nextNameId: next.nameId,
+    prompt: nextPrompt,
     completed: usedTrials >= resolved.invite.max_trials,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
