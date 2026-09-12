@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: بناء المرحلة الأولى من `NAVIXA UI System` بنظام واجهة Responsive مملوك للمشروع وقابل للتطوير والاستبدال، دون اعتماد Runtime جديد على مكتبة واجهات خارجية.
 - الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. نجح آخر head في `Verify NAVIXA Pull Request` و`NAVIXA Pre-Launch Gate` بعد فصل فحص الـUI System وإصلاح انتظار Hydration/Drawer. المرحلة الحالية هي توليد أدلة بصرية narrow/medium/wide من نفس CI قبل أي دمج.
-- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`, `.github/workflows/pr-verify.yml`.
+- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`, `.github/workflows/ui-system-preview.yml`.
 
 ## آخر ما اكتمل
 
