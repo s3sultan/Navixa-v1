@@ -13,8 +13,11 @@ Last verified: 2026-09-12
 - Production domain: `https://navixasa.com`
 - Runtime/hosting: Cloudflare Worker
 - Worker name: `navixa`
-- Production workflow: `.github/workflows/deploy-navixa.yml`
-- Production deployments must originate from reviewed `master` history through the guarded GitHub Actions workflow.
+- Automatic production workflow: `.github/workflows/deploy-navixa-auto.yml`
+- Controlled/manual production workflow: `.github/workflows/deploy-navixa.yml`
+- Automatic production deployment accepts reviewed `master` commits with merged-pull-request provenance, then runs dependency audit, lint/tests/UI smoke/build, GitHub Actions audit, committed-secret scan, production D1 migrations, Worker deployment, production smoke tests, sync-route verification, and security-header verification.
+- The controlled/manual workflow is the guarded operator path for an explicitly selected reviewed `master` commit.
+- Production deployments must originate from reviewed `master` history through one of these guarded workflows in this repository.
 
 ## Legacy repository
 
@@ -33,8 +36,8 @@ Last verified: 2026-09-12
 Before changing, reviewing, or deploying NAVIXA, verify all of the following:
 
 1. Repository is `s3sultan/Navixa-v1`.
-2. Production code comes from `master`.
-3. Production deployment uses the Cloudflare workflow in this repository.
+2. Production code comes from reviewed `master` history.
+3. Production deployment uses the guarded Cloudflare workflows in this repository.
 4. `s3sultan/Navixa` and the legacy Vercel project are not used as production references.
 
-If any tool reports conflicting deployment information, this document and the guarded production workflow in `Navixa-v1` take precedence until the infrastructure is intentionally migrated and this document is updated in the same reviewed change.
+If any tool reports conflicting deployment information, this document and the guarded production workflows in `Navixa-v1` take precedence until the infrastructure is intentionally migrated and this document is updated in the same reviewed change.
