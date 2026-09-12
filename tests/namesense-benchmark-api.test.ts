@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { validateNameSenseBenchmarkTrial } from "../app/api/admin/namesense-benchmark/schema.ts";
 import {
@@ -97,4 +98,29 @@ test("study prompt must match the server-owned name and expected class", () => {
   assert.equal(nameSenseStudyPromptMatchesAssignment("negative-mohammed-2", negative), true);
   assert.equal(nameSenseStudyPromptMatchesAssignment("direct-question-mohammed", negative), false);
   assert.equal(nameSenseStudyPromptMatchesAssignment("negative-sultan-2", negative), false);
+});
+
+test("study invite token stays out of request URLs and browser address after activation", () => {
+  const adminInviteRoute = readFileSync(new URL("../app/api/admin/namesense-benchmark/invites/route.ts", import.meta.url), "utf8");
+  const publicRoute = readFileSync(new URL("../app/api/namesense-study/route.ts", import.meta.url), "utf8");
+  const participantPage = readFileSync(new URL("../app/namesense-study/page.tsx", import.meta.url), "utf8");
+
+  assert.match(adminInviteRoute, /invitePath:\s*`\/namesense-study#invite=\$\{token\}`/);
+  assert.doesNotMatch(adminInviteRoute, /namesense-study\?invite=/);
+  assert.match(publicRoute, /export async function PUT\(/);
+  assert.doesNotMatch(publicRoute, /searchParams\.get\(["']invite["']\)/);
+  assert.match(participantPage, /window\.location\.hash/);
+  assert.match(participantPage, /history\.replaceState/);
+  assert.doesNotMatch(participantPage, /\/api\/namesense-study\?invite=/);
+});
+
+test("study invite is browser-bound and failed storage never rolls the usage counter backward", () => {
+  const publicRoute = readFileSync(new URL("../app/api/namesense-study/route.ts", import.meta.url), "utf8");
+  const migration = readFileSync(new URL("../migrations/0053_namesense_study_invites.sql", import.meta.url), "utf8");
+
+  assert.match(migration, /client_hash TEXT/);
+  assert.match(publicRoute, /client_hash=\?/);
+  assert.match(publicRoute, /client_hash IS NULL/);
+  assert.match(publicRoute, /client_hash=\? AND revoked=0/);
+  assert.doesNotMatch(publicRoute, /used_trials=CASE WHEN used_trials>0 THEN used_trials-1/);
 });
