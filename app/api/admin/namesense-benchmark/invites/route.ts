@@ -138,7 +138,11 @@ export async function POST(request: Request) {
     for (const inviteId of attemptedIds) {
       try {
         await database.prepare("DELETE FROM navixa_namesense_study_invites WHERE invite_id=?").bind(inviteId).run();
-      } catch {}
+      } catch {
+        try {
+          await database.prepare("UPDATE navixa_namesense_study_invites SET revoked=1 WHERE invite_id=?").bind(inviteId).run();
+        } catch {}
+      }
     }
     return NextResponse.json({ error: "تعذر إنشاء الدفعة كاملة؛ لم تُعتمد دفعة جزئية" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
