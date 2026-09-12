@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ const APP_PORT = 4175;
 const DEBUG_PORT = 9334;
 const BASE_URL = `http://[::1]:${APP_PORT}`;
 const DEBUG_URL = `http://127.0.0.1:${DEBUG_PORT}`;
+const SCREENSHOT_DIR = join(process.cwd(), "artifacts", "ui-system");
 const vinextCli = join(process.cwd(), "node_modules", "vinext", "dist", "cli.js");
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
@@ -153,6 +154,17 @@ async function navigate(cdp, url) {
   assert.equal(ready, true, `لم تجهز صفحة ${url}`);
 }
 
+async function captureScreenshot(cdp, filename) {
+  await mkdir(SCREENSHOT_DIR, { recursive: true });
+  const shot = await cdp.call("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: false,
+    fromSurface: true,
+  });
+  assert.ok(shot?.data, `تعذر التقاط الصورة ${filename}`);
+  await writeFile(join(SCREENSHOT_DIR, filename), Buffer.from(shot.data, "base64"));
+}
+
 async function inspectViewport(cdp, { width, height, mobile }) {
   await cdp.call("Emulation.setDeviceMetricsOverride", {
     width,
@@ -250,6 +262,7 @@ async function main() {
     assert.notEqual(mobile.bottomNavDisplay, "none", "يجب إظهار Bottom Navigation على الجوال");
     assert.notEqual(mobile.menuDisplay, "none", "يجب إظهار زر قائمة الجوال");
     assert.ok(mobile.cards >= 5, "يجب أن تظهر بطاقات المعاينة الأساسية على الجوال");
+    await captureScreenshot(cdp, "mobile-390.png");
 
     const drawer = await openMobileDrawer(cdp);
     assert.equal(drawer.found, true, "يجب أن يفتح Drawer الجوال بعد اكتمال Hydration");
@@ -257,6 +270,7 @@ async function main() {
     assert.equal(drawer.modal, "true", "يجب أن يعلن Drawer أنه modal");
     assert.ok(drawer.width >= 380, `عرض Drawer غير متوقع: ${JSON.stringify(drawer)}`);
     assert.ok(Math.abs(drawer.bottomGap ?? 99) <= 1, `يجب أن يستقر Drawer عند أسفل الشاشة: ${JSON.stringify(drawer)}`);
+    await captureScreenshot(cdp, "mobile-drawer-390.png");
 
     await cdp.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
     await cdp.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
@@ -269,6 +283,7 @@ async function main() {
     assert.ok(tablet.sidebarWidth >= 70 && tablet.sidebarWidth <= 110, `عرض شريط التابلت غير متوقع: ${JSON.stringify(tablet)}`);
     assert.equal(tablet.bottomNavDisplay, "none", "يجب إخفاء Bottom Navigation على التابلت");
     assert.equal(tablet.menuDisplay, "none", "يجب إخفاء زر قائمة الجوال على التابلت");
+    await captureScreenshot(cdp, "tablet-820.png");
 
     const desktop = await inspectViewport(cdp, { width: 1440, height: 1000, mobile: false });
     assert.equal(desktop.overflow, false, `يوجد overflow أفقي على سطح المكتب: ${JSON.stringify(desktop)}`);
@@ -276,8 +291,16 @@ async function main() {
     assert.ok(desktop.sidebarWidth >= 240, `عرض Sidebar سطح المكتب غير متوقع: ${JSON.stringify(desktop)}`);
     assert.equal(desktop.bottomNavDisplay, "none", "يجب إخفاء Bottom Navigation على سطح المكتب");
     assert.equal(desktop.menuDisplay, "none", "يجب إخفاء زر قائمة الجوال على سطح المكتب");
+    await captureScreenshot(cdp, "desktop-1440.png");
 
-    console.log(JSON.stringify({ status: "passed", mobile, drawer, tablet, desktop }, null, 2));
+    console.log(JSON.stringify({
+      status: "passed",
+      screenshots: ["mobile-390.png", "mobile-drawer-390.png", "tablet-820.png", "desktop-1440.png"],
+      mobile,
+      drawer,
+      tablet,
+      desktop,
+    }, null, 2));
   } finally {
     cdp?.close();
     await stop(chrome, browserListenerPid);
