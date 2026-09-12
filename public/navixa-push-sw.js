@@ -3,10 +3,21 @@ const base64UrlToUint8Array=value=>{const padding="=".repeat((4-value.length%4)%
 self.addEventListener("install",()=>self.skipWaiting());
 self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));
 
+const safeActions=value=>{
+  if(!Array.isArray(value))return [];
+  const supported=typeof Notification!=="undefined"&&Number.isFinite(Notification.maxActions)?Math.max(0,Notification.maxActions):2;
+  return value.slice(0,supported).flatMap(item=>{
+    const action=typeof item?.action==="string"?item.action.trim():"";
+    const title=typeof item?.title==="string"?item.title.trim():"";
+    return /^[a-z0-9_-]{1,32}$/i.test(action)&&title?[{action,title:title.slice(0,24)}]:[];
+  });
+};
+
 self.addEventListener("push",event=>{
   if(!event.data)return;
   let data={};
   try{data=event.data.json()}catch{data={title:"NAVIXA",body:event.data.text()}}
+  const actions=safeActions(data.actions);
   const options={
     body:data.body||"لديك تنبيه جديد",
     icon:"/navixa-mark.webp",
@@ -15,19 +26,33 @@ self.addEventListener("push",event=>{
     renotify:false,
     requireInteraction:data.requireInteraction===true,
     silent:data.silent===true,
-    data:{...(data.data||{url:"/"}),kind:data.kind||"general",accentColor:data.accentColor||undefined},
+    data:{...(data.data||{url:"/"}),kind:data.kind||"general",priority:data.priority||"normal",accentColor:data.accentColor||undefined},
+    ...(actions.length?{actions}:{}),
   };
-  event.waitUntil(self.registration.showNotification(data.title||"NAVIXA",options));
+  event.waitUntil((async()=>{
+    try{
+      await self.registration.showNotification(data.title||"NAVIXA",options);
+    }catch(error){
+      if(!actions.length)throw error;
+      const fallbackOptions={...options};
+      delete fallbackOptions.actions;
+      await self.registration.showNotification(data.title||"NAVIXA",fallbackOptions);
+    }
+  })());
 });
 
 self.addEventListener("notificationclick",event=>{
   event.notification.close();
+  const selectedAction=typeof event.action==="string"?event.action:"";
+  if(selectedAction==="dismiss")return;
+  const actionUrls=event.notification.data?.actionUrls&&typeof event.notification.data.actionUrls==="object"?event.notification.data.actionUrls:{};
+  const requestedUrl=selectedAction&&typeof actionUrls[selectedAction]==="string"?actionUrls[selectedAction]:event.notification.data?.url||"/";
   let destination=self.location.origin+"/";
-  try{const target=new URL(event.notification.data?.url||"/",self.location.origin);if(target.origin===self.location.origin)destination=target.href}catch{}
+  try{const target=new URL(requestedUrl,self.location.origin);if(target.origin===self.location.origin)destination=target.href}catch{}
   event.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(async clients=>{
     const existing=clients.find(client=>new URL(client.url).origin===self.location.origin);
     if(existing){
-      existing.postMessage({type:"NAVIXA_PUSH_OPEN",kind:event.notification.data?.kind||"general",accentColor:event.notification.data?.accentColor});
+      existing.postMessage({type:"NAVIXA_PUSH_OPEN",kind:event.notification.data?.kind||"general",priority:event.notification.data?.priority||"normal",action:selectedAction||"open",accentColor:event.notification.data?.accentColor});
       try{if("navigate" in existing)await existing.navigate(destination)}catch{}
       return existing.focus();
     }
