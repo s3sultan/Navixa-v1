@@ -1,6 +1,6 @@
 # NAVIXA Security Validation
 
-هذه الطبقة تضيف فحوصًا أمنية دفاعية فوق بوابات NAVIXA الحالية، دون تغيير Runtime المنتج.
+هذه الطبقة تضيف فحوصًا أمنية دفاعية وتقوية محدودة منخفضة المخاطر فوق بوابات NAVIXA الحالية. أي تعديل Runtime ناتج عن finding يبقى على فرع معزول ولا يصل الإنتاج قبل بوابات التحقق والمراجعة.
 
 ## قبل الدمج
 
@@ -10,19 +10,28 @@
 - Trivy على المستودع والإعدادات والأسرار والاعتماديات.
 - SARIF إلى GitHub Code Scanning.
 - CycloneDX SBOM من Trivy.
-- Gate يفشل عند High/Critical في Trivy، وعند CodeQL security-severity >= 7.0.
-- `package-lock.json` هو قفل الاعتماديات الفعلي لأن CI والإنتاج يستخدمان `npm ci`. تمت إزالة `pnpm-lock.yaml` القديم بعد أن ثبت أنه لا يطابق `package.json` وكان يشير إلى إصدارات أقدم غير مستخدمة في الإنتاج.
+- Gate يمنع High/Critical في Trivy، ويمنع CodeQL runtime security-severity >= 7.0.
+- التقارير الكاملة لا تُختزل في نتيجة الـgate: كل finding يُراجع ويُسجّل في `security/ALERT_REGISTER.md` حتى لو كان Low أو Informational أو داخل أدوات التطوير/الاختبارات.
+- `package-lock.json` يبقى قفل الاعتماديات الفعلي لأن CI والإنتاج يستخدمان `npm ci`. لا تُحذف lockfiles الأخرى عرضًا ضمن مهمة الأمان؛ أي تنظيف اعتماديات له تغيير مستقل.
 
-## بعد نشر الإنتاج
+## الفحص الحي
 
-`security-live.yml` يعمل عند تغييرات منظومة الأمان في PR، وأسبوعيًا، ويدويًا. عند كل push إلى `master` ينتظر نجاح `Deploy NAVIXA Auto` لنفس SHA تحديدًا قبل بدء الفحص الحي:
+`security-live.yml` يعمل عند تغييرات منظومة الأمان في PR، وأسبوعيًا، ويدويًا. عند كل push إلى `master` ينتظر نجاح نشر الإنتاج لنفس SHA قبل اعتبار الفحص الحي دليلًا على الإصدار الجديد:
 
 - OWASP ZAP Baseline فقط، وهو passive baseline ولا يشغّل Active Scan.
 - Nuclei بفحص High/Critical منخفض المعدل، مع استبعاد `fuzz`, `dos`, `bruteforce`, `intrusive` وتعطيل Interactsh والقوالب غير الموقعة.
 - قوالب Nuclei الرسمية تُنزّل صراحة قبل الفحص ثم تُقرأ read-only أثناء التنفيذ.
-- ZAP ينتج HTML/JSON/Markdown.
+- ZAP ينتج HTML/JSON/Markdown ويعرض Medium/Low/Informational أيضًا؛ لا تُهمل لأنها لا تفشل الـjob.
 - Nuclei ينتج JSONL/SARIF.
 - التقارير تُرفع كـGitHub Actions artifacts لمدة 14 يومًا.
+
+## سياسة جميع التنبيهات
+
+- نجاح GitHub Action لا يعني وحده أن كل التنبيهات اختفت.
+- كل تنبيه يجب أن ينتهي إلى واحدة من ثلاث حالات فقط: `fixed` أو `accepted-temporarily` بسبب موثّق أو `informational/expected` بعد المراجعة.
+- لا يُقبل تنبيه جديد غير مسجل على أنه معروف تلقائيًا.
+- إصلاحات الإنتاج التي لا يستطيع PR live scan رؤيتها، مثل هيدرات static assets، تبقى `fixed-pending-deploy` حتى النشر وإعادة الفحص على SHA المنشور.
+- لا يتم تشديد CSP/COEP/COOP/CORP فقط لإرضاء الماسح إذا كان التغيير قد يكسر Google login أو الصوت أو CDN؛ يمر أولًا عبر staging واختبار توافق واضح.
 
 ## حدود الأمان
 
