@@ -54,7 +54,8 @@ jobs:
         run: node scripts/dev-guardian/guardian-task-runner.mjs
 
       - name: AI Tester via Gemini
-        if: inputs.dispatch_external == true && steps.plan.outputs.has_ai_tester == 'true'
+        id: ai_tester
+        if: ${{ inputs.dispatch_external == true && steps.plan.outputs.has_ai_tester == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -63,12 +64,15 @@ jobs:
           NAVIXA_ISSUE_NUMBER: ${{ inputs.issue_number }}
           NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
           NAVIXA_PLAN_FILE: ${{ runner.temp }}/navixa-dev-guardian-plan.json
+          NAVIXA_EVENT_LOG: ${{ runner.temp }}/navixa-dev-guardian-events.jsonl
+          NAVIXA_REVIEW_OUTPUT: ${{ runner.temp }}/navixa-ai-tester-result.json
           NAVIXA_REVIEW_PROVIDER: gemini
           NAVIXA_REVIEW_ROLE: ai-tester
         run: node scripts/dev-guardian/external-review-runner.mjs
 
       - name: Independent Reviewer via Manus
-        if: inputs.dispatch_external == true && steps.plan.outputs.has_independent_reviewer == 'true'
+        id: independent_reviewer
+        if: ${{ always() && inputs.dispatch_external == true && steps.plan.conclusion == 'success' && steps.plan.outputs.has_independent_reviewer == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MANUS_API_KEY: ${{ secrets.MANUS_API_KEY }}
@@ -76,10 +80,25 @@ jobs:
           NAVIXA_ISSUE_NUMBER: ${{ inputs.issue_number }}
           NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
           NAVIXA_PLAN_FILE: ${{ runner.temp }}/navixa-dev-guardian-plan.json
+          NAVIXA_EVENT_LOG: ${{ runner.temp }}/navixa-dev-guardian-events.jsonl
+          NAVIXA_REVIEW_OUTPUT: ${{ runner.temp }}/navixa-independent-review-result.json
           NAVIXA_REVIEW_PROVIDER: manus
           NAVIXA_REVIEW_ROLE: independent-reviewer
         run: node scripts/dev-guardian/external-review-runner.mjs
 
+      - name: Aggregate guarded evidence
+        if: ${{ always() && inputs.dispatch_external == true && steps.plan.conclusion == 'success' }}
+        env:
+          NAVIXA_PLAN_FILE: ${{ runner.temp }}/navixa-dev-guardian-plan.json
+          NAVIXA_EVENT_LOG: ${{ runner.temp }}/navixa-dev-guardian-events.jsonl
+          NAVIXA_AI_TESTER_RESULT: ${{ runner.temp }}/navixa-ai-tester-result.json
+          NAVIXA_REVIEWER_RESULT: ${{ runner.temp }}/navixa-independent-review-result.json
+          NAVIXA_EVIDENCE_OUTPUT: ${{ runner.temp }}/navixa-dev-guardian-evidence.json
+          NAVIXA_PLAN_STEP_STATUS: ${{ steps.plan.conclusion }}
+          NAVIXA_AI_TESTER_STEP_STATUS: ${{ steps.ai_tester.conclusion }}
+          NAVIXA_REVIEWER_STEP_STATUS: ${{ steps.independent_reviewer.conclusion }}
+        run: node scripts/dev-guardian/evidence-aggregator.mjs
+
       - name: External dispatch remains opt-in
-        if: inputs.dispatch_external != true
+        if: ${{ inputs.dispatch_external != true }}
         run: echo "Plan completed. External AI calls were not requested."
