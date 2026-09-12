@@ -27,6 +27,7 @@ type StudySession = {
   expiresAt: string;
   nextExpected: Expected;
   nextNameId: NameId;
+  prompt: Prompt;
 };
 
 type BenchmarkProtocol = {
@@ -58,34 +59,8 @@ const NAMES: Record<NameId, { ar: string; en: string }> = {
   alharbi: { ar: "الحربي", en: "Alharbi" },
 };
 
-const POSITIVE_TEMPLATES = [
-  { id: "name-only", ar: "{name}", en: "{name}", latencyEligible: true },
-  { id: "direct-question", ar: "يا {name} تسمعني؟", en: "{name}, can you hear me?", latencyEligible: false },
-  { id: "classroom-answer", ar: "{name} جاوب على السؤال لو سمحت", en: "{name}, answer the question please", latencyEligible: false },
-  { id: "mid-sentence", ar: "السؤال الجاي عند {name} وبعده نكمل", en: "The next question is for {name}, then we continue", latencyEligible: false },
-  { id: "name-final", ar: "نحتاج إجابتك الآن يا {name}", en: "We need your answer now, {name}", latencyEligible: true },
-  { id: "code-switch", ar: "يا {latinName} are you with us?", en: "{latinName} جاوب لو سمحت", latencyEligible: false },
-  { id: "repeat-name", ar: "{name}، {name}، تسمعني؟", en: "{name}, {name}, can you hear me?", latencyEligible: false },
-] as const;
-
-const NEGATIVES: Record<NameId, { ar: string[]; en: string[] }> = {
-  sultan: {
-    ar: ["يا سلمان جاوب على السؤال", "سليم موجود معنا؟", "نكمل السؤال التالي بدون أسماء"],
-    en: ["Please ask Salman now", "Please ask Salim now", "Please ask Zoltan now", "Please ask Shelton now", "Please ask Sullivan now", "The sultanate announced a change"],
-  },
-  mohammed: {
-    ar: ["يا محمود جاوب على السؤال", "حمد موجود معنا؟", "نكمل السؤال التالي بدون أسماء"],
-    en: ["Please ask Mahmoud to answer", "Please ask Hamad to answer", "Let's continue with the next slide"],
-  },
-  alharbi: {
-    ar: ["الحارثي موجود؟", "نحتاج إجابة الطالب التالي الآن", "نكمل السؤال التالي بدون أسماء"],
-    en: ["Next is Al Hardy", "Please ask Al Harithy now", "Let's continue with the next slide"],
-  },
-};
-
 const accentLanguage = (accent: Accent): NavixaVoiceLanguage => accent === "ar-GULF" ? "ar-SA" : accent as NavixaVoiceLanguage;
 const defaultDeviceClass = (): DeviceClass => typeof navigator !== "undefined" && /Mobile|Android|iP(?:hone|ad|od)/.test(navigator.userAgent) ? "phone" : "laptop-built-in";
-const nextIndex = (length: number) => Math.floor(Math.random() * Math.max(1, length));
 const randomHex = () => {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -100,23 +75,6 @@ const browserClass = (): BrowserClass | null => {
   if (!/Mobile|Android|iP(?:hone|ad|od)/.test(ua) && /(?:Chrome|Chromium|Edg)\//.test(ua)) return "desktop-chromium";
   return null;
 };
-
-function buildPrompt(accent: Accent, nameId: NameId, expected: Expected): Prompt {
-  const arabic = accent.startsWith("ar-");
-  const name = arabic ? NAMES[nameId].ar : NAMES[nameId].en;
-  if (expected === "hit") {
-    const item = POSITIVE_TEMPLATES[nextIndex(POSITIVE_TEMPLATES.length)];
-    const template = arabic ? item.ar : item.en;
-    return {
-      id: `${item.id}-${nameId}`,
-      text: template.replaceAll("{name}", name).replaceAll("{latinName}", NAMES[nameId].en),
-      latencyEligible: item.latencyEligible,
-    };
-  }
-  const candidates = arabic ? NEGATIVES[nameId].ar : NEGATIVES[nameId].en;
-  const index = nextIndex(candidates.length);
-  return { id: `negative-${nameId}-${index + 1}`, text: candidates[index], latencyEligible: false };
-}
 
 const flatten = (chunks: Float32Array[]) => {
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -148,7 +106,6 @@ export default function NameSenseStudyPage() {
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("جاهز");
   const [lastResult, setLastResult] = useState("");
-  const [prompt, setPrompt] = useState<Prompt | null>(null);
   const mounted = useRef(true);
   const detectedBrowser = useMemo(() => browserClass(), []);
 
@@ -198,20 +155,14 @@ export default function NameSenseStudyPage() {
     return () => { mounted.current = false; };
   }, [loadSession]);
 
-  useEffect(() => {
-    if (!running && session && session.remainingTrials > 0) {
-      setPrompt(buildPrompt(session.accent, session.nextNameId, session.nextExpected));
-    }
-  }, [running, session]);
-
   const runTrial = async () => {
-    if (running || !session || !prompt || !invite || !clientNonce) return;
+    if (running || !session || !invite || !clientNonce) return;
     if (!consent) { setStatus("أكد موافقتك أولًا"); return; }
     if (!detectedBrowser) { setStatus("هذا المتصفح خارج مجموعة القياس الحالية"); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setStatus("الميكروفون غير مدعوم في هذا المتصفح"); return; }
 
     const trialSession = session;
-    const trialPrompt = prompt;
+    const trialPrompt = trialSession.prompt;
     const watchedTerm = trialSession.accent.startsWith("ar-") ? NAMES[trialSession.nextNameId].ar : NAMES[trialSession.nextNameId].en;
 
     setRunning(true); setLastResult(""); setStatus("اقرأ الجملة الآن بصوت طبيعي…");
@@ -258,7 +209,7 @@ export default function NameSenseStudyPage() {
           body: JSON.stringify({ invite, clientNonce, trial: record }),
         });
         const data = await response.json().catch(() => ({})) as {
-          error?: string; remainingTrials?: number; nextExpected?: Expected; nextNameId?: NameId; completed?: boolean; refreshRequired?: boolean;
+          error?: string; remainingTrials?: number; nextExpected?: Expected; nextNameId?: NameId; prompt?: Prompt; completed?: boolean; refreshRequired?: boolean;
         };
         if (!response.ok) {
           if (data.refreshRequired) void loadSession(invite, clientNonce);
@@ -271,6 +222,7 @@ export default function NameSenseStudyPage() {
             remainingTrials,
             nextExpected: data.nextExpected || current.nextExpected,
             nextNameId: data.nextNameId || current.nextNameId,
+            prompt: data.prompt || current.prompt,
           } : current);
           setLastResult(detectedAt !== null ? "تم تسجيل نتيجة الالتقاط" : "تم تسجيل عدم الالتقاط");
           setStatus(data.completed ? "اكتملت مشاركتك. شكرًا لك." : "حُفظت النتيجة فقط، وتم التخلص من الصوت الخام");
@@ -369,8 +321,8 @@ export default function NameSenseStudyPage() {
         <section className="study-card study-trial">
           <span className="study-kicker">الجولة التالية</span>
           <h2>اقرأ الجملة كما تنطقها عادة</h2>
-          <div className="study-prompt" aria-live="polite">{prompt?.text || "…"}</div>
-          <button type="button" className="study-primary" disabled={running || !consent || !detectedBrowser || !prompt} onClick={() => void runTrial()}>{running ? "يستمع الآن…" : "ابدأ واستعد للقراءة"}</button>
+          <div className="study-prompt" aria-live="polite">{session.prompt.text}</div>
+          <button type="button" className="study-primary" disabled={running || !consent || !detectedBrowser} onClick={() => void runTrial()}>{running ? "يستمع الآن…" : "ابدأ واستعد للقراءة"}</button>
           <div className="study-status" aria-live="polite"><b>{status}</b>{lastResult && <span>{lastResult}</span>}</div>
         </section>
       </>}
