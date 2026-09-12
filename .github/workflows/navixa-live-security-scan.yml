@@ -104,14 +104,22 @@ jobs:
           set -euo pipefail
           work="$RUNNER_TEMP/navixa-security"
           out="$work/nuclei.jsonl"
+          templates="$work/nuclei-templates"
+
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/projectdiscovery/nuclei-templates.git "$templates"
+          git -C "$templates" sparse-checkout set http/exposures http/misconfiguration
 
           docker pull projectdiscovery/nuclei:latest
-          docker run --rm projectdiscovery/nuclei:latest \
+          docker run --rm \
+            -v "$templates:/templates:ro" \
+            projectdiscovery/nuclei:latest \
             -u https://navixasa.com \
             -silent \
             -jsonl \
             -disable-update-check \
-            -tags misconfig,exposure \
+            -t /templates/http/exposures \
+            -t /templates/http/misconfiguration \
             -severity medium,high,critical \
             -exclude-tags cve,dos,fuzz,intrusive,bruteforce,headless,code \
             -rate-limit 8 \
@@ -153,8 +161,8 @@ jobs:
         run: |
           cat <<'EOF'
           This workflow intentionally performs only authorized low-rate public-surface checks.
-          ZAP uses baseline/passive scanning only. Nuclei is restricted to medium/high/critical
-          exposure and misconfiguration templates and explicitly excludes CVE, DoS, fuzzing,
-          intrusive, brute-force, headless, and code-execution categories. No authentication,
-          POST mutation, credential guessing, or destructive testing is performed.
+          ZAP uses baseline/passive scanning only. Nuclei is restricted to official medium/high/critical
+          exposure and misconfiguration templates and explicitly excludes CVE, DoS, fuzzing, intrusive,
+          brute-force, headless, and code-execution categories. No authentication, POST mutation,
+          credential guessing, or destructive testing is performed.
           EOF
