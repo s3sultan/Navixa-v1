@@ -122,7 +122,7 @@ export default function NameSenseStudyInvitesPage() {
   const recruitment = useMemo(() => ACCENTS.map((item) => {
     const cohort = invites.filter((invite) => invite.accent === item.id && !invite.revoked);
     const started = cohort.filter((invite) => invite.used_trials > 0).length;
-    const completed = cohort.filter((invite) => invite.used_trials >= invite.max_trials).length;
+    const completed = cohort.filter((invite) => invite.max_trials >= 40 && invite.used_trials >= 40).length;
     return { ...item, created: cohort.length, started, completed };
   }), [invites]);
   const completedTotal = recruitment.reduce((sum, item) => sum + Math.min(item.completed, TARGET_SPEAKERS_PER_ACCENT), 0);
