@@ -1,0 +1,45 @@
+name: Ops Inspect NAVIXA Mail DNS
+
+on:
+  push:
+    branches:
+      - ops/fix-resend-mx-20260912
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-mail-dns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect Cloudflare zone and root MX
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
+
+          zone_json=$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/zones?name=navixasa.com")
+          printf '%s' "$zone_json" | jq -e '.success == true' >/dev/null
+          zone_id=$(printf '%s' "$zone_json" | jq -r '.result[0].id // empty')
+          test -n "$zone_id" || { echo "Zone navixasa.com was not found or token cannot access it"; exit 1; }
+          echo "Zone navixasa.com is accessible."
+
+          mx_json=$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records?type=MX&name=navixasa.com&per_page=100")
+          printf '%s' "$mx_json" | jq -e '.success == true' >/dev/null
+          count=$(printf '%s' "$mx_json" | jq '.result | length')
+          echo "ROOT_MX_COUNT=${count}"
+          if [ "$count" -eq 0 ]; then
+            echo "No root MX records currently exist."
+          else
+            printf '%s' "$mx_json" | jq -r '.result[] | "MX id=\(.id) name=\(.name) content=\(.content) priority=\(.priority) ttl=\(.ttl)"'
+          fi
