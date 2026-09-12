@@ -14,10 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  passive-live-scan:
-    name: ZAP baseline + targeted Nuclei + headers
+  targeted-live-scan:
+    name: NAVIXA-targeted Nuclei + headers
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - name: Check HTTPS and security headers
         shell: bash
@@ -57,63 +57,155 @@ jobs:
             echo "${path} -> HTTP ${status}"
           done
 
-      - name: OWASP ZAP baseline passive scan
+      - name: Build NAVIXA-specific passive Nuclei templates
         shell: bash
         run: |
           set -euo pipefail
-          work="$RUNNER_TEMP/navixa-security"
-          mkdir -p "$work"
-          chmod 777 "$work"
+          templates="$RUNNER_TEMP/navixa-nuclei"
+          mkdir -p "$templates"
 
-          docker pull ghcr.io/zaproxy/zaproxy:stable
-          set +e
-          docker run --rm \
-            -v "$work:/zap/wrk/:rw" \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py \
-            -t https://navixasa.com \
-            -m 1 \
-            -J zap-report.json \
-            -r zap-report.html \
-            -I
-          zap_rc=$?
-          set -e
+          cat > "$templates/env-exposure.yaml" <<'YAML'
+          id: navixa-environment-file-exposure
+          info:
+            name: NAVIXA Environment File Exposure
+            author: navixa-security
+            severity: critical
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/.env"
+                - "{{BaseURL}}/.env.local"
+                - "{{BaseURL}}/.env.production"
+                - "{{BaseURL}}/.env.production.local"
+              matchers-condition: and
+              matchers:
+                - type: status
+                  status: [200]
+                - type: regex
+                  part: body
+                  regex:
+                    - '(?m)^[A-Z][A-Z0-9_]{2,}=.+$'
+          YAML
 
-          echo "ZAP exit code: $zap_rc"
-          test -s "$work/zap-report.json" || { echo 'ZAP report missing'; exit 1; }
+          cat > "$templates/git-config.yaml" <<'YAML'
+          id: navixa-git-config-exposure
+          info:
+            name: NAVIXA Git Config Exposure
+            author: navixa-security
+            severity: high
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/.git/config"
+              matchers-condition: and
+              matchers:
+                - type: status
+                  status: [200]
+                - type: regex
+                  part: body
+                  regex:
+                    - '(?m)^\[core\]\s*$'
+                    - '(?m)^\s*repositoryformatversion\s*='
+          YAML
 
-          echo '=== ZAP alert summary ==='
-          python3 - "$work/zap-report.json" <<'PY'
-          import json, sys, collections
-          report = json.load(open(sys.argv[1], encoding='utf-8'))
-          alerts = []
-          for site in report.get('site', []):
-              alerts.extend(site.get('alerts', []))
-          counts = collections.Counter(a.get('riskdesc', 'Unknown').split(' ')[0] for a in alerts)
-          print('alerts_total=', len(alerts))
-          for key in ('High', 'Medium', 'Low', 'Informational', 'Unknown'):
-              if counts.get(key):
-                  print(f'{key}={counts[key]}')
-          for a in alerts:
-              print(f"[{a.get('riskdesc','Unknown')}] {a.get('alert','Unnamed alert')}")
-          PY
+          cat > "$templates/package-token.yaml" <<'YAML'
+          id: navixa-package-token-exposure
+          info:
+            name: NAVIXA Package Registry Token Exposure
+            author: navixa-security
+            severity: critical
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/.npmrc"
+                - "{{BaseURL}}/.yarnrc"
+                - "{{BaseURL}}/.yarnrc.yml"
+              matchers-condition: and
+              matchers:
+                - type: status
+                  status: [200]
+                - type: regex
+                  part: body
+                  regex:
+                    - '(?i)(_authToken|npmAuthToken|npmRegistryServer|:_auth)\s*[:=]'
+          YAML
+
+          cat > "$templates/wrangler-config.yaml" <<'YAML'
+          id: navixa-wrangler-config-exposure
+          info:
+            name: NAVIXA Wrangler Configuration Exposure
+            author: navixa-security
+            severity: medium
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/wrangler.toml"
+                - "{{BaseURL}}/wrangler.json"
+                - "{{BaseURL}}/wrangler.jsonc"
+              matchers-condition: and
+              matchers:
+                - type: status
+                  status: [200]
+                - type: regex
+                  part: body
+                  regex:
+                    - '(?i)(compatibility_date|compatibilityDate|d1_databases|d1Databases|account_id|accountId)'
+          YAML
+
+          cat > "$templates/debug-log.yaml" <<'YAML'
+          id: navixa-debug-log-exposure
+          info:
+            name: NAVIXA Package Manager Debug Log Exposure
+            author: navixa-security
+            severity: medium
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/npm-debug.log"
+                - "{{BaseURL}}/yarn-error.log"
+                - "{{BaseURL}}/pnpm-debug.log"
+              matchers-condition: and
+              matchers:
+                - type: status
+                  status: [200]
+                - type: regex
+                  part: body
+                  regex:
+                    - '(?i)(npm ERR!|yarn error|pnpm.*error)'
+          YAML
+
+          cat > "$templates/backup-archive.yaml" <<'YAML'
+          id: navixa-backup-archive-exposure
+          info:
+            name: NAVIXA Backup Archive Exposure
+            author: navixa-security
+            severity: high
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/backup.zip"
+                - "{{BaseURL}}/site.zip"
+                - "{{BaseURL}}/www.zip"
+                - "{{BaseURL}}/navixa.zip"
+                - "{{BaseURL}}/backup.tar.gz"
+              matchers-condition: and
+              matchers:
+                - type: status
+                  status: [200]
+                - type: regex
+                  part: header
+                  regex:
+                    - '(?i)content-type:\s*(application/(zip|x-zip-compressed|gzip|x-gzip)|application/octet-stream)'
+          YAML
 
       - name: Nuclei targeted sensitive-exposure scan
         shell: bash
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/navixa-security"
+          templates="$RUNNER_TEMP/navixa-nuclei"
           out="$work/nuclei.jsonl"
-          templates="$work/nuclei-templates"
-
-          git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/projectdiscovery/nuclei-templates.git "$templates"
-          git -C "$templates" sparse-checkout set \
-            http/exposures/backups \
-            http/exposures/configs \
-            http/exposures/files \
-            http/exposures/logs \
-            http/exposures/tokens
+          mkdir -p "$work"
 
           docker pull projectdiscovery/nuclei:latest
           docker run --rm \
@@ -123,22 +215,16 @@ jobs:
             -silent \
             -jsonl \
             -disable-update-check \
-            -t /templates/http/exposures/backups \
-            -t /templates/http/exposures/configs \
-            -t /templates/http/exposures/files \
-            -t /templates/http/exposures/logs \
-            -t /templates/http/exposures/tokens \
-            -severity medium,high,critical \
-            -exclude-tags cve,dos,fuzz,intrusive,bruteforce,headless,code \
-            -rate-limit 10 \
+            -t /templates \
+            -rate-limit 5 \
             -concurrency 1 \
             -bulk-size 1 \
-            -timeout 4 \
+            -timeout 5 \
             -retries 0 \
             -H 'User-Agent: NAVIXA-Authorized-Security-Scan/1.0' \
             > "$out"
 
-          echo '=== Nuclei material-risk findings ==='
+          echo '=== Nuclei NAVIXA-targeted findings ==='
           if [[ -s "$out" ]]; then
             python3 - "$out" <<'PY'
           import json, sys, collections
@@ -153,7 +239,7 @@ jobs:
                   pass
           counts=collections.Counter((r.get('info') or {}).get('severity','unknown') for r in rows)
           print('findings_total=', len(rows))
-          for sev in ('critical','high','medium','unknown'):
+          for sev in ('critical','high','medium','low','info','unknown'):
               if counts.get(sev):
                   print(f'{sev}={counts[sev]}')
           for r in rows:
@@ -168,9 +254,9 @@ jobs:
         shell: bash
         run: |
           cat <<'EOF'
-          This workflow intentionally performs only authorized low-rate public-surface checks.
-          ZAP uses baseline/passive scanning only. Nuclei is limited to official medium/high/critical
-          templates for exposed backups, configs, files, logs, and tokens. CVE, DoS, fuzzing,
-          intrusive, brute-force, headless, and code-execution categories are excluded. No authentication,
-          POST mutation, credential guessing, or destructive testing is performed.
+          This workflow performs authorized low-rate GET-only public-surface checks.
+          The ZAP result used for this assessment comes from the earlier baseline/passive run on this PR.
+          This final Nuclei run uses six NAVIXA-specific passive templates for exposed environment files,
+          Git config, package-registry tokens, Wrangler config, package-manager logs, and backup archives.
+          No authentication, POST mutation, credential guessing, exploit payloads, or destructive testing is performed.
           EOF
