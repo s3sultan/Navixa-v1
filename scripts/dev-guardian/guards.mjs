@@ -1,8 +1,20 @@
 import path from "node:path";
 
+function rawPath(value) {
+  return String(value || "").replaceAll("\\", "/");
+}
+
 function normalizePath(value) {
-  const normalized = String(value || "").replaceAll("\\", "/").replace(/^\.\//, "");
+  const normalized = rawPath(value).replace(/^\.\//, "");
   return path.posix.normalize(normalized).replace(/^\.\//, "");
+}
+
+function isUnsafeRepoPath(value) {
+  const raw = rawPath(value).trim();
+  if (!raw) return true;
+  if (raw.startsWith("/") || /^[A-Za-z]:\//.test(raw)) return true;
+  const normalized = normalizePath(raw);
+  return normalized === ".." || normalized.startsWith("../");
 }
 
 function escapeRegex(value) {
@@ -16,8 +28,13 @@ function globToRegex(glob) {
     const character = normalized[index];
     if (character === "*") {
       if (normalized[index + 1] === "*") {
-        pattern += ".*";
-        index += 1;
+        if (normalized[index + 2] === "/") {
+          pattern += "(?:.*/)?";
+          index += 2;
+        } else {
+          pattern += ".*";
+          index += 1;
+        }
       } else {
         pattern += "[^/]*";
       }
@@ -34,11 +51,16 @@ function matchesAny(filePath, patterns) {
 }
 
 export function evaluateScope({ files = [], allowed = ["**"], forbidden = [] } = {}) {
-  const normalizedFiles = [...new Set(files.map(normalizePath).filter(Boolean))];
+  const uniqueFiles = [...new Set(files.map((value) => String(value || "")).filter(Boolean))];
   const blocked = [];
   const accepted = [];
 
-  for (const file of normalizedFiles) {
+  for (const originalFile of uniqueFiles) {
+    if (isUnsafeRepoPath(originalFile)) {
+      blocked.push({ file: rawPath(originalFile), reason: "unsafe-path" });
+      continue;
+    }
+    const file = normalizePath(originalFile);
     if (forbidden.length && matchesAny(file, forbidden)) {
       blocked.push({ file, reason: "forbidden-scope" });
       continue;
