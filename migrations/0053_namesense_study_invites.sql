@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS navixa_namesense_study_invites (
   invite_id TEXT PRIMARY KEY,
   token_hash TEXT NOT NULL UNIQUE,
+  client_hash TEXT,
   speaker_id TEXT NOT NULL UNIQUE,
   accent TEXT NOT NULL,
   max_trials INTEGER NOT NULL CHECK(max_trials BETWEEN 1 AND 100),
