@@ -1,0 +1,107 @@
+name: PR192 Manual Gate
+
+on:
+  push:
+    branches:
+      - ops/pr192-manual-gate-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build, tests, security baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 5e833fb205d66893f7e1449664e8a072c2210d35
+          persist-credentials: false
+
+      - name: Assert exact target SHA
+        run: test "$(git rev-parse HEAD)" = "5e833fb205d66893f7e1449664e8a072c2210d35"
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.13.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Report development and build-tool vulnerabilities
+        continue-on-error: true
+        run: |
+          npm audit --audit-level=high || {
+            echo "::warning::Development/build-tool vulnerabilities remain; production dependencies passed the blocking audit."
+          }
+
+      - name: Lint, tests, UI smoke and production build
+        run: npm run test:verify
+
+  actions-security:
+    name: GitHub Actions security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      ZIZMOR_VERSION: '1.30.0'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 5e833fb205d66893f7e1449664e8a072c2210d35
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Audit GitHub Actions with zizmor
+        run: uvx "zizmor@${ZIZMOR_VERSION}" --strict-collection --min-severity=medium --format=github .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  secret-scan:
+    name: Secret exposure guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 5e833fb205d66893f7e1449664e8a072c2210d35
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan repository for committed secrets
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  gate:
+    name: Release gate
+    if: always()
+    needs: [verify, actions-security, secret-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce blocking checks
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          ACTIONS_SECURITY_RESULT: ${{ needs.actions-security.result }}
+          SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
+        run: |
+          echo "Build/tests/security baseline: $VERIFY_RESULT"
+          echo "GitHub Actions security: $ACTIONS_SECURITY_RESULT"
+          echo "Secret scan: $SECRET_SCAN_RESULT"
+          if [ "$VERIFY_RESULT" != "success" ] || [ "$ACTIONS_SECURITY_RESULT" != "success" ] || [ "$SECRET_SCAN_RESULT" != "success" ]; then
+            echo "PR192 Manual Gate: BLOCK"
+            exit 1
+          fi
+          echo "PR192 Manual Gate: PASS"
