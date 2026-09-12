@@ -31,6 +31,12 @@ async function allowed(request: Request, mutation = false) {
 
 async function ensureSchema(database: Db) {
   await database.prepare(`
+    CREATE TABLE IF NOT EXISTS navixa_namesense_benchmark_speakers (
+      speaker_id TEXT PRIMARY KEY,
+      accent TEXT NOT NULL
+    )
+  `).run();
+  await database.prepare(`
     CREATE TABLE IF NOT EXISTS navixa_namesense_benchmark_trials (
       trial_id TEXT PRIMARY KEY,
       speaker_id TEXT NOT NULL,
@@ -56,7 +62,8 @@ async function ensureSchema(database: Db) {
       raw_audio_retained INTEGER NOT NULL,
       match_method TEXT,
       match_score REAL,
-      captured_at TEXT NOT NULL
+      captured_at TEXT NOT NULL,
+      FOREIGN KEY (speaker_id) REFERENCES navixa_namesense_benchmark_speakers(speaker_id)
     )
   `).run();
 }
@@ -114,11 +121,22 @@ export async function POST(request: Request) {
   await ensureSchema(database);
 
   const trial = parsed.trial;
+  try {
+    await database.prepare(
+      "INSERT OR IGNORE INTO navixa_namesense_benchmark_speakers (speaker_id, accent) VALUES (?, ?)",
+    ).bind(trial.speakerId, trial.accent).run();
+  } catch {
+    return NextResponse.json(
+      { error: "تعذر حجز مجموعة المتحدث" },
+      { status: 409, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const prior = await database.prepare(
-    "SELECT accent FROM navixa_namesense_benchmark_trials WHERE speaker_id=? LIMIT 1",
+    "SELECT accent FROM navixa_namesense_benchmark_speakers WHERE speaker_id=? LIMIT 1",
   ).bind(trial.speakerId).all<{ accent: string }>();
   const existingAccent = prior.results[0]?.accent;
-  if (existingAccent && existingAccent !== trial.accent) {
+  if (!existingAccent || existingAccent !== trial.accent) {
     return NextResponse.json(
       { error: "معرّف المتحدث مستخدم مسبقًا في مجموعة لهجة أخرى" },
       { status: 409, headers: { "Cache-Control": "no-store" } },
