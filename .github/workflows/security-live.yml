@@ -83,11 +83,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Prepare report directory
-        run: mkdir -p security/reports/nuclei
+      - name: Prepare report and template directories
+        run: |
+          mkdir -p security/reports/nuclei security/nuclei-templates
+          chmod 777 security/reports/nuclei security/nuclei-templates
 
       - name: Pull pinned Nuclei release image
         run: docker pull projectdiscovery/nuclei:v3.11.1
+
+      - name: Fetch official signed Nuclei templates
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/security/nuclei-templates:/templates" \
+            projectdiscovery/nuclei:v3.11.1 \
+            -ut \
+            -ud /templates
 
       - name: Run controlled Nuclei validation
         id: nuclei_scan
@@ -97,8 +108,10 @@ jobs:
           set -euo pipefail
           docker run --rm \
             -v "$GITHUB_WORKSPACE/security/reports/nuclei:/out" \
+            -v "$GITHUB_WORKSPACE/security/nuclei-templates:/templates:ro" \
             projectdiscovery/nuclei:v3.11.1 \
             -u https://navixasa.com \
+            -t /templates \
             -severity high,critical \
             -etags fuzz,dos,bruteforce,intrusive \
             -dut \
