@@ -11,6 +11,8 @@ const [worker, route, index, preferences, controls, today] = await Promise.all([
 ]);
 assert.match(worker, /UNIQUE\(user_id,title,due_at\)/);
 assert.match(worker, /maxAttempts=3/);
+assert.match(worker, /scheduleFreshness=10\*60_000/);
+assert.match(worker, /push_status='skipped'/);
 assert.match(worker, /email_enabled/);
 assert.match(worker, /telegram_enabled/);
 assert.match(worker, /push_enabled/);
