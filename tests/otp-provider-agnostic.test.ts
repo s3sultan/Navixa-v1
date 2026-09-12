@@ -22,6 +22,12 @@ test("OTP accepts valid email providers without a Gmail-only restriction", async
   assert.match(requestRoute, /providerReady/);
   assert.match(requestRoute, /!settings\.emailOtpEnabled/);
   assert.doesNotMatch(requestRoute, /email_otp_enabled['"],\s*['"]true/i);
+  assert.match(requestRoute, /crypto\.getRandomValues\(values\)/);
+  assert.match(requestRoute, /const high = value >> 4/);
+  assert.match(requestRoute, /const low = value & 0x0f/);
+  assert.match(requestRoute, /high <= 9/);
+  assert.match(requestRoute, /low <= 9/);
+  assert.doesNotMatch(requestRoute, /%\s*1_000_000/);
   assert.match(accountPage, /iCloud/);
   assert.match(accountPage, /Outlook/);
   assert.match(accountPage, /حساب Google مجرد خيار إضافي وليس شرطًا/);
