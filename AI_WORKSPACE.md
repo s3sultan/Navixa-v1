@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: تحويل جامع NameSense البشري من أداة إدارة داخلية إلى مسار مشاركة بشرية محكوم وآمن باستخدام دعوات محدودة دون فتح صلاحيات الإدارة
 - الحالة: قيد التنفيذ على فرع معزول بعد نجاح ونشر PR #184
-- الملفات المحجوزة: `app/admin/namesense-benchmark/page.tsx`, `app/admin/namesense-benchmark/collector.css`, `app/namesense-study/page.tsx`, `app/namesense-study/study.css`, `app/api/namesense-study/route.ts`, `app/api/admin/namesense-benchmark/invites/route.ts`, `app/api/admin/namesense-benchmark/schema.ts`, `migrations/0053_namesense_study_invites.sql`, `tests/namesense-study.test.mjs`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الملفات المحجوزة: `app/admin/namesense-benchmark/page.tsx`, `app/admin/namesense-benchmark/collector.css`, `app/admin/namesense-benchmark/invites/page.tsx`, `app/admin/namesense-benchmark/invites/invites.css`, `app/api/admin/namesense-benchmark/route.ts`, `app/api/admin/namesense-benchmark/invites/route.ts`, `app/api/admin/namesense-benchmark/schema.ts`, `app/api/namesense-study/route.ts`, `app/namesense-study/page.tsx`, `app/namesense-study/study.css`, `benchmarks/namesense/storage.ts`, `migrations/0053_namesense_study_invites.sql`, `tests/namesense-study.test.mjs`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
@@ -26,4 +26,5 @@
 - إنشاء مسار مشاركة بشرية محدود بدعوات عشوائية مخزنة كـhash في D1، مع تثبيت اللهجة لكل دعوة، سقف محاولات، انتهاء صلاحية، وموافقة صريحة.
 - إبقاء الصوت الخام محليًا وعدم إرسال transcript أو أي معرف حساب، وربط السجلات بنفس scorer الصارم الحالي.
 - إضافة مولد دعوات داخل جامع الإدارة لتشغيل الدراسة عمليًا دون أوامر يدوية.
+- استخدام طبقة تخزين مشتركة بين مسار الإدارة ومسار الدراسة لتوحيد قيود D1 وعدم تكرار منطق النزاهة.
 - فتح PR معزول، تشغيل Verify + Pre-Launch + مراجعة مستقلة، وعدم دمج/نشر أي مسار عام قبل إغلاق أي MAJOR/BLOCKER.
