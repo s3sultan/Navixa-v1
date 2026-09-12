@@ -27,6 +27,7 @@ test("batch invite creation is bounded and cleans partial batches before returni
   assert.match(route, /count\s*<\s*1\s*\|\|\s*count\s*>\s*25/);
   assert.match(route, /for \(let index = 0; index < count; index \+= 1\)/);
   assert.match(route, /DELETE FROM navixa_namesense_study_invites WHERE invite_id=\?/);
+  assert.match(route, /UPDATE navixa_namesense_study_invites SET revoked=1 WHERE invite_id=\?/);
   assert.match(route, /لم تُعتمد دفعة جزئية/);
   assert.match(route, /invites:\s*createdInvites/);
   assert.match(route, /LIMIT 500/);
