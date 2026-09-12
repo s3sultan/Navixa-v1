@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   conditionNavixaVoiceAudio,
+  createNavixaLocalNameFallback,
   getNavixaVoiceFlushReason,
   hasNavixaVoiceActivity,
   resampleNavixaVoiceAudio,
@@ -117,4 +118,64 @@ test("caps the in-memory rolling buffer instead of growing with lecture length",
 test("rejects unusable source rates safely", () => {
   assert.equal(resampleNavixaVoiceAudio(new Float32Array([1, 2]), 0).length, 0);
   assert.equal(resampleNavixaVoiceAudio(new Float32Array(), 48_000).length, 0);
+});
+
+test("reuses an external live microphone stream without reacquiring or stopping it", async () => {
+  let getUserMediaCalls = 0;
+  let stopCalls = 0;
+  const track = { readyState: "live", stop: () => { stopCalls += 1; } };
+  const externalStream = {
+    getAudioTracks: () => [track],
+    getTracks: () => [track],
+  } as unknown as MediaStream;
+
+  class FakeNode {
+    onaudioprocess: ((event: AudioProcessingEvent) => void) | null = null;
+    connect() { return this; }
+    disconnect() {}
+  }
+  class FakeAudioContext {
+    state: AudioContextState = "running";
+    sampleRate = 48_000;
+    destination = new FakeNode() as unknown as AudioDestinationNode;
+    createMediaStreamSource() { return new FakeNode() as unknown as MediaStreamAudioSourceNode; }
+    createScriptProcessor() { return new FakeNode() as unknown as ScriptProcessorNode; }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  class FakeWorker {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    onerror: (() => void) | null = null;
+    postMessage() {}
+    terminate() {}
+  }
+
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  try {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { AudioContext: FakeAudioContext },
+    });
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: { mediaDevices: { getUserMedia: async () => { getUserMediaCalls += 1; return externalStream; } } },
+    });
+    Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
+
+    const fallback = createNavixaLocalNameFallback({
+      onTranscript: () => undefined,
+      mediaStream: externalStream,
+    });
+    assert.equal(fallback.supported, true);
+    assert.equal(await fallback.start(), true);
+    assert.equal(getUserMediaCalls, 0);
+    fallback.destroy();
+    assert.equal(stopCalls, 0);
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow); else Reflect.deleteProperty(globalThis, "window");
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator); else Reflect.deleteProperty(globalThis, "navigator");
+    if (previousWorker) Object.defineProperty(globalThis, "Worker", previousWorker); else Reflect.deleteProperty(globalThis, "Worker");
+  }
 });
