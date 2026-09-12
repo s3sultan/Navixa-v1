@@ -6,6 +6,13 @@ export type NavixaPushSubscriptionResult={
 type PushConfig={enabled?:boolean;publicKey?:string};
 type SubscriptionSaveResult={ok?:boolean;accountBound?:boolean;error?:string};
 
+type DeviceNotificationOptions={
+  body:string;
+  tag?:string;
+  url?:string;
+  requireInteraction?:boolean;
+};
+
 function base64UrlToUint8Array(value:string){
   const padding="=".repeat((4-value.length%4)%4);
   const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
@@ -71,6 +78,20 @@ export async function ensureNavixaPushSubscription(options:{requestPermission?:b
 export async function syncExistingNavixaPushSubscription(){
   if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return null;
   try{return await ensureNavixaPushSubscription({requestPermission:false})}catch{return null}
+}
+
+export async function showNavixaDeviceNotification(title:string,options:DeviceNotificationOptions){
+  if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted"||!("serviceWorker" in navigator))return false;
+  const registration=await navigator.serviceWorker.ready;
+  await registration.showNotification(title,{
+    body:options.body,
+    tag:options.tag||"navixa-device",
+    icon:"/navixa-mark.webp",
+    badge:"/navixa-mark.webp",
+    requireInteraction:options.requireInteraction===true,
+    data:{url:options.url||"/"},
+  });
+  return true;
 }
 
 export async function sendNavixaPushTest(endpoint:string){
