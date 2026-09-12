@@ -6,8 +6,8 @@
 
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: بناء المرحلة الأولى من `NAVIXA UI System` بنظام واجهة Responsive مملوك للمشروع وقابل للتطوير والاستبدال، دون اعتماد Runtime جديد على مكتبة واجهات خارجية.
-- الحالة: بدء العمل على فرع معزول `feat/navixa-ui-system-20260912`؛ الإنتاج و`master` لن يتأثرا بكود المنتج حتى المراجعة والاعتماد.
-- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
+- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. أول فحص كشف lint على رابط داخلي وتم إصلاحه، وتجري إعادة الفحوص على أحدث head.
+- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
 
 ## آخر ما اكتمل
 
@@ -21,8 +21,7 @@
 
 ## التالي
 
-- تنفيذ نواة `NAVIXA UI System`: design tokens، shell متجاوب، mobile bottom navigation، drawer/modal مملوكان للمشروع، وحالات RTL/LTR وreduced-motion وsafe-area.
-- إنشاء `/ui-lab` كمعاينة معزولة للنظام الجديد دون ربطه بالصفحة الرئيسية أو الإنتاج.
-- إضافة اختبارات انحدار تمنع إدخال اعتماد UI خارجي للنواة وتتحقق من عقود المكونات الأساسية.
-- فتح Pull Request منفصل وعدم الدمج قبل المراجعة البصرية والفحوص.
+- توسيع UI smoke للمختبر `/ui-lab` على narrow/medium/wide مع فحص overflow وتبدل أنماط التنقل.
+- إكمال GitHub Actions على PR #193 وإصلاح أي فشل حتى تصبح البوابة نظيفة.
+- توثيق التسليم وإبقاء PR Draft دون دمج حتى مراجعة المستخدم.
 - تبقى متابعة PR #188 ونشر NameSense مسارًا مستقلًا ولا تتداخل ملفاته مع هذه المهمة.
