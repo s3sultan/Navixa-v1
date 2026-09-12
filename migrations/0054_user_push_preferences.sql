@@ -9,3 +9,7 @@ CREATE TABLE IF NOT EXISTS navixa_user_push_preferences (
 
 CREATE INDEX IF NOT EXISTS idx_navixa_user_push_preferences_category
   ON navixa_user_push_preferences(category, enabled, snoozed_until);
+
+ALTER TABLE navixa_important_reminders ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
+CREATE INDEX IF NOT EXISTS idx_navixa_important_reminders_source_due
+  ON navixa_important_reminders(source, due_at);
