@@ -23,7 +23,7 @@ NAVIXA Planner + Agent Router
         ↓
 Executor Guard
         ↓
-Developer Agent
+Guarded Developer Bridge
         ↓
 Existing NAVIXA Tests
         ↓
@@ -111,28 +111,13 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 
 الملف: `scripts/dev-guardian/executor-guard.mjs`
 
-هذا هو العقد الإلزامي لأي Bridge كتابي لاحق. لا يسمح للتنفيذ إذا:
-
-- المنفذ مختلف عن المنفذ الذي حدده Router.
-- base commit مختلف عن العقد.
-- أي ملف معدل خارج `allowedScope` أو داخل `forbiddenScope`.
-- Budget/Stuck Guard أوقف المهمة.
-- Task Contract نفسه غير صالح.
-
-إضافة Bridge كتابة مستقبلًا لا تعني منحه حرية المستودع؛ يجب تمرير قائمة الملفات المقترحة إلى Executor Guard قبل السماح بالتغيير.
+لا يسمح للتنفيذ إذا كان المنفذ مختلفًا عن Router، أو base commit مختلفًا عن العقد، أو أي ملف خارج النطاق، أو Budget/Stuck Guard أوقف المهمة، أو Task Contract غير صالح.
 
 ### Evidence Aggregator
 
 الملف: `scripts/dev-guardian/evidence-aggregator.mjs`
 
-يجمع بصورة deterministic:
-
-- حالة التخطيط والفحوص المطلوبة.
-- نتيجة AI Tester.
-- حكم Independent Reviewer.
-- حالة Live Execution Guard.
-
-AI Tester لا يطلب منه حكم `CLEAR/MINOR/MAJOR/BLOCKER` لأن دوره اكتشاف الفجوات. المراجع المستقل هو صاحب الحكم. `MINOR` يسمح بالاستمرار مع تسجيل الملاحظة، أما `MAJOR` أو `BLOCKER` أو غياب مراجعة إلزامية أو فشل Guard فينتج `BLOCK`.
+يجمع بصورة deterministic حالة التخطيط والفحوص وAI Tester والمراجع المستقل وحالة Live Execution Guard. AI Tester لا يحتاج حكمًا نهائيًا، بينما المراجع المستقل يجب أن ينهي بسطر verdict صريح. `MINOR` يسمح بالاستمرار مع تسجيل الملاحظة، أما `MAJOR` أو `BLOCKER` أو غياب دليل إلزامي أو فشل Guard فينتج `BLOCK`. كما تُطابق المراجعة بالدور واسم الوكيل المحدد في الخطة، وليس بالدور وحده.
 
 ### Workflow اليدوي
 
@@ -140,12 +125,45 @@ AI Tester لا يطلب منه حكم `CLEAR/MINOR/MAJOR/BLOCKER` لأن دور�
 
 مدخلاته `issue_number`, `approved`, `dispatch_external`. `approved=true` يبني الخطة فقط. لا يبدأ Gemini/Manus إلا إذا كان `dispatch_external=true` أيضًا والمشغل مالك المستودع. عند التشغيل الخارجي يستخدم المراجعان سجل الأحداث نفسه، ويستمر المراجع المستقل حتى لو فشل AI Tester كي لا تضيع الأدلة، ثم يشغل Evidence Aggregator الحكم النهائي.
 
+## المرحلة الرابعة: Guarded Developer Bridge
+
+### Patch Developer Bridge
+
+الملف: `scripts/dev-guardian/patch-developer-bridge.mjs`
+
+هذا أول مسار كتابة فعلي داخل Dev Guardian، ومقصود أن يكون أضيق من shell agent حر. يستقبل Unified Diff كبيانات، ولا يعطي المزود الخارجي صلاحية مباشرة على المستودع.
+
+قبل الكتابة:
+
+- يجب أن يكون ملف patch خارج working tree.
+- يجب أن يكون Event Ledger خارج working tree.
+- يفرض حدًا لحجم patch وعدد الملفات.
+- يرفض binary patches وsymlinks والـrename/copy والمسارات المقتبسة أو غير المدعومة.
+- يشترط working tree نظيفًا تمامًا.
+- يتحقق من `HEAD` مقابل base commit في Task Contract.
+- يتحقق من المنفذ مقابل Router.
+- يمرر كل الملفات إلى Executor Guard قبل أي تطبيق.
+- يسجل `patch-preflight` في Live Event Ledger.
+- يشغّل `git apply --check --whitespace=error-all` قبل الكتابة الفعلية.
+
+بعد التطبيق:
+
+- يستخدم `git status --porcelain=v1 -z --untracked-files=all` حتى لا تختفي الملفات الجديدة غير المتتبعة عن الحارس.
+- يقارن الملفات الفعلية بملفات manifest ولا يقبل ملفًا إضافيًا أو مفقودًا.
+- يشغّل Executor Guard مرة ثانية على الحالة الفعلية.
+- إذا فشل فحص post-apply ينفذ rollback إلى الشجرة النظيفة (`git reset --hard HEAD` ثم `git clean -fd`) ويسجل حدث rollback.
+- إذا أوقف Live Guard الاستمرار بعد التطبيق، يعيد الشجرة النظيفة أيضًا.
+- عند النجاح يسجل `patch-applied` فقط، ولا ينفذ commit أو push أو merge أو deploy.
+
+هذا التصميم يجعل الكتابة عملية transactional محدودة بعقد المهمة بدل إعطاء Agent وصول كتابة عام.
+
 ## التحقق
 
 - `tests/dev-guardian.test.mjs`: Repo Intelligence والـguards والـrouter.
 - `tests/dev-guardian-stage2.test.mjs`: Task Contract، base commit، scope، budget، استقلال المراجع، bounded context وفصل تعليمات الأمان.
-- `tests/dev-guardian-stage3.test.mjs`: عدم تخزين النص الخام في Event Ledger، كشف التكرار الحي، Executor Guard، Evidence Aggregator وأحكام CLEAR/MINOR/MAJOR.
-- `.github/workflows/dev-guardian-verify.yml`: يشغل المراحل الثلاث ويفحص syntax للـrunners ويبني Repo Intelligence snapshot للمستودع الحقيقي.
+- `tests/dev-guardian-stage3.test.mjs`: Event Ledger، كشف التكرار الحي، Executor Guard، Evidence Aggregator وأحكام المراجعة الصريحة.
+- `tests/dev-guardian-stage4.test.mjs`: رفض binary/symlink/rename/quoted paths، تطبيق patch داخل النطاق مع ملف جديد، منع out-of-scope، منع المنفذ الخاطئ والـbase القديم، والتحقق من بقاء الشجرة نظيفة عند الرفض.
+- `.github/workflows/dev-guardian-verify.yml`: يشغل المراحل الأربع، يفحص syntax للـrunners، ويبني Repo Intelligence snapshot للمستودع الحقيقي.
 - `pr-verify` و`pre-launch-gate` يبقيان كما هما ولا يتم تخفيف أي فحص موجود.
 
 ## ما لم يتم بعد عمدًا
@@ -153,12 +171,12 @@ AI Tester لا يطلب منه حكم `CLEAR/MINOR/MAJOR/BLOCKER` لأن دور�
 - لا تعديل على `package.json` بسبب مهمة UI System الموازية.
 - لا تشغيل خارجي تلقائي بسبب label أو push أو PR.
 - لا AI Tester أو Reviewer يكتب في المستودع.
-- لا دمج أو نشر إنتاجي من Dev Guardian.
-- لم يُمنح أي مزود خارجي صلاحية تنفيذ كتابي.
+- لا commit أو push أو merge أو deploy من Developer Bridge.
+- لا shell حر أو صلاحيات إنتاج لمزود خارجي.
 
-## المرحلة التالية بعد نجاح المرحلة الثالثة
+## المرحلة التالية بعد اعتماد المرحلة الرابعة
 
-1. ربط أول Developer Bridge فعلي بـExecutor Guard بحيث يكون المنع تقنيًا قبل الكتابة لا مجرد سياسة.
-2. تمرير أدلة PR checks الفعلية إلى Evidence Aggregator، لا أدلة workflow اليدوي فقط.
-3. تجربة Dev Guardian على مهام منخفضة الخطورة ومقارنة false blocks/false passes.
-4. بعد ثباته، جعل Dev Guardian فحصًا مطلوبًا قبل الدمج دون تخفيف `NAVIXA Pre-Launch Gate`.
+1. تمرير أدلة PR checks الفعلية إلى Evidence Aggregator، لا أدلة workflow اليدوي فقط.
+2. إضافة Producer محدود يولّد patch كبيانات فقط ثم يمرره إلى Guarded Developer Bridge.
+3. تجربة Dev Guardian على مهام منخفضة الخطورة وقياس false blocks/false passes قبل جعله إلزاميًا.
+4. بعد إثبات الثبات، جعل Dev Guardian فحصًا مطلوبًا قبل الدمج دون تخفيف `NAVIXA Pre-Launch Gate`.
