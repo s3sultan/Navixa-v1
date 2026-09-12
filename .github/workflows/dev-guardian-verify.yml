@@ -1,0 +1,66 @@
+name: NAVIXA Dev Guardian Verify
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "scripts/dev-guardian/**"
+      - "tests/dev-guardian*.test.mjs"
+      - "NAVIXA_DEV_GUARDIAN.md"
+      - ".github/workflows/dev-guardian-verify.yml"
+      - ".github/workflows/dev-guardian-task.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-guardian-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Repo intelligence, contracts, live guards, evidence, CI, producer and developer bridge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.13.0"
+
+      - name: Run Dev Guardian unit tests and low-risk trial matrix
+        run: node --test tests/dev-guardian.test.mjs tests/dev-guardian-stage2.test.mjs tests/dev-guardian-stage3.test.mjs tests/dev-guardian-stage4.test.mjs tests/dev-guardian-stage5.test.mjs tests/dev-guardian-stage6.test.mjs
+
+      - name: Parse Dev Guardian runner modules
+        run: |
+          node --check scripts/dev-guardian/guardian-task-runner.mjs
+          node --check scripts/dev-guardian/external-review-runner.mjs
+          node --check scripts/dev-guardian/event-ledger.mjs
+          node --check scripts/dev-guardian/executor-guard.mjs
+          node --check scripts/dev-guardian/evidence-aggregator.mjs
+          node --check scripts/dev-guardian/patch-developer-bridge.mjs
+          node --check scripts/dev-guardian/patch-producer.mjs
+          node --check scripts/dev-guardian/ci-evidence.mjs
+
+      - name: Build repository intelligence snapshot
+        run: node scripts/dev-guardian/repo-intelligence.mjs --root . --json --check > "$RUNNER_TEMP/navixa-repo-map.json"
+
+      - name: Validate repository intelligence contract
+        env:
+          REPO_MAP: ${{ runner.temp }}/navixa-repo-map.json
+        run: |
+          node --input-type=module -e '
+            import { readFile } from "node:fs/promises";
+            const map = JSON.parse(await readFile(process.env.REPO_MAP, "utf8"));
+            if (map.schemaVersion !== 1) throw new Error("unexpected schemaVersion");
+            if (!map.summary || map.summary.files < 1) throw new Error("empty repository map");
+            if (!Array.isArray(map.hotspots)) throw new Error("missing hotspots");
+            if (!map.dependencyGraph || !map.reverseDependencyGraph) throw new Error("missing dependency graphs");
+            console.log(`Repo map OK: ${map.summary.files} files, ${map.hotspots.length} hotspots`);
+          '
