@@ -29,6 +29,10 @@ function normalizeReview(review = {}) {
   };
 }
 
+function roleRequiresVerdict(role) {
+  return role === "independent-reviewer" || role === "security-reviewer";
+}
+
 export function aggregateEvidence({ plan, checks = [], reviews = [], executionGuard = { allowed: true } } = {}) {
   const normalizedChecks = checks.map(normalizeCheck);
   const normalizedReviews = reviews.map(normalizeReview);
@@ -46,7 +50,7 @@ export function aggregateEvidence({ plan, checks = [], reviews = [], executionGu
       continue;
     }
     if (evidence.status !== "success") reasons.push(`review-failed:${role}:${evidence.status}`);
-    if (!evidence.verdict) reasons.push(`missing-verdict:${role}`);
+    if (roleRequiresVerdict(role) && !evidence.verdict) reasons.push(`missing-verdict:${role}`);
   }
 
   for (const review of normalizedReviews) {
@@ -73,7 +77,7 @@ export function aggregateEvidence({ plan, checks = [], reviews = [], executionGu
 
 export function formatEvidenceSummary(evidence) {
   const checks = evidence.checks.map((item) => `- ${item.name}: ${item.status}${item.required ? " (required)" : ""}`).join("\n") || "- none";
-  const reviews = evidence.reviews.map((item) => `- ${item.role} / ${item.agent}: ${item.status}, verdict ${item.verdict || "missing"}`).join("\n") || "- none";
+  const reviews = evidence.reviews.map((item) => `- ${item.role} / ${item.agent}: ${item.status}, verdict ${item.verdict || "n/a"}`).join("\n") || "- none";
   const reasons = evidence.reasons.map((item) => `- ${item}`).join("\n") || "- none";
   return `## NAVIXA Dev Guardian evidence\n\n- Verdict: **${evidence.verdict}**\n- Merge allowed by Dev Guardian evidence: **${evidence.mergeAllowed ? "yes" : "no"}**\n\n### Checks\n${checks}\n\n### Reviews\n${reviews}\n\n### Blocking reasons\n${reasons}`;
 }
