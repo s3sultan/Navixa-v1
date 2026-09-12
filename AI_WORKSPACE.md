@@ -6,8 +6,8 @@
 
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: بناء المرحلة الأولى من `NAVIXA UI System` بنظام واجهة Responsive مملوك للمشروع وقابل للتطوير والاستبدال، دون اعتماد Runtime جديد على مكتبة واجهات خارجية.
-- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. أول فحص كشف lint على رابط داخلي وتم إصلاحه؛ الفحص التالي أثبت نجاح 245 اختبارًا وكشف أن قياس Drawer تم أثناء حركة الدخول، لذلك يُفصل فحص الـUI System في smoke مستقل أكثر ثباتًا.
-- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
+- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. نجح آخر head في `Verify NAVIXA Pull Request` و`NAVIXA Pre-Launch Gate` بعد فصل فحص الـUI System وإصلاح انتظار Hydration/Drawer. المرحلة الحالية هي توليد أدلة بصرية narrow/medium/wide من نفس CI قبل أي دمج.
+- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`, `.github/workflows/pr-verify.yml`.
 
 ## آخر ما اكتمل
 
@@ -18,10 +18,11 @@
 - الصوت الخام وtranscript لا يُخزنان ولا يُرسلان للخادم، ومسار الدراسة لا يعدّل حالة NameSense الإنتاجية أو تلميحات اللغة أو الكلمات المراقبة.
 - نجح آخر head موثق لـPR #188 في Verify NAVIXA Pull Request #437 وNAVIXA Pre-Launch Gate #320 شاملًا lint والاختبارات وUI smoke وبناء الإنتاج وفحص الاعتماديات والأسرار وGitHub Actions.
 - المراجعة المستقلة النهائية لم تجد MAJOR/BLOCKER، مع بقاء الحكم الحقيقي لدقة NameSense معتمدًا فقط على corpus بشري مؤهل وتشغيل scorer الصارم.
+- نجح PR #193 على head `c17a562b1f1795d885e921ccd38f39284e6d0f69`: 245/245 اختبارًا، UI smoke القديم، UI System smoke، build، فحص الأسرار، تدقيق الاعتماديات، وأمان GitHub Actions.
 
 ## التالي
 
-- إعادة `tests/ui-smoke.mjs` لفحصه الأصلي وفصل `/ui-lab` في `tests/ui-system-smoke.mjs` على narrow/medium/wide مع انتظار استقرار الحركة قبل القياس.
-- إكمال GitHub Actions على PR #193 وإصلاح أي فشل حتى تصبح البوابة نظيفة.
+- التقاط صور مرجعية لـ`/ui-lab` على 390px و820px و1440px من نفس CI ورفعها Artifact للمراجعة البصرية.
+- مراجعة الصور بصريًا ثم تعديل النظام نفسه فقط عند الحاجة، دون تغيير واجهة الإنتاج.
 - توثيق التسليم وإبقاء PR Draft دون دمج حتى مراجعة المستخدم.
 - تبقى متابعة PR #188 ونشر NameSense مسارًا مستقلًا ولا تتداخل ملفاته مع هذه المهمة.
