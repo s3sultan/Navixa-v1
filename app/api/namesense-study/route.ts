@@ -5,6 +5,10 @@ import {
   storeNameSenseBenchmarkTrial,
   type NameSenseDb,
 } from "../../../benchmarks/namesense/storage.ts";
+import {
+  nameSenseStudyPromptMatchesAssignment,
+  nextNameSenseStudyAssignment,
+} from "../../../benchmarks/namesense/study.ts";
 import { validateNameSenseBenchmarkTrial } from "../admin/namesense-benchmark/schema.ts";
 
 type InviteRow = {
@@ -16,9 +20,6 @@ type InviteRow = {
   expires_at: string;
   revoked: number;
 };
-
-type NextNameId = "sultan" | "mohammed" | "alharbi";
-type NextExpected = "hit" | "miss";
 
 async function db(): Promise<NameSenseDb | null> {
   try {
@@ -47,22 +48,6 @@ async function ensureInviteSchema(database: NameSenseDb) {
 const hex = (bytes: Uint8Array) => Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 const hashToken = async (token: string) => hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
 const tokenPattern = /^[a-f0-9]{64}$/i;
-const NAME_SEQUENCE: NextNameId[] = ["sultan", "mohammed", "alharbi"];
-
-function nextAssignment(usedTrials: number): { expected: NextExpected; nameId: NextNameId } {
-  return {
-    expected: usedTrials % 2 === 0 ? "hit" : "miss",
-    nameId: NAME_SEQUENCE[usedTrials % NAME_SEQUENCE.length],
-  };
-}
-
-function promptMatchesAssignment(promptId: unknown, assignment: { expected: NextExpected; nameId: NextNameId }) {
-  if (typeof promptId !== "string") return false;
-  const normalized = promptId.trim().toLowerCase();
-  const nameMarker = `-${assignment.nameId}`;
-  if (!normalized.includes(nameMarker)) return false;
-  return assignment.expected === "miss" ? normalized.startsWith("negative-") : !normalized.startsWith("negative-");
-}
 
 async function findInvite(database: NameSenseDb, token: string) {
   if (!tokenPattern.test(token)) return null;
@@ -94,7 +79,7 @@ export async function GET(request: Request) {
   if (!active(invite)) {
     return NextResponse.json({ error: "رابط المشاركة غير صالح أو انتهت صلاحيته" }, { status: 410, headers: { "Cache-Control": "no-store" } });
   }
-  const assignment = nextAssignment(invite!.used_trials);
+  const assignment = nextNameSenseStudyAssignment(invite!.used_trials);
   return NextResponse.json({
     ok: true,
     accent: invite!.accent,
@@ -125,11 +110,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "رابط المشاركة غير صالح أو اكتملت محاولاته" }, { status: 410, headers: { "Cache-Control": "no-store" } });
   }
 
-  const assignment = nextAssignment(invite!.used_trials);
+  const assignment = nextNameSenseStudyAssignment(invite!.used_trials);
   const rawTrial = body?.trial && typeof body.trial === "object" && !Array.isArray(body.trial)
     ? body.trial as Record<string, unknown>
     : null;
-  if (!rawTrial || !promptMatchesAssignment(rawTrial.promptId, assignment)) {
+  if (!rawTrial || !nameSenseStudyPromptMatchesAssignment(rawTrial.promptId, assignment)) {
     return NextResponse.json({ error: "الجملة لا تطابق الجولة الحالية؛ أعد تحميل الصفحة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
 
@@ -164,7 +149,7 @@ export async function POST(request: Request) {
   }
 
   const usedTrials = invite!.used_trials + 1;
-  const next = nextAssignment(usedTrials);
+  const next = nextNameSenseStudyAssignment(usedTrials);
   return NextResponse.json({
     ok: true,
     trialId: stored.trialId,
