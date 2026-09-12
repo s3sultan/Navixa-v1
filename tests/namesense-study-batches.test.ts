@@ -42,3 +42,8 @@ test("batch responses keep raw invite tokens fragment-only and the admin export 
   assert.match(page, /URL\.revokeObjectURL/);
   assert.doesNotMatch(page, /localStorage\.setItem\([^\n]*newLinks/);
 });
+
+test("recruitment target only counts participants who actually completed forty trials", () => {
+  assert.match(page, /invite\.max_trials\s*>=\s*40\s*&&\s*invite\.used_trials\s*>=\s*40/);
+  assert.match(page, /أكملوا 40 جولة/);
+});
