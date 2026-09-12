@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { evaluateScope, DEV_GUARDIAN_DEFAULTS } from "./guards.mjs";
 import { roleInstructions } from "./review-dispatch.mjs";
+import { evaluateLiveExecution, readExecutionEvents, recordGuardedExecutionEvent } from "./event-ledger.mjs";
+import { parseReviewVerdict } from "./evidence-aggregator.mjs";
 
 const PROVIDERS = Object.freeze({
   gemini: { agent: "Gemini API / AI Studio", secret: "GEMINI_API_KEY" },
@@ -100,7 +102,7 @@ function assertAssignment(plan, provider, role) {
   return assignment;
 }
 
-async function runGemini({ apiKey, systemInstruction, prompt }) {
+async function runGemini({ apiKey, systemInstruction, prompt, maxOutputTokens = 6000 }) {
   const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const response = await requestJson(
@@ -111,7 +113,7 @@ async function runGemini({ apiKey, systemInstruction, prompt }) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 6000 },
+        generationConfig: { temperature: 0.1, maxOutputTokens },
       }),
     },
     "Gemini Dev Guardian review",
@@ -189,6 +191,8 @@ async function main() {
   const planPath = required("NAVIXA_PLAN_FILE");
   const githubToken = required("GITHUB_TOKEN");
   const triggerActor = required("NAVIXA_TRIGGER_ACTOR");
+  const eventLog = process.env.NAVIXA_EVENT_LOG || "";
+  const reviewOutput = process.env.NAVIXA_REVIEW_OUTPUT || "";
   const [owner, repo] = repository.split("/");
   if (triggerActor !== owner) throw new Error("Only the repository owner may dispatch external Dev Guardian reviews.");
   if (!owner || !repo || !Number.isSafeInteger(issueNumber) || issueNumber < 1) throw new Error("Invalid repository or issue number.");
@@ -199,9 +203,20 @@ async function main() {
   const plan = JSON.parse(await readFile(planPath, "utf8"));
   assertAssignment(plan, provider, role);
   const context = await readBoundedContext({ contract: plan.contract });
+  const priorEvents = await readExecutionEvents(eventLog);
+  const preGuard = evaluateLiveExecution({ plan, events: priorEvents, files: context.included, pendingUsageDelta: { steps: 1 } });
+  if (!preGuard.allowed) throw new Error(`Live guard blocked external review: ${preGuard.reasons.join(", ")}`);
+
+  const start = await recordGuardedExecutionEvent({
+    filePath: eventLog,
+    plan,
+    files: context.included,
+    event: { role, agent: config.agent, action: "external-review-start", target: `${provider}:${role}`, ok: true, progressHash: `${role}:started`, usageDelta: { steps: 1 } },
+  });
+  if (!start.guard.allowed) throw new Error(`Live guard blocked external review start: ${start.guard.reasons.join(", ")}`);
+
   const systemInstruction = buildExternalReviewSystemInstruction({ plan, role });
   const userPrompt = buildExternalReviewPrompt({ plan, contextText: context.text });
-
   const headers = {
     Accept: "application/vnd.github+json",
     Authorization: `Bearer ${githubToken}`,
@@ -216,14 +231,60 @@ async function main() {
 
   await addComment(`## Dev Guardian ${role} started\n\n- Provider: ${config.agent}\n- Base commit: \`${plan.contract.baseCommit}\`\n- Context files: ${context.included.length}\n- Safety: read-only review; no merge or deployment.`);
 
-  const result = provider === "gemini"
-    ? await runGemini({ apiKey, systemInstruction, prompt: userPrompt })
-    : await runManus({ apiKey, prompt: `${systemInstruction}\n\n${userPrompt}`, title: `NAVIXA ${role} #${issueNumber}: ${plan.contract.title}` });
+  let result;
+  try {
+    const remainingTokens = start.guard.budget?.remaining?.tokens;
+    const outputLimit = Number.isFinite(remainingTokens) && remainingTokens > 0 ? Math.max(1, Math.min(6000, Math.floor(remainingTokens))) : 6000;
+    result = provider === "gemini"
+      ? await runGemini({ apiKey, systemInstruction, prompt: userPrompt, maxOutputTokens: outputLimit })
+      : await runManus({ apiKey, prompt: `${systemInstruction}\n\n${userPrompt}`, title: `NAVIXA ${role} #${issueNumber}: ${plan.contract.title}` });
+  } catch (error) {
+    await recordGuardedExecutionEvent({
+      filePath: eventLog,
+      plan,
+      files: context.included,
+      event: { role, agent: config.agent, action: "external-review-failed", target: `${provider}:${role}`, ok: false, error: error?.message || "review failed", progressHash: `${role}:failed`, usageDelta: { steps: 1 } },
+    });
+    throw error;
+  }
+
+  const tokenUsage = Number(result.usage?.totalTokenCount) || 0;
+  const verdict = parseReviewVerdict(result.text);
+  const completed = await recordGuardedExecutionEvent({
+    filePath: eventLog,
+    plan,
+    files: context.included,
+    event: {
+      role,
+      agent: config.agent,
+      action: "external-review-complete",
+      target: `${provider}:${role}`,
+      ok: true,
+      result: result.text,
+      progressHash: `${role}:${verdict || "completed"}`,
+      usageDelta: { steps: 1, tokens: tokenUsage },
+    },
+  });
+
+  const reviewRecord = {
+    schemaVersion: 1,
+    role,
+    agent: config.agent,
+    provider,
+    model: result.model,
+    status: completed.guard.allowed ? "success" : "guard-blocked",
+    verdict,
+    contextFiles: context.included.length,
+    usage: provider === "gemini" ? { tokens: tokenUsage } : { credits: result.usage.credits ?? null },
+  };
+  if (reviewOutput) await writeFile(reviewOutput, `${JSON.stringify(reviewRecord, null, 2)}\n`, "utf8");
 
   const usage = provider === "gemini"
     ? `tokens ${result.usage.totalTokenCount ?? "not reported"}`
     : `credits ${result.usage.credits ?? "not reported"}`;
   await addComment(`## Dev Guardian ${role} result\n\n- Provider: ${config.agent}\n- Model: \`${result.model}\`\n- Base commit: \`${plan.contract.baseCommit}\`\n- Context files: ${context.included.length}\n- Usage: ${usage}\n${result.taskUrl ? `- Private task: ${result.taskUrl}\n` : ""}\n${result.text || "No text result returned."}\n\n---\nUntrusted review material only. Nothing was applied, merged, or deployed.`);
+
+  if (!completed.guard.allowed) throw new Error(`Live guard blocked continuation after review: ${completed.guard.reasons.join(", ")}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
