@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Overlay from "./Overlay";
 import styles from "./ui-system.module.css";
@@ -52,14 +53,14 @@ function NavItemView({ item, compact = false, onAfterSelect }: NavItemViewProps)
 
   if (item.href) {
     return (
-      <a
+      <Link
         className={className}
         href={item.href}
         aria-current={item.active ? "page" : undefined}
         onClick={handleSelect}
       >
         {content}
-      </a>
+      </Link>
     );
   }
 
@@ -102,13 +103,13 @@ export default function NavixaShell({
     <div className={styles.systemRoot}>
       <div className={styles.shell}>
         <aside className={styles.sidebar} aria-label="التنقل الرئيسي">
-          <a className={styles.brand} href="/" aria-label="NAVIXA الصفحة الرئيسية">
+          <Link className={styles.brand} href="/" aria-label="NAVIXA الصفحة الرئيسية">
             <span className={styles.brandMark} aria-hidden="true">N</span>
             <span className={styles.brandText}>
               <strong>{brandLabel}</strong>
               <small>{brandMeta}</small>
             </span>
-          </a>
+          </Link>
 
           <nav className={styles.sidebarNav} aria-label="أقسام NAVIXA">
             {navItems.map((item) => <NavItemView key={item.id} item={item} />)}
