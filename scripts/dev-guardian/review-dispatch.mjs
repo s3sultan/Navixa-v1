@@ -18,8 +18,10 @@ function chooseIndependentReviewer(executor, preferred = []) {
 
 export function buildReviewDispatch({ contract, route, executor } = {}) {
   const primaryExecutor = executor || route?.primary || contract?.requestedAgent || "Codex";
-  const preferredReviewers = Array.isArray(route?.reviewers) ? route.reviewers : [];
-  const independentReviewer = chooseIndependentReviewer(primaryExecutor, preferredReviewers);
+  // Automated stage-two review is intentionally restricted to the connected
+  // read-only providers. Route reviewers such as Claude Code remain valid
+  // manual/agent reviewers but are not silently treated as callable bridges.
+  const independentReviewer = chooseIndependentReviewer(primaryExecutor, [MANUS, GEMINI]);
   const assignments = [];
 
   if (GEMINI !== primaryExecutor) {
@@ -57,6 +59,7 @@ export function buildReviewDispatch({ contract, route, executor } = {}) {
   return {
     schemaVersion: 1,
     executor: primaryExecutor,
+    routeReviewers: Array.isArray(route?.reviewers) ? [...route.reviewers] : [],
     assignments: normalized,
     valid: independenceViolations.length === 0 && (!contract?.signals?.needsWrite || Boolean(independentReviewer)),
     violations: independenceViolations.map((assignment) => `reviewer-matches-executor:${assignment.role}:${assignment.agent}`),
