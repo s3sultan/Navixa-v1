@@ -31,6 +31,8 @@ AI Tester (read-only)
         ↓
 Independent Reviewer (+ security when required)
         ↓
+Exact-head GitHub CI Evidence
+        ↓
 Evidence Aggregator
         ↓
 NAVIXA Pre-Launch Gate
@@ -123,7 +125,7 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 
 `.github/workflows/dev-guardian-task.yml`
 
-مدخلاته `issue_number`, `approved`, `dispatch_external`. `approved=true` يبني الخطة فقط. لا يبدأ Gemini/Manus إلا إذا كان `dispatch_external=true` أيضًا والمشغل مالك المستودع. عند التشغيل الخارجي يستخدم المراجعان سجل الأحداث نفسه، ويستمر المراجع المستقل حتى لو فشل AI Tester كي لا تضيع الأدلة، ثم يشغل Evidence Aggregator الحكم النهائي.
+مدخلاته الأساسية `issue_number`, `approved`, `dispatch_external`. `approved=true` يبني الخطة فقط. لا يبدأ Gemini/Manus إلا إذا كان `dispatch_external=true` أيضًا والمشغل مالك المستودع.
 
 ## المرحلة الرابعة: Guarded Developer Bridge
 
@@ -157,13 +159,40 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 
 هذا التصميم يجعل الكتابة عملية transactional محدودة بعقد المهمة بدل إعطاء Agent وصول كتابة عام.
 
+## المرحلة الخامسة: Exact-head CI Evidence
+
+### GitHub CI Evidence Collector
+
+الملف: `scripts/dev-guardian/ci-evidence.mjs`
+
+يجمع أدلة GitHub Actions الفعلية لرقم PR محدد، ويثبتها على `head SHA` الحالي لذلك PR. البوابات الافتراضية المطلوبة هي:
+
+- `NAVIXA Dev Guardian Verify`
+- `Verify NAVIXA Pull Request`
+- `NAVIXA Pre-Launch Gate`
+
+قواعده:
+
+- لا يقبل تشغيلًا أخضر من commit آخر.
+- لكل workflow يأخذ أحدث `run_number`/attempt على نفس head فقط.
+- نجاح قديم لا يغطي تشغيلًا أحدث `failed`, `cancelled`, `pending` أو `in_progress`.
+- أي workflow مفقود أو غير `success` يجعل CI evidence غير صالح.
+- Collector قراءة فقط ويحتاج `actions: read` و`pull-requests: read` ولا يغير PR أو المستودع.
+
+### ربط CI بالحكم الموحد
+
+`Evidence Aggregator` يقبل الآن ملف CI evidence اختياريًا، ويحوّل البوابات الحقيقية إلى checks داخل نفس الحكم. عند تفعيل `NAVIXA_REQUIRE_CI_EVIDENCE=true`، غياب الدليل نفسه يسبب `BLOCK`. ويمكن أيضًا فرض `expectedHeadSha` لمنع تمرير دليل لنسخة مختلفة.
+
+`dev-guardian-task.yml` يملك الآن input اختياريًا باسم `pr_number`. إذا تم تمريره، يجمع CI الفعلي لذلك PR ثم يمرره إلى Evidence Aggregator. بذلك لا تصبح عبارة «الاختبارات نجحت» ادعاءً من الوكيل، بل دليلًا من GitHub على رأس PR نفسه.
+
 ## التحقق
 
 - `tests/dev-guardian.test.mjs`: Repo Intelligence والـguards والـrouter.
 - `tests/dev-guardian-stage2.test.mjs`: Task Contract، base commit، scope، budget، استقلال المراجع، bounded context وفصل تعليمات الأمان.
 - `tests/dev-guardian-stage3.test.mjs`: Event Ledger، كشف التكرار الحي، Executor Guard، Evidence Aggregator وأحكام المراجعة الصريحة.
 - `tests/dev-guardian-stage4.test.mjs`: رفض binary/symlink/rename/quoted paths، تطبيق patch داخل النطاق مع ملف جديد، منع out-of-scope، منع المنفذ الخاطئ والـbase القديم، والتحقق من بقاء الشجرة نظيفة عند الرفض.
-- `.github/workflows/dev-guardian-verify.yml`: يشغل المراحل الأربع، يفحص syntax للـrunners، ويبني Repo Intelligence snapshot للمستودع الحقيقي.
+- `tests/dev-guardian-stage5.test.mjs`: exact-head CI، منع نجاح commit آخر، منع النجاح القديم من تغطية cancellation أحدث، منع pending، وربط CI بالحكم الموحد.
+- `.github/workflows/dev-guardian-verify.yml`: يشغل المراحل الخمس ويفحص syntax لكل runners ويبني Repo Intelligence snapshot للمستودع الحقيقي.
 - `pr-verify` و`pre-launch-gate` يبقيان كما هما ولا يتم تخفيف أي فحص موجود.
 
 ## ما لم يتم بعد عمدًا
@@ -174,9 +203,9 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 - لا commit أو push أو merge أو deploy من Developer Bridge.
 - لا shell حر أو صلاحيات إنتاج لمزود خارجي.
 
-## المرحلة التالية بعد اعتماد المرحلة الرابعة
+## المرحلة التالية بعد اعتماد المرحلة الخامسة
 
-1. تمرير أدلة PR checks الفعلية إلى Evidence Aggregator، لا أدلة workflow اليدوي فقط.
-2. إضافة Producer محدود يولّد patch كبيانات فقط ثم يمرره إلى Guarded Developer Bridge.
-3. تجربة Dev Guardian على مهام منخفضة الخطورة وقياس false blocks/false passes قبل جعله إلزاميًا.
+1. إضافة Producer محدود يولّد patch كبيانات فقط ثم يمرره إلى Guarded Developer Bridge، دون shell حر.
+2. تجربة Dev Guardian على مهام منخفضة الخطورة وقياس false blocks/false passes قبل جعله إلزاميًا.
+3. إضافة تقرير تشخيص يوضح لماذا تم BLOCK وما أقل إجراء مطلوب لفك الحظر دون تخفيف السياسة.
 4. بعد إثبات الثبات، جعل Dev Guardian فحصًا مطلوبًا قبل الدمج دون تخفيف `NAVIXA Pre-Launch Gate`.
