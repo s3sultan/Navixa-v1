@@ -4,6 +4,7 @@ import {useEffect,useRef,useState} from "react";
 import {dismissPersonalReminder,getPersonalReminderPrefs,isPersonalReminderMuted,PersonalReminderKind} from "./reminderPrefs";
 import {readAcademicReminders} from "./academicReminders";
 import {isScreenEnabled} from "./alertPrefs";
+import {showNavixaDeviceNotification} from "./pushClient";
 
 const MINUTE=60_000;
 const ACTIVITY_KEY="navixa-last-activity-at";
@@ -46,7 +47,7 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
       ];
       const next=candidates.find(candidate=>candidate.due&&!isPersonalReminderMuted(candidate.kind)&&now-Number(localStorage.getItem(sentKey(candidate.kind))||0)>=quietFor);if(!next)return;
       localStorage.setItem(LAST_ANY_KEY,String(now));localStorage.setItem(sentKey(next.kind),String(now));
-      if(prefs.browser&&"Notification" in window&&Notification.permission==="granted")new Notification(next.title,{body:next.body,tag:`navixa-${next.kind}`});
+      if(prefs.browser)void showNavixaDeviceNotification(next.title,{body:next.body,tag:`navixa-${next.kind}`,url:next.kind==="academic"?"/today":"/"}).catch(()=>false);
       setVisible(next);
     };
     const timer=window.setInterval(maybeRemind,30_000);
