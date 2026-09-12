@@ -13,6 +13,7 @@ type LocalNameFallbackOptions = {
   windowSeconds?: number;
   overlapSeconds?: number;
   getLanguageHint?: () => NavixaLocalSpeechLanguage;
+  mediaStream?: MediaStream;
 };
 
 type LocalWorkerMessage = {
@@ -174,16 +175,21 @@ const safeLanguageHint = (value: unknown): NavixaLocalSpeechLanguage => (
   value === "ar" || value === "en" ? value : "auto"
 );
 
+const hasLiveAudioTrack = (stream: MediaStream | undefined | null) => Boolean(
+  stream?.getAudioTracks().some((track) => track.readyState === "live"),
+);
+
 export function createNavixaLocalNameFallback({
   onTranscript,
   windowSeconds = DEFAULT_WINDOW_SECONDS,
   overlapSeconds = DEFAULT_OVERLAP_SECONDS,
   getLanguageHint,
+  mediaStream,
 }: LocalNameFallbackOptions): NavixaLocalNameFallback {
   const AudioContextClass = getAudioContextConstructor();
   const supported = Boolean(
     typeof window !== "undefined"
-    && navigator.mediaDevices?.getUserMedia
+    && (hasLiveAudioTrack(mediaStream) || navigator.mediaDevices?.getUserMedia)
     && typeof Worker !== "undefined"
     && AudioContextClass,
   );
@@ -193,6 +199,7 @@ export function createNavixaLocalNameFallback({
   let starting = false;
   let busy = false;
   let stream: MediaStream | null = null;
+  let ownsStream = false;
   let context: AudioContext | null = null;
   let source: MediaStreamAudioSourceNode | null = null;
   let processor: ScriptProcessorNode | null = null;
@@ -309,8 +316,9 @@ export function createNavixaLocalNameFallback({
       try { source.disconnect(); } catch {}
       source = null;
     }
-    stream?.getTracks().forEach((track) => track.stop());
+    if (ownsStream) stream?.getTracks().forEach((track) => track.stop());
     stream = null;
+    ownsStream = false;
     if (context && context.state !== "closed") void context.close().catch(() => undefined);
     context = null;
     worker?.terminate();
@@ -324,13 +332,21 @@ export function createNavixaLocalNameFallback({
       if (!supported || destroyed || active || starting || !AudioContextClass) return false;
       starting = true;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: false,
-        });
+        if (hasLiveAudioTrack(mediaStream)) {
+          stream = mediaStream || null;
+          ownsStream = false;
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: false,
+          });
+          ownsStream = true;
+        }
+        if (!stream || !hasLiveAudioTrack(stream)) throw new Error("voice-stream-unavailable");
         if (destroyed) {
-          stream.getTracks().forEach((track) => track.stop());
+          if (ownsStream) stream.getTracks().forEach((track) => track.stop());
           stream = null;
+          ownsStream = false;
           return false;
         }
         context = new AudioContextClass();
