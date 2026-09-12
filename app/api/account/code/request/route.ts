@@ -20,7 +20,22 @@ async function env(): Promise<Env> {
   if (!merged.NAVIXA_AUTH_FROM && !merged.RESEND_FROM_EMAIL) merged.NAVIXA_AUTH_FROM = DEFAULT_AUTH_FROM;
   return merged;
 }
-function code() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0"); }
+function code() {
+  const digits: number[] = [];
+  const values = new Uint8Array(8);
+  while (digits.length < 6) {
+    crypto.getRandomValues(values);
+    for (const value of values) {
+      const high = value >> 4;
+      if (high <= 9) digits.push(high);
+      if (digits.length === 6) break;
+      const low = value & 0x0f;
+      if (low <= 9) digits.push(low);
+      if (digits.length === 6) break;
+    }
+  }
+  return digits.join("");
+}
 
 function otpHtml(loginCode: string) {
   const digits = loginCode.split("");

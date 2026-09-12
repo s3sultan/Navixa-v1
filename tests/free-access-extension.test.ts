@@ -16,10 +16,10 @@ test("free access runs through Sep 19 Riyadh without extending paid-only entitle
     read("app/FeatureAccessGate.tsx"),
   ]);
 
-  assert.match(login, new RegExp(FREE_ACCESS_END.replace(/[.]/g, "\\.")));
+  assert.ok(login.includes(FREE_ACCESS_END));
   assert.match(login, /Date\.now\(\) >= campaignEnd/);
   assert.match(migration, /WHERE status = 'trial'/);
-  assert.match(migration, new RegExp(FREE_ACCESS_END.replace(/[.]/g, "\\.")));
+  assert.ok(migration.includes(FREE_ACCESS_END));
   assert.doesNotMatch(migration, /status\s*=\s*'active'/);
   assert.match(gate, /2026-09-20T00:00:00\+03:00/);
   assert.match(gate, /Date\.now\(\) < PUBLIC_FREE_ACCESS_UNTIL/);

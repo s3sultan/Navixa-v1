@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import os from "node:os";
@@ -15,6 +16,7 @@ const MAX_EDITS = 8;
 const MAX_OUTPUT_BYTES = 180_000;
 const MAX_NEW_FILE_BYTES = 48_000;
 const MAX_EXISTING_FILE_BYTES = 96_000;
+const READ_NOFOLLOW = constants.O_RDONLY | (constants.O_NOFOLLOW || 0);
 
 function fingerprint(value) {
   return createHash("sha256").update(String(value || "")).digest("hex").slice(0, 24);
@@ -83,12 +85,18 @@ function rewriteDiffPaths(diffText, filePath, { create = false } = {}) {
 async function assertRegularTextFile(root, relativePath) {
   const absolute = path.resolve(root, relativePath);
   if (!withinRoot(root, absolute)) throw new Error(`Unsafe repository path: ${relativePath}`);
-  const metadata = await lstat(absolute);
-  if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`Only regular text files are supported: ${relativePath}`);
-  if (metadata.size > MAX_EXISTING_FILE_BYTES) throw new Error(`Existing file exceeds ${MAX_EXISTING_FILE_BYTES} bytes: ${relativePath}`);
-  const content = await readFile(absolute, "utf8");
-  if (content.includes("\u0000")) throw new Error(`Binary-like file is not supported: ${relativePath}`);
-  return content;
+  let handle;
+  try {
+    handle = await open(absolute, READ_NOFOLLOW);
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) throw new Error(`Only regular text files are supported: ${relativePath}`);
+    if (metadata.size > MAX_EXISTING_FILE_BYTES) throw new Error(`Existing file exceeds ${MAX_EXISTING_FILE_BYTES} bytes: ${relativePath}`);
+    const content = await handle.readFile({ encoding: "utf8" });
+    if (content.includes("\u0000")) throw new Error(`Binary-like file is not supported: ${relativePath}`);
+    return content;
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
 }
 
 function validateEditShape(edit, index) {

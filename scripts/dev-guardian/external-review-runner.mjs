@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { lstat, readFile, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { evaluateScope, DEV_GUARDIAN_DEFAULTS } from "./guards.mjs";
 import { roleInstructions } from "./review-dispatch.mjs";
@@ -11,6 +12,7 @@ const PROVIDERS = Object.freeze({
   gemini: { agent: "Gemini API / AI Studio", secret: "GEMINI_API_KEY" },
   manus: { agent: "Manus", secret: "MANUS_API_KEY" },
 });
+const READ_NOFOLLOW = constants.O_RDONLY | (constants.O_NOFOLLOW || 0);
 
 function required(name) {
   const value = process.env[name];
@@ -56,17 +58,21 @@ export async function readBoundedContext({ contract, root = process.cwd(), maxBy
     if (!scope.allowed) continue;
     const absolute = path.resolve(repositoryRoot, relativePath);
     if (!withinRoot(repositoryRoot, absolute)) continue;
+    let handle;
     try {
-      const metadata = await lstat(absolute);
-      if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > maxFileBytes || totalBytes + metadata.size > maxBytes) continue;
-      const content = await readFile(absolute, "utf8");
+      handle = await open(absolute, READ_NOFOLLOW);
+      const metadata = await handle.stat();
+      if (!metadata.isFile() || metadata.size > maxFileBytes || totalBytes + metadata.size > maxBytes) continue;
+      const content = await handle.readFile({ encoding: "utf8" });
       const bytes = Buffer.byteLength(content);
       if (totalBytes + bytes > maxBytes) continue;
       totalBytes += bytes;
       included.push(relativePath);
       sections.push(`FILE: ${relativePath}\n---\n${content}\n---`);
     } catch {
-      // Context is best-effort. Missing or non-text files are omitted.
+      // Context is best-effort. Missing, linked, or non-text files are omitted.
+    } finally {
+      await handle?.close().catch(() => undefined);
     }
   }
   return { text: sections.join("\n\n"), included, totalBytes };

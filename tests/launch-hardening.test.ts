@@ -92,7 +92,7 @@ for (const workflow of [setupPush, resetCounters]) {
   assert.match(workflow, /persist-credentials: false/);
 }
 assert.match(setupPush, /--name navixa/);
-assert.match(setupPush, /https:\/\/navixasa\.com/);
+assert.ok(setupPush.includes("https://navixasa.com"));
 
 for (const workflow of [geminiBridge, manusBridge]) {
   assert.match(workflow, /github\.actor == github\.repository_owner/);
@@ -101,7 +101,7 @@ for (const workflow of [geminiBridge, manusBridge]) {
 
 for (const workflow of [stagingLoad, stagingSoak]) {
   assert.match(workflow, /github\.actor == github\.repository_owner/);
-  assert.match(workflow, /https:\/\/navixa-staging\.s2shug\.workers\.dev/);
+  assert.ok(workflow.includes("https://navixa-staging.s2shug.workers.dev"));
   assert.match(workflow, /staging_url must be the NAVIXA staging Worker/);
 }
 

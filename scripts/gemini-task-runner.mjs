@@ -1,4 +1,5 @@
-import { lstat, readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import path from "node:path";
 
 const required = [
@@ -23,6 +24,7 @@ const triggerActor = process.env.NAVIXA_TRIGGER_ACTOR;
 const [owner, repo] = repository.split("/");
 const githubBase = `https://api.github.com/repos/${owner}/${repo}`;
 const textExtensions = new Set([".css", ".html", ".js", ".json", ".jsx", ".md", ".mjs", ".ts", ".tsx", ".txt", ".yml", ".yaml"]);
+const READ_NOFOLLOW = constants.O_RDONLY | (constants.O_NOFOLLOW || 0);
 
 if (!owner || !repo || !Number.isSafeInteger(issueNumber) || issueNumber < 1) {
   throw new Error("Invalid repository or issue number.");
@@ -75,15 +77,19 @@ async function repositoryContext(body) {
   const sections = [];
   let total = 0;
   for (const relative of candidatePaths(body)) {
+    let handle;
     try {
       const absolute = path.resolve(relative);
-      const metadata = await lstat(absolute);
-      if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > 30_000 || total + metadata.size > 60_000) continue;
-      const content = await readFile(absolute, "utf8");
+      handle = await open(absolute, READ_NOFOLLOW);
+      const metadata = await handle.stat();
+      if (!metadata.isFile() || metadata.size > 30_000 || total + metadata.size > 60_000) continue;
+      const content = await handle.readFile({ encoding: "utf8" });
       total += Buffer.byteLength(content);
       sections.push(`FILE: ${relative}\n---\n${content}\n---`);
     } catch {
-      // A referenced path can be absent in the approved snapshot; omit it.
+      // A referenced path can be absent or unsafe in the approved snapshot; omit it.
+    } finally {
+      await handle?.close().catch(() => undefined);
     }
   }
   return sections.join("\n\n");

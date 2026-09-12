@@ -1,0 +1,206 @@
+name: NAVIXA Live Security Validation
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/security-live.yml'
+      - 'security/**'
+      - 'NAVIXA_SECURITY_SCAN.md'
+  push:
+    branches: [master]
+  schedule:
+    - cron: '41 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navixa-live-security-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  wait-production:
+    name: Wait for exact-SHA production deploy
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require successful Deploy NAVIXA Auto for this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            run="$(gh api "/repos/${NAVIXA_REPOSITORY}/actions/workflows/deploy-navixa-auto.yml/runs?branch=master&event=push&per_page=20" \
+              --jq '[.workflow_runs[] | select(.head_sha == env.NAVIXA_SHA)] | sort_by(.created_at) | last // empty')"
+
+            if [ -z "$run" ]; then
+              echo "Deploy run for $NAVIXA_SHA not visible yet"
+              sleep 10
+              continue
+            fi
+
+            status="$(jq -r '.status' <<<"$run")"
+            conclusion="$(jq -r '.conclusion // ""' <<<"$run")"
+            echo "Deploy status=$status conclusion=${conclusion:-pending}"
+
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Timed out waiting for production deploy of $NAVIXA_SHA"
+          exit 1
+
+  zap-baseline:
+    name: OWASP ZAP passive baseline
+    needs: [wait-production]
+    if: always() && (github.event_name != 'push' || needs.wait-production.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Prepare report directory
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/security/reports/zap"
+          chmod 777 "$GITHUB_WORKSPACE/security/reports/zap"
+
+      - name: Pull pinned ZAP release image
+        run: docker pull ghcr.io/zaproxy/zaproxy:2.17.0
+
+      - name: Run passive ZAP baseline against production
+        id: zap
+        continue-on-error: true
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/security/reports/zap:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:2.17.0 \
+            zap-baseline.py \
+            -t https://navixasa.com \
+            -m 2 \
+            -I \
+            -r navixa-zap.html \
+            -J navixa-zap.json \
+            -w navixa-zap.md
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: navixa-zap-baseline
+          path: security/reports/zap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce ZAP fail-level findings
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.zap.outcome }}" != "success" ]; then
+            echo "ZAP reported at least one FAIL-level passive finding."
+            exit 1
+          fi
+
+  nuclei:
+    name: Nuclei controlled High/Critical validation
+    needs: [wait-production]
+    if: always() && (github.event_name != 'push' || needs.wait-production.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout for report upload context
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare report and template directories
+        run: |
+          mkdir -p security/reports/nuclei security/nuclei-templates
+          chmod 777 security/reports/nuclei security/nuclei-templates
+
+      - name: Pull pinned Nuclei release image
+        run: docker pull projectdiscovery/nuclei:v3.11.1
+
+      - name: Fetch official signed Nuclei templates
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/security/nuclei-templates:/templates" \
+            projectdiscovery/nuclei:v3.11.1 \
+            -ut \
+            -ud /templates
+
+      - name: Run controlled Nuclei validation
+        id: nuclei_scan
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Preserve the same signed High/Critical template coverage while keeping
+          # a single-host production scan bounded enough for the CI gate to finish.
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/security/reports/nuclei:/out" \
+            -v "$GITHUB_WORKSPACE/security/nuclei-templates:/templates:ro" \
+            projectdiscovery/nuclei:v3.11.1 \
+            -u https://navixasa.com \
+            -t /templates \
+            -severity high,critical \
+            -etags fuzz,dos,bruteforce,intrusive \
+            -dut \
+            -ni \
+            -rl 15 \
+            -c 10 \
+            -bs 10 \
+            -timeout 6 \
+            -retries 0 \
+            -jle /out/navixa-nuclei.jsonl \
+            -se /out/navixa-nuclei.sarif \
+            -duc
+
+          findings=0
+          if [ -s security/reports/nuclei/navixa-nuclei.jsonl ]; then
+            findings="$(wc -l < security/reports/nuclei/navixa-nuclei.jsonl | tr -d ' ')"
+          fi
+          echo "Nuclei High/Critical findings: $findings"
+          test "$findings" -eq 0
+
+      - name: Upload Nuclei SARIF to code scanning
+        if: always() && hashFiles('security/reports/nuclei/navixa-nuclei.sarif') != ''
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4, resolved 2026-09-12
+        with:
+          sarif_file: security/reports/nuclei/navixa-nuclei.sarif
+          category: nuclei-production
+
+      - name: Upload Nuclei reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: navixa-nuclei-controlled
+          path: security/reports/nuclei
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce Nuclei High/Critical gate
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.nuclei_scan.outcome }}" != "success" ]; then
+            echo "Nuclei found a High/Critical issue or the controlled scan failed."
+            exit 1
+          fi

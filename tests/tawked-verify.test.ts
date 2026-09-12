@@ -9,7 +9,7 @@ test("Tawked adapter stays REST-only and Saudi-number scoped", () => {
   assert.equal(normalizeSaudiPhone("0505383358"), "+966505383358");
   assert.equal(normalizeSaudiPhone("+966505383358"), "+966505383358");
   assert.equal(normalizeSaudiPhone("123"), "");
-  assert.match(adapter, /https:\/\/tawked\.com\/v1/);
+  assert.ok(adapter.includes("https://tawked.com/v1"));
   assert.match(adapter, /\/verify\/start/);
   assert.match(adapter, /\/verify\/check/);
   assert.match(adapter, /Authorization: `Bearer \$\{apiKey\}`/);

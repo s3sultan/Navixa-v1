@@ -16,21 +16,22 @@ test("sends bounded issue context to Gemini and posts a safe report", async () =
   });
 
   globalThis.fetch = async (url, options = {}) => {
-    calls.push({ url: String(url), options });
+    const rawUrl = String(url);
+    calls.push({ url: rawUrl, options });
     let payload;
-    if (String(url).endsWith("/issues/3")) {
+    if (rawUrl.endsWith("/issues/3")) {
       payload = {
         state: "open",
         title: "Review old test",
         body: "Read `tests/rendered-html.test.mjs`; do not read `../secret.txt`.",
         html_url: "https://github.com/s3sultan/Navixa-v1/issues/3",
       };
-    } else if (String(url).includes("generativelanguage.googleapis.com")) {
+    } else if (new URL(rawUrl).hostname === "generativelanguage.googleapis.com") {
       payload = {
         candidates: [{ content: { parts: [{ text: "Safe Gemini report for @owner" }] } }],
         usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
       };
-    } else if (String(url).endsWith("/issues/3/comments")) {
+    } else if (rawUrl.endsWith("/issues/3/comments")) {
       payload = { id: calls.length };
     } else {
       return new Response(JSON.stringify({ message: "unexpected URL" }), { status: 404 });
@@ -51,7 +52,7 @@ test("sends bounded issue context to Gemini and posts a safe report", async () =
     Object.assign(process.env, originalEnv);
   }
 
-  const geminiCall = calls.find((call) => call.url.includes("generativelanguage.googleapis.com"));
+  const geminiCall = calls.find((call) => new URL(call.url).hostname === "generativelanguage.googleapis.com");
   const request = JSON.parse(geminiCall.options.body);
   assert.match(request.contents[0].parts[0].text, /FILE: tests\/rendered-html\.test\.mjs/);
   assert.doesNotMatch(request.contents[0].parts[0].text, /FILE: \.\.\/secret\.txt/);
