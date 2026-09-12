@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: تحويل جامع NameSense البشري من أداة إدارة داخلية إلى مسار مشاركة بشرية محكوم وآمن باستخدام دعوات محدودة دون فتح صلاحيات الإدارة
 - الحالة: قيد التنفيذ على فرع معزول بعد نجاح ونشر PR #184
-- الملفات المحجوزة: `app/admin/namesense-benchmark/page.tsx`, `app/admin/namesense-benchmark/collector.css`, `app/admin/namesense-benchmark/invites/page.tsx`, `app/admin/namesense-benchmark/invites/invites.css`, `app/api/admin/namesense-benchmark/route.ts`, `app/api/admin/namesense-benchmark/invites/route.ts`, `app/api/admin/namesense-benchmark/schema.ts`, `app/api/namesense-study/route.ts`, `app/namesense-study/page.tsx`, `app/namesense-study/study.css`, `benchmarks/namesense/storage.ts`, `migrations/0053_namesense_study_invites.sql`, `tests/namesense-study.test.mjs`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
+- الملفات المحجوزة: `app/admin/namesense-benchmark/page.tsx`, `app/admin/namesense-benchmark/collector.css`, `app/admin/namesense-benchmark/invites/page.tsx`, `app/admin/namesense-benchmark/invites/invites.css`, `app/api/admin/namesense-benchmark/route.ts`, `app/api/admin/namesense-benchmark/invites/route.ts`, `app/api/admin/namesense-benchmark/schema.ts`, `app/api/namesense-study/route.ts`, `app/namesense-study/page.tsx`, `app/namesense-study/study.css`, `benchmarks/namesense/storage.ts`, `benchmarks/namesense/study.ts`, `migrations/0053_namesense_study_invites.sql`, `tests/namesense-benchmark-api.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`
 
 ## آخر ما اكتمل
 
