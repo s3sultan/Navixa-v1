@@ -1,4 +1,4 @@
-name: Ops Configure NAVIXA Mail DNS
+name: Ops Activate NAVIXA Payments Email
 
 on:
   push:
@@ -6,74 +6,77 @@ on:
       - master
     paths:
       - .github/workflows/ops-resend-mx.yml
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  configure-mail-dns:
+  activate-payments-email:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ensure Resend inbound MX on navixasa.com
+      - name: Ensure payments address routes through Cloudflare Email Routing
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Cloudflare token is missing"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Cloudflare account ID is missing"; exit 1; }
 
-          desired_name="navixasa.com"
-          desired_content="inbound-smtp.ap-northeast-1.amazonaws.com"
-          desired_priority=10
+          api='https://api.cloudflare.com/client/v4'
+          auth=(-H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H 'Content-Type: application/json')
 
-          zone_json=$(curl --fail-with-body --silent --show-error \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/zones?name=${desired_name}")
-          printf '%s' "$zone_json" | jq -e '.success == true' >/dev/null
+          zone_json=$(curl --fail-with-body --silent --show-error "${auth[@]}" "$api/zones?name=navixasa.com")
           zone_id=$(printf '%s' "$zone_json" | jq -r '.result[0].id // empty')
-          test -n "$zone_id" || { echo "Zone navixasa.com was not found or token cannot access it"; exit 1; }
-          echo "Cloudflare zone is accessible."
+          test -n "$zone_id" || { echo "Cloudflare zone is unavailable"; exit 1; }
+          echo "Cloudflare zone access: OK"
 
-          mx_json=$(curl --fail-with-body --silent --show-error \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records?type=MX&name=${desired_name}&per_page=100")
-          printf '%s' "$mx_json" | jq -e '.success == true' >/dev/null
-          count=$(printf '%s' "$mx_json" | jq '.result | length')
-          echo "Current root MX record count: ${count}"
+          addresses_json=$(curl --fail-with-body --silent --show-error "${auth[@]}" "$api/accounts/${CLOUDFLARE_ACCOUNT_ID}/email/routing/addresses?per_page=100")
+          printf '%s' "$addresses_json" | jq -e '.success == true' >/dev/null
+          verified_count=$(printf '%s' "$addresses_json" | jq '[.result[] | select(.verified != null)] | length')
+          echo "Verified Email Routing destinations: ${verified_count}"
 
-          if [ "$count" -eq 0 ]; then
-            echo "No root MX exists. Creating the Resend inbound MX."
-            payload=$(jq -nc \
-              --arg name "$desired_name" \
-              --arg content "$desired_content" \
-              --argjson priority "$desired_priority" \
-              '{type:"MX",name:$name,content:$content,priority:$priority,ttl:1}')
-            create_json=$(curl --fail-with-body --silent --show-error \
-              --request POST \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              --data "$payload" \
-              "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records")
-            printf '%s' "$create_json" | jq -e '.success == true' >/dev/null
-            echo "Resend inbound MX created."
-          else
-            exact_matches=$(printf '%s' "$mx_json" | jq --arg content "$desired_content" --argjson priority "$desired_priority" '[.result[] | select(.content == $content and .priority == $priority)] | length')
-            if [ "$count" -eq 1 ] && [ "$exact_matches" -eq 1 ]; then
-              echo "Resend inbound MX already configured correctly."
-            else
-              echo "Conflicting root MX records detected. No DNS records were changed."
-              printf '%s' "$mx_json" | jq -r '.result[] | "MX name=\(.name) content=\(.content) priority=\(.priority) ttl=\(.ttl)"'
-              exit 2
-            fi
+          rules_json=$(curl --fail-with-body --silent --show-error "${auth[@]}" "$api/zones/${zone_id}/email/routing/rules?per_page=100")
+          printf '%s' "$rules_json" | jq -e '.success == true' >/dev/null
+          payment_rules=$(printf '%s' "$rules_json" | jq '[.result[] | select(any(.matchers[]?; .type == "literal" and .field == "to" and .value == "payments@navixasa.com"))] | length')
+          echo "Existing payments routing rules: ${payment_rules}"
+
+          if [ "$payment_rules" -gt 1 ]; then
+            echo "Multiple payments routing rules exist; refusing an ambiguous change."
+            exit 2
           fi
 
-          verify_json=$(curl --fail-with-body --silent --show-error \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records?type=MX&name=${desired_name}&per_page=100")
-          printf '%s' "$verify_json" | jq -e --arg content "$desired_content" --argjson priority "$desired_priority" '.success == true and ([.result[] | select(.content == $content and .priority == $priority)] | length) == 1' >/dev/null
-          echo "Cloudflare MX verification passed."
+          if [ "$payment_rules" -eq 1 ]; then
+            rule=$(printf '%s' "$rules_json" | jq -c '.result[] | select(any(.matchers[]?; .type == "literal" and .field == "to" and .value == "payments@navixasa.com"))')
+            enabled=$(printf '%s' "$rule" | jq -r '.enabled')
+            action=$(printf '%s' "$rule" | jq -r '.actions[0].type // empty')
+            if [ "$action" != "forward" ]; then
+              echo "payments routing exists but is not a forward rule; refusing to overwrite it."
+              exit 3
+            fi
+            if [ "$enabled" = "true" ]; then
+              echo "payments@navixasa.com routing is already active."
+              exit 0
+            fi
+
+            rule_id=$(printf '%s' "$rule" | jq -r '.id')
+            payload=$(printf '%s' "$rule" | jq '{actions,matchers,name,priority,enabled:true}')
+            update_json=$(curl --fail-with-body --silent --show-error --request PUT "${auth[@]}" --data "$payload" "$api/zones/${zone_id}/email/routing/rules/${rule_id}")
+            printf '%s' "$update_json" | jq -e '.success == true and .result.enabled == true' >/dev/null
+            echo "Existing payments routing rule activated."
+            exit 0
+          fi
+
+          if [ "$verified_count" -ne 1 ]; then
+            echo "Cannot safely choose a forwarding destination automatically."
+            exit 4
+          fi
+
+          destination=$(printf '%s' "$addresses_json" | jq -r '.result[] | select(.verified != null) | .email')
+          test -n "$destination"
+          payload=$(jq -nc --arg destination "$destination" '{actions:[{type:"forward",value:[$destination]}],matchers:[{type:"literal",field:"to",value:"payments@navixasa.com"}],enabled:true,name:"NAVIXA payments inbox",priority:0}')
+          create_json=$(curl --fail-with-body --silent --show-error --request POST "${auth[@]}" --data "$payload" "$api/zones/${zone_id}/email/routing/rules")
+          printf '%s' "$create_json" | jq -e '.success == true and .result.enabled == true' >/dev/null
+          echo "payments@navixasa.com routing rule created and activated."
