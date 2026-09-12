@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createNavixaBrowserVoiceEngine, type NavixaVoiceEngine, type NavixaVoiceLanguage } from "../../voice/voiceEngine";
 import { findNavixaVoiceTerm, type NavixaVoiceMatch } from "../../voice/voiceDetection";
 import { hasNavixaVoiceActivity } from "../../voice/localNameFallback";
-import { createControlledLiveNameSenseTrial } from "../../../benchmarks/namesense/collector-core.mjs";
+import {
+  createControlledLiveNameSenseTrial,
+  deriveNameSenseAdaptiveVadThreshold,
+  isNameSenseNoiseFloorCandidate,
+} from "../../../benchmarks/namesense/collector-core.mjs";
 import protocolJson from "../../../benchmarks/namesense/protocol.json";
 import { useAdminAuth } from "../useAdminAuth";
 import "./collector.css";
@@ -258,13 +262,13 @@ export default function NameSenseBenchmarkCollector() {
         const input = new Float32Array(event.inputBuffer.getChannelData(0));
         chunks.push(input); bufferedSamples += input.length;
         const frameRms = rmsOf(input);
-        if (!speechSeen && frameRms < 0.02 && noiseFloorFrames < 30) {
+        if (!speechSeen && noiseFloorFrames < 30 && isNameSenseNoiseFloorCandidate(frameRms, protocol.signalQuality.minRms)) {
           noiseFloorRms = (noiseFloorRms * noiseFloorFrames + frameRms) / (noiseFloorFrames + 1);
           noiseFloorFrames += 1;
         }
-        const adaptiveRmsThreshold = Math.max(
+        const adaptiveRmsThreshold = deriveNameSenseAdaptiveVadThreshold(
+          noiseFloorRms,
           protocol.signalQuality.minRms,
-          Math.min(0.015, noiseFloorRms * 2.5),
         );
         const hasVoice = hasNavixaVoiceActivity(input, context.sampleRate, 20, adaptiveRmsThreshold, 60);
         if (hasVoice) { speechSeen = true; trailingSilenceSamples = 0; } else if (speechSeen) trailingSilenceSamples += input.length;
