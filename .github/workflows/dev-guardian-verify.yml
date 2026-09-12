@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Repo intelligence, contracts, live guards and evidence
+    name: Repo intelligence, contracts, live guards, evidence and developer bridge
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -35,7 +35,7 @@ jobs:
           node-version: "22.13.0"
 
       - name: Run Dev Guardian unit tests
-        run: node --test tests/dev-guardian.test.mjs tests/dev-guardian-stage2.test.mjs tests/dev-guardian-stage3.test.mjs
+        run: node --test tests/dev-guardian.test.mjs tests/dev-guardian-stage2.test.mjs tests/dev-guardian-stage3.test.mjs tests/dev-guardian-stage4.test.mjs
 
       - name: Parse Dev Guardian runner modules
         run: |
@@ -44,6 +44,7 @@ jobs:
           node --check scripts/dev-guardian/event-ledger.mjs
           node --check scripts/dev-guardian/executor-guard.mjs
           node --check scripts/dev-guardian/evidence-aggregator.mjs
+          node --check scripts/dev-guardian/patch-developer-bridge.mjs
 
       - name: Build repository intelligence snapshot
         run: node scripts/dev-guardian/repo-intelligence.mjs --root . --json --check > "$RUNNER_TEMP/navixa-repo-map.json"
