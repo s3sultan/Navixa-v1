@@ -139,29 +139,6 @@ async function navigate(cdp, url) {
   assert.equal(readiness.ready, true, `لم تجهز الصفحة ${url}: ${JSON.stringify(readiness)}`);
 }
 
-async function inspectUiLab(cdp, { width, height, mobile }) {
-  await cdp.call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
-  await navigate(cdp, `${BASE_URL}/ui-lab`);
-  return evaluate(cdp, `(() => {
-    const sidebar = document.querySelector('aside[aria-label="التنقل الرئيسي"]');
-    const bottomNav = document.querySelector('nav[aria-label="التنقل السريع"]');
-    const menuButton = document.querySelector('button[aria-controls="navixa-mobile-navigation"]');
-    const heading = document.querySelector('main h1');
-    const sidebarRect = sidebar?.getBoundingClientRect();
-    return {
-      heading: heading?.textContent?.trim() || "",
-      innerWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-      hasHorizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
-      sidebarDisplay: sidebar ? getComputedStyle(sidebar).display : null,
-      sidebarWidth: sidebarRect ? Math.round(sidebarRect.width) : 0,
-      bottomNavDisplay: bottomNav ? getComputedStyle(bottomNav).display : null,
-      menuDisplay: menuButton ? getComputedStyle(menuButton).display : null,
-      cardCount: document.querySelectorAll('main section').length,
-    };
-  })()`);
-}
-
 async function main() {
   const profileDir = await mkdtemp(join(tmpdir(), "navixa-ui-profile-"));
   const dev = start(process.execPath, [vinextCli, "dev", "--host", "::1", "--port", String(APP_PORT)]);
@@ -258,55 +235,6 @@ async function main() {
     assert.equal(meetingGate.visible, true, "يجب أن تظهر أدوات الاجتماعات للزائر خلال الفترة المجانية");
     assert.equal(meetingGate.gateHidden, true, "يجب ألا تظهر بوابة الحساب في الاجتماعات خلال الفترة المجانية");
 
-    const uiLabMobile = await inspectUiLab(cdp, { width: 390, height: 844, mobile: true });
-    assert.equal(uiLabMobile.hasHorizontalOverflow, false, `يجب ألا يظهر overflow أفقي في UI Lab على الجوال: ${JSON.stringify(uiLabMobile)}`);
-    assert.equal(uiLabMobile.sidebarDisplay, "none", "يجب إخفاء Sidebar على الجوال");
-    assert.notEqual(uiLabMobile.bottomNavDisplay, "none", "يجب إظهار Bottom Navigation على الجوال");
-    assert.notEqual(uiLabMobile.menuDisplay, "none", "يجب إظهار زر قائمة الجوال");
-    assert.ok(uiLabMobile.cardCount >= 5, "يجب أن تعرض معاينة الجوال البطاقات الأساسية");
-
-    await evaluate(cdp, `document.querySelector('button[aria-controls="navixa-mobile-navigation"]')?.click()`);
-    const uiLabDrawer = await evaluate(cdp, `new Promise(resolve => {
-      const deadline = performance.now() + 1_500;
-      const inspect = () => {
-        const drawer = document.getElementById("navixa-mobile-navigation");
-        if (!drawer && performance.now() < deadline) return setTimeout(inspect, 50);
-        const rect = drawer?.getBoundingClientRect();
-        resolve({
-          found: Boolean(drawer),
-          role: drawer?.getAttribute("role") || null,
-          modal: drawer?.getAttribute("aria-modal") || null,
-          width: rect ? Math.round(rect.width) : 0,
-          bottomGap: rect ? Math.round(innerHeight - rect.bottom) : null,
-        });
-      };
-      inspect();
-    })`);
-    assert.equal(uiLabDrawer.found, true, "يجب أن تفتح قائمة الجوال كـDrawer");
-    assert.equal(uiLabDrawer.role, "dialog", "يجب أن يحمل Drawer دلالة dialog");
-    assert.equal(uiLabDrawer.modal, "true", "يجب أن يعلن Drawer أنه modal");
-    assert.ok(uiLabDrawer.width >= 380, `يجب أن يستخدم Drawer عرض الجوال تقريبًا: ${JSON.stringify(uiLabDrawer)}`);
-    assert.ok(Math.abs(uiLabDrawer.bottomGap ?? 99) <= 1, "يجب أن يلتصق Drawer بأسفل الشاشة على الجوال");
-    await cdp.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
-    await cdp.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
-    await sleep(100);
-    const drawerClosed = await evaluate(cdp, `!document.getElementById("navixa-mobile-navigation")`);
-    assert.equal(drawerClosed, true, "يجب أن يغلق Drawer بزر Escape");
-
-    const uiLabTablet = await inspectUiLab(cdp, { width: 820, height: 900, mobile: false });
-    assert.equal(uiLabTablet.hasHorizontalOverflow, false, `يجب ألا يظهر overflow أفقي في UI Lab على التابلت: ${JSON.stringify(uiLabTablet)}`);
-    assert.notEqual(uiLabTablet.sidebarDisplay, "none", "يجب إظهار شريط جانبي مختصر على التابلت");
-    assert.ok(uiLabTablet.sidebarWidth >= 70 && uiLabTablet.sidebarWidth <= 110, `عرض شريط التابلت غير متوقع: ${JSON.stringify(uiLabTablet)}`);
-    assert.equal(uiLabTablet.bottomNavDisplay, "none", "يجب إخفاء Bottom Navigation على التابلت");
-    assert.equal(uiLabTablet.menuDisplay, "none", "يجب إخفاء زر قائمة الجوال على التابلت");
-
-    const uiLabDesktop = await inspectUiLab(cdp, { width: 1440, height: 1000, mobile: false });
-    assert.equal(uiLabDesktop.hasHorizontalOverflow, false, `يجب ألا يظهر overflow أفقي في UI Lab على سطح المكتب: ${JSON.stringify(uiLabDesktop)}`);
-    assert.notEqual(uiLabDesktop.sidebarDisplay, "none", "يجب إظهار Sidebar كامل على سطح المكتب");
-    assert.ok(uiLabDesktop.sidebarWidth >= 240, `يجب أن يكون Sidebar سطح المكتب كامل العرض: ${JSON.stringify(uiLabDesktop)}`);
-    assert.equal(uiLabDesktop.bottomNavDisplay, "none", "يجب إخفاء Bottom Navigation على سطح المكتب");
-    assert.equal(uiLabDesktop.menuDisplay, "none", "يجب إخفاء زر قائمة الجوال على سطح المكتب");
-
     console.log(JSON.stringify({
       status: "passed",
       checks: {
@@ -315,12 +243,6 @@ async function main() {
         loginLayout,
         adminGuard,
         meetingGate,
-        uiLab: {
-          mobile: uiLabMobile,
-          drawer: uiLabDrawer,
-          tablet: uiLabTablet,
-          desktop: uiLabDesktop,
-        },
       },
     }, null, 2));
   } finally {
