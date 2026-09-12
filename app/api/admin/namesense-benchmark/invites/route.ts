@@ -40,6 +40,7 @@ async function ensureInviteSchema(database: NameSenseDb) {
     CREATE TABLE IF NOT EXISTS navixa_namesense_study_invites (
       invite_id TEXT PRIMARY KEY,
       token_hash TEXT NOT NULL UNIQUE,
+      client_hash TEXT,
       speaker_id TEXT NOT NULL UNIQUE,
       accent TEXT NOT NULL,
       max_trials INTEGER NOT NULL,
@@ -107,8 +108,8 @@ export async function POST(request: Request) {
   try {
     await database.prepare(`
       INSERT INTO navixa_namesense_study_invites (
-        invite_id,token_hash,speaker_id,accent,max_trials,used_trials,expires_at,revoked,created_at
-      ) VALUES (?,?,?,?,?,0,?,0,?)
+        invite_id,token_hash,client_hash,speaker_id,accent,max_trials,used_trials,expires_at,revoked,created_at
+      ) VALUES (?,?,NULL,?,?,?,0,?,0,?)
     `).bind(inviteId, tokenHash, speakerId, body.accent, maxTrials, expiresAt, createdAt).run();
   } catch {
     return NextResponse.json({ error: "تعذر إنشاء الدعوة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     accent: body.accent,
     maxTrials,
     expiresAt,
-    invitePath: `/namesense-study?invite=${token}`,
+    invitePath: `/namesense-study#invite=${token}`,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
