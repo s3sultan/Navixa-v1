@@ -87,7 +87,7 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 - إشارات حساسية الأمان/UI/التكاملات.
 - ملفات context مختارة من Repo Intelligence.
 
-إذا غاب الهدف أو معايير القبول أو النطاق المسموح أو base commit تتوقف المهمة بدل التخمين.
+إذا غاب الهدف أو معايير القبول أو النطاق المسموح أو base commit تتوقف المهمة بدل التخمين. إذا طلبت المهمة commit صريحًا لا يطابق snapshot الجاري، تتوقف بـ`base-commit-mismatch`. كما أن اختيار context يخضع لنفس allowed/forbidden scope منذ مرحلة التخطيط، فلا تتوسع الخريطة خارج النطاق المعتمد.
 
 ### Guardian Planner
 
@@ -122,6 +122,8 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 - يعامل الكود والنص كمدخل غير موثوق.
 - النتيجة تقرير مراجعة فقط ولا تطبق أو تدمج أو تنشر.
 
+مع Gemini توضع قواعد الدور والأمان في `system_instruction` منفصلة عن task/context غير الموثوق، ويُطلب صراحة تجاهل أي تعليمات مضمنة داخل الكود أو التعليقات أو التوثيق تحاول تغيير الدور أو كشف البيانات أو إضعاف الحدود. مع Manus تُسبق البيانات غير الموثوقة بنفس قواعد الأمان الثابتة داخل الرسالة المقيدة.
+
 ### Workflow اليدوي
 
 `.github/workflows/dev-guardian-task.yml`
@@ -137,7 +139,7 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 ## التحقق
 
 - `tests/dev-guardian.test.mjs`: Repo Intelligence والـguards والـrouter.
-- `tests/dev-guardian-stage2.test.mjs`: Task Contract، الميزانية، استقلال المراجع، bounded context، منع الأسرار، prompts وخطة المرحلة الثانية.
+- `tests/dev-guardian-stage2.test.mjs`: Task Contract، ربط base commit، منع توسيع context خارج scope، الميزانية، استقلال المراجع، bounded context، منع الأسرار، فصل system safety عن البيانات غير الموثوقة، وخطة المرحلة الثانية.
 - `.github/workflows/dev-guardian-verify.yml`: يشغل المجموعتين، يفحص syntax للـrunners ويبني Repo Intelligence snapshot للمستودع الحقيقي.
 - `pr-verify` و`pre-launch-gate` يبقيان كما هما ولا يتم تخفيف أي فحص موجود.
 
