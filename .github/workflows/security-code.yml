@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  security-events: write
 
 concurrency:
   group: navixa-security-code-${{ github.ref }}
@@ -23,6 +21,9 @@ jobs:
     name: CodeQL deep analysis
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout reviewed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,13 +34,13 @@ jobs:
         run: mkdir -p security/reports/codeql
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4, resolved 2026-09-12
         with:
           languages: javascript-typescript
           queries: security-extended
 
       - name: Analyze and upload CodeQL SARIF
-        uses: github/codeql-action/analyze@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4, resolved 2026-09-12
         with:
           category: /language:javascript-typescript
           output: security/reports/codeql
@@ -72,6 +73,9 @@ jobs:
     name: Trivy repository and configuration scan
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout reviewed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -118,7 +122,7 @@ jobs:
 
       - name: Upload Trivy SARIF to code scanning
         if: always() && hashFiles('security/reports/trivy.sarif') != ''
-        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4, resolved 2026-09-12
         with:
           sarif_file: security/reports/trivy.sarif
           category: trivy
