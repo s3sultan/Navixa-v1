@@ -1,0 +1,144 @@
+name: NAVIXA Security Code Scan
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  schedule:
+    - cron: '17 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+concurrency:
+  group: navixa-security-code-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL deep analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare report directory
+        run: mkdir -p security/reports/codeql
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Analyze and upload CodeQL SARIF
+        uses: github/codeql-action/analyze@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        with:
+          category: /language:javascript-typescript
+          output: security/reports/codeql
+          upload: always
+
+      - name: Block CodeQL High or Critical findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(security/reports/codeql/*.sarif)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "CodeQL SARIF output missing"
+            exit 1
+          fi
+          count="$(jq -s '[.[].runs[]?.results[]? | select(((.properties["security-severity"] // "0") | tonumber) >= 7.0)] | length' "${files[@]}")"
+          echo "CodeQL High/Critical findings: $count"
+          test "$count" -eq 0
+
+      - name: Upload CodeQL report artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: navixa-codeql-sarif
+          path: security/reports/codeql
+          if-no-files-found: error
+          retention-days: 14
+
+  trivy:
+    name: Trivy repository and configuration scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare report directory
+        run: mkdir -p security/reports
+
+      - name: Pull pinned Trivy release
+        run: docker pull aquasec/trivy:0.74.0
+
+      - name: Generate Trivy SARIF and enforce High/Critical gate
+        id: trivy_gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            aquasec/trivy:0.74.0 \
+            fs \
+            --scanners vuln,misconfig,secret \
+            --severity HIGH,CRITICAL \
+            --skip-dirs .git,node_modules,.next,dist \
+            --format sarif \
+            --output security/reports/trivy.sarif \
+            --exit-code 1 \
+            .
+
+      - name: Generate CycloneDX SBOM
+        if: always()
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            aquasec/trivy:0.74.0 \
+            fs \
+            --scanners vuln \
+            --skip-dirs .git,node_modules,.next,dist \
+            --format cyclonedx \
+            --output security/reports/navixa-sbom.cdx.json \
+            .
+
+      - name: Upload Trivy SARIF to code scanning
+        if: always() && hashFiles('security/reports/trivy.sarif') != ''
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        with:
+          sarif_file: security/reports/trivy.sarif
+          category: trivy
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: navixa-trivy-security
+          path: |
+            security/reports/trivy.sarif
+            security/reports/navixa-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce Trivy gate
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.trivy_gate.outcome }}" != "success" ]; then
+            echo "Trivy found High/Critical vulnerabilities, misconfigurations, or secrets."
+            exit 1
+          fi
