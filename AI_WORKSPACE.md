@@ -9,6 +9,14 @@
 - الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. أول فحص كشف lint على رابط داخلي وتم إصلاحه؛ الفحص التالي أثبت نجاح 245 اختبارًا وكشف أن قياس Drawer تم أثناء حركة الدخول، لذلك يُفصل فحص الـUI System في smoke مستقل أكثر ثباتًا.
 - الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
 
+## مهمة موازية غير متقاطعة — NAVIXA Dev Guardian Foundation
+
+- الوكيل: ChatGPT.
+- المهمة: بناء الأساس الأول لـ`NAVIXA Repo Intelligence` و`Scope/Budget/Stuck Guards` دون إدخال Runtime خارجي ودون لمس ملفات UI System المحجوزة.
+- الحالة: حجز فقط؛ التنفيذ سيكون على فرع معزول وPull Request مستقل، ولا يوجد نشر أو تعديل إنتاجي مباشر.
+- الملفات المحجوزة لهذه المهمة: `scripts/dev-guardian/*`, `tests/dev-guardian.test.mjs`, `.github/workflows/dev-guardian-verify.yml`, `NAVIXA_DEV_GUARDIAN.md`.
+- القيود: لا تعديل لـ`package.json` أو ملفات PR #193، ولا دمج أو نشر قبل نجاح الفحوص والمراجعة.
+
 ## آخر ما اكتمل
 
 - دُمج PR #179 لبناء بوابة benchmark بشرية صارمة لـNameSense تشمل مجموعات اللهجات/اللكنات المطلوبة، حدود Wilson 95%، متطلبات تنوع صارمة، استبعاد الصوت الاصطناعي من دليل الاعتماد، فحص جودة الإشارة RMS/variance/VAD، ومنع تسرب المتحدثين بين مجموعات اللهجات. لا توجد حتى الآن نسبة دقة بشرية معلنة قبل جمع البيانات المؤهلة.
@@ -24,4 +32,5 @@
 - إعادة `tests/ui-smoke.mjs` لفحصه الأصلي وفصل `/ui-lab` في `tests/ui-system-smoke.mjs` على narrow/medium/wide مع انتظار استقرار الحركة قبل القياس.
 - إكمال GitHub Actions على PR #193 وإصلاح أي فشل حتى تصبح البوابة نظيفة.
 - توثيق التسليم وإبقاء PR Draft دون دمج حتى مراجعة المستخدم.
+- بناء Dev Guardian Foundation على فرع مستقل: Repo Intelligence ثم Scope/Budget/Stuck Guards واختبار مستقل، دون لمس نطاق UI System.
 - تبقى متابعة PR #188 ونشر NameSense مسارًا مستقلًا ولا تتداخل ملفاته مع هذه المهمة.
