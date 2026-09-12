@@ -1,4 +1,4 @@
-import {sendNavixaFeaturePushEvent} from "./pushClient";
+import {sendNavixaFeaturePushEvent} from "./pushClient.ts";
 
 export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"wird"|"sadaqah"|"task";
 export type Policy="user"|"on"|"off";
