@@ -4,6 +4,20 @@
 
 ## 2026-09-12 — ChatGPT
 
+- حوّل جامع NameSense البشري من أداة إدارة داخلية فقط إلى دراسة بشرية محكومة بدعوات منفصلة لكل متحدث عبر `/namesense-study`، دون منح أي صلاحية إدارية.
+- جعل دعوات الدراسة تستخدم token عشوائي 256-bit مخزنًا في D1 كـSHA-256 فقط، ونقل token الخام إلى URL fragment يُزال فور فتح الصفحة بدل query string، مع إبقائه session-scoped في المتصفح فقط.
+- ربط كل دعوة بأول متصفح مشارك عبر client nonce مجهول مخزن كـhash لمنع خلط شخصين داخل speaker cohort واحد، مع انتهاء صلاحية وإلغاء وسقف محاولات من الخادم.
+- جعل الخادم مالكًا كاملًا لـaccent وspeakerId وhit/miss وwatched name والجملة الدقيقة وlatency eligibility، مع رفض prompt قديم أو معدّل وconditional update يمنع multi-tab races وتجاوز max trials.
+- ألغى rollback العداد عند فشل تخزين نادر؛ تُستهلك الجولة دون تسجيل evidence بدل خفض العداد بعد تزامن محتمل، فلا يمكن تضخيم نتيجة benchmark.
+- أضاف صفحة إدارة `/admin/namesense-benchmark/invites` لإنشاء ونسخ وإلغاء الدعوات ومتابعة التقدم دون كشف tokens السابقة، وطبقة تخزين مشتركة لمساري الإدارة والدراسة.
+- حافظ على الخصوصية: الصوت الخام وtranscript لا يصلان إلى D1، ومسار الدراسة لا يعدّل watched terms أو learned aliases أو production language hints، ويستخدم `MediaStream` واحدًا ويغلقه بعد كل جولة.
+- أضاف migration `0053_namesense_study_invites.sql` واختبارات لعقد token URL، browser binding، عدم rollback، server-owned ground truth، exact prompts، توازن hit/miss، ورفض البيانات الحساسة.
+- مراجعة التهديدات في Issue #190 أعطت `CLEAR` للتصميم المطلوب؛ وبشكل مستقل نجح التنفيذ على head `daf2f3060fb05ea4a612a64954ee0ab5ee2004d0` في Verify NAVIXA Pull Request #436 وNAVIXA Pre-Launch Gate #319 وRelease Gate، شاملًا lint والاختبارات وUI smoke وبناء الإنتاج وتدقيق الاعتماديات والأسرار وGitHub Actions.
+- لا توجد أي نسبة دقة بشرية معلنة حتى الآن؛ الدراسة تجهز جمع corpus حقيقي، ويبقى scorer الصارم من PR #179 هو بوابة الاعتماد بعد اكتمال العينات المؤهلة.
+- الملفات: `app/namesense-study/*`, `app/api/namesense-study/route.ts`, `app/admin/namesense-benchmark/invites/*`, `app/api/admin/namesense-benchmark/invites/route.ts`, `app/api/admin/namesense-benchmark/route.ts`, `benchmarks/namesense/storage.ts`, `benchmarks/namesense/study.ts`, `migrations/0053_namesense_study_invites.sql`, `tests/namesense-benchmark-api.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
+## 2026-09-12 — ChatGPT
+
 - أنشأ جامعًا داخليًا محميًا للـNameSense human holdout benchmark داخل `/admin/namesense-benchmark` مع API إدارة محمي وD1، دون حفظ الصوت الخام أو transcript أو هوية الحساب.
 - وحّد التقاط الميكروفون بحيث يعيد local Whisper fallback استخدام `MediaStream` نفسه، مع ملكية صريحة تمنع إيقاف track خارجي، وعزل benchmark عن watched terms والتعلم وتلميح اللغة الخاص بالمستخدم.
 - أضاف سجلًا ذريًا لمجموعة كل `speakerId` لمنع دخوله في لهجتين متعارضتين تحت الطلبات المتزامنة، مع تحقق accent بعد `INSERT OR IGNORE` ورفض mismatch.
