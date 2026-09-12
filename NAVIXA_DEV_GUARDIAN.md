@@ -143,7 +143,7 @@ Router حتمي وقابل للمراجعة يعتمد على مستوى الخ�
 - `.github/workflows/dev-guardian-verify.yml`: يشغل المجموعتين، يفحص syntax للـrunners ويبني Repo Intelligence snapshot للمستودع الحقيقي.
 - `pr-verify` و`pre-launch-gate` يبقيان كما هما ولا يتم تخفيف أي فحص موجود.
 
-المرحلة الثانية اجتازت على PR #194 قبل تحديث هذا السجل: `NAVIXA Dev Guardian Verify` #19، و`Verify NAVIXA Pull Request` #476، و`NAVIXA Pre-Launch Gate` #366 مع Release Gate، شاملة فحص GitHub Actions والأسرار وتدقيق اعتماديات الإنتاج وlint والاختبارات وUI smoke وبناء الإنتاج. تحديث هذا السجل توثيقي فقط ولا يغيّر منطق Dev Guardian.
+المرحلتان الأولى والثانية اجتازتا على PR #194 وhead `cc902ae8b75f1a0cd2694616d74627b4ef5a3439`: `NAVIXA Dev Guardian Verify` #20، و`Verify NAVIXA Pull Request` #477، و`NAVIXA Pre-Launch Gate` #367 مع Release Gate، شاملة فحص GitHub Actions والأسرار وتدقيق اعتماديات الإنتاج وlint والاختبارات وUI smoke وبناء الإنتاج.
 
 ## ما لم يتم بعد عمدًا
 
