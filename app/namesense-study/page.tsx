@@ -37,6 +37,8 @@ type BenchmarkProtocol = {
 };
 
 const protocol = protocolJson as BenchmarkProtocol;
+const INVITE_SESSION_KEY = "navixa-ns-study-invite";
+const HEX_64 = /^[a-f0-9]{64}$/i;
 
 const ACCENT_LABELS: Record<Accent, string> = {
   "en-IN": "English · Indian",
@@ -84,6 +86,11 @@ const NEGATIVES: Record<NameId, { ar: string[]; en: string[] }> = {
 const accentLanguage = (accent: Accent): NavixaVoiceLanguage => accent === "ar-GULF" ? "ar-SA" : accent as NavixaVoiceLanguage;
 const defaultDeviceClass = (): DeviceClass => typeof navigator !== "undefined" && /Mobile|Android|iP(?:hone|ad|od)/.test(navigator.userAgent) ? "phone" : "laptop-built-in";
 const nextIndex = (length: number) => Math.floor(Math.random() * Math.max(1, length));
+const randomHex = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+};
 
 const browserClass = (): BrowserClass | null => {
   if (typeof navigator === "undefined") return null;
@@ -131,6 +138,7 @@ const rmsOf = (input: Float32Array) => {
 
 export default function NameSenseStudyPage() {
   const [invite, setInvite] = useState("");
+  const [clientNonce, setClientNonce] = useState("");
   const [session, setSession] = useState<StudySession | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -144,10 +152,16 @@ export default function NameSenseStudyPage() {
   const mounted = useRef(true);
   const detectedBrowser = useMemo(() => browserClass(), []);
 
-  const loadSession = useCallback(async (token: string) => {
+  const loadSession = useCallback(async (token: string, nonce: string) => {
     setLoading(true); setPageError("");
     try {
-      const response = await fetch(`/api/namesense-study?invite=${encodeURIComponent(token)}`, { cache: "no-store" });
+      const response = await fetch("/api/namesense-study", {
+        method: "PUT",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invite: token, clientNonce: nonce }),
+      });
       const data = await response.json().catch(() => ({})) as StudySession & { error?: string };
       if (!response.ok) throw new Error(data.error || "تعذر فتح جلسة المشاركة");
       if (mounted.current) setSession(data);
@@ -160,9 +174,27 @@ export default function NameSenseStudyPage() {
 
   useEffect(() => {
     mounted.current = true;
-    const token = new URLSearchParams(window.location.search).get("invite")?.trim().toLowerCase() || "";
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const fragmentToken = fragment.get("invite")?.trim().toLowerCase() || "";
+    const storedToken = sessionStorage.getItem(INVITE_SESSION_KEY)?.trim().toLowerCase() || "";
+    const token = HEX_64.test(fragmentToken) ? fragmentToken : HEX_64.test(storedToken) ? storedToken : "";
+
+    if (fragmentToken) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    if (!token) {
+      setLoading(false);
+      setPageError("رابط المشاركة ناقص أو غير صالح");
+      return () => { mounted.current = false; };
+    }
+
+    sessionStorage.setItem(INVITE_SESSION_KEY, token);
+    const clientKey = `navixa-ns-study-client:${token.slice(0, 16)}`;
+    const storedNonce = localStorage.getItem(clientKey)?.trim().toLowerCase() || "";
+    const nonce = HEX_64.test(storedNonce) ? storedNonce : randomHex();
+    if (!HEX_64.test(storedNonce)) localStorage.setItem(clientKey, nonce);
+
     setInvite(token);
-    if (token) void loadSession(token); else { setLoading(false); setPageError("رابط المشاركة ناقص أو غير صالح"); }
+    setClientNonce(nonce);
+    void loadSession(token, nonce);
     return () => { mounted.current = false; };
   }, [loadSession]);
 
@@ -173,7 +205,7 @@ export default function NameSenseStudyPage() {
   }, [running, session]);
 
   const runTrial = async () => {
-    if (running || !session || !prompt || !invite) return;
+    if (running || !session || !prompt || !invite || !clientNonce) return;
     if (!consent) { setStatus("أكد موافقتك أولًا"); return; }
     if (!detectedBrowser) { setStatus("هذا المتصفح خارج مجموعة القياس الحالية"); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setStatus("الميكروفون غير مدعوم في هذا المتصفح"); return; }
@@ -223,12 +255,15 @@ export default function NameSenseStudyPage() {
           method: "POST",
           credentials: "same-origin",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ invite, trial: record }),
+          body: JSON.stringify({ invite, clientNonce, trial: record }),
         });
         const data = await response.json().catch(() => ({})) as {
-          error?: string; remainingTrials?: number; nextExpected?: Expected; nextNameId?: NameId; completed?: boolean;
+          error?: string; remainingTrials?: number; nextExpected?: Expected; nextNameId?: NameId; completed?: boolean; refreshRequired?: boolean;
         };
-        if (!response.ok) throw new Error(data.error || "تعذر اعتماد التجربة");
+        if (!response.ok) {
+          if (data.refreshRequired) void loadSession(invite, clientNonce);
+          throw new Error(data.error || "تعذر اعتماد التجربة");
+        }
         if (mounted.current) {
           const remainingTrials = Number(data.remainingTrials ?? 0);
           setSession((current) => current ? {
