@@ -10,6 +10,27 @@ export function readAcademicReminders(): AcademicReminder[] {
   } catch { return []; }
 }
 
+async function syncAcademicPush(reminder:AcademicReminder){
+  const eventDate=new Date(`${reminder.date}T18:00:00+03:00`);
+  const due=new Date(eventDate.getTime()-24*60*60*1000);
+  if(!Number.isFinite(due.getTime())||due.getTime()<=Date.now())return;
+  try{
+    await fetch("/api/reminders",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      credentials:"same-origin",
+      body:JSON.stringify({
+        title:`${reminder.title} (${reminder.date})`,
+        dueAt:due.toISOString(),
+        push:true,
+        email:false,
+        telegram:false,
+        source:"schedule",
+      }),
+    });
+  }catch{/* Local schedule remains available if server sync is temporarily unavailable. */}
+}
+
 export function saveAcademicReminder(input: Omit<AcademicReminder, "id" | "createdAt" | "alertDate" | "source">): AcademicReminder {
   const eventDate = new Date(`${input.date}T18:00:00+03:00`);
   const alert = new Date(eventDate.getTime() - 24 * 60 * 60 * 1000);
@@ -17,5 +38,6 @@ export function saveAcademicReminder(input: Omit<AcademicReminder, "id" | "creat
   const existing = readAcademicReminders().filter((item) => item.id !== reminder.id);
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...existing, reminder]));
   window.dispatchEvent(new CustomEvent("navixa:academic-reminder", { detail: reminder }));
+  void syncAcademicPush(reminder);
   return reminder;
 }
