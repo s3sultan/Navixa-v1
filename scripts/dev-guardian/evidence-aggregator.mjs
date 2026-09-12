@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { evaluateLiveExecution, readExecutionEvents } from "./event-ledger.mjs";
+
 const REVIEW_ORDER = Object.freeze({ CLEAR: 0, MINOR: 1, MAJOR: 2, BLOCKER: 3 });
 
 export function parseReviewVerdict(text = "") {
@@ -68,7 +71,7 @@ export function aggregateEvidence({ plan, checks = [], reviews = [], executionGu
     schemaVersion: 1,
     verdict: blocked ? "BLOCK" : hasMinor ? "PASS_WITH_MINOR" : "PASS",
     mergeAllowed: !blocked,
-    reasons,
+    reasons: [...new Set(reasons)],
     checks: normalizedChecks,
     reviews: normalizedReviews,
     requiredRoles,
@@ -80,4 +83,50 @@ export function formatEvidenceSummary(evidence) {
   const reviews = evidence.reviews.map((item) => `- ${item.role} / ${item.agent}: ${item.status}, verdict ${item.verdict || "n/a"}`).join("\n") || "- none";
   const reasons = evidence.reasons.map((item) => `- ${item}`).join("\n") || "- none";
   return `## NAVIXA Dev Guardian evidence\n\n- Verdict: **${evidence.verdict}**\n- Merge allowed by Dev Guardian evidence: **${evidence.mergeAllowed ? "yes" : "no"}**\n\n### Checks\n${checks}\n\n### Reviews\n${reviews}\n\n### Blocking reasons\n${reasons}`;
+}
+
+async function readOptionalJson(filePath) {
+  if (!filePath) return null;
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function main() {
+  const planPath = process.env.NAVIXA_PLAN_FILE;
+  if (!planPath) throw new Error("NAVIXA_PLAN_FILE is required.");
+  const plan = JSON.parse(await readFile(planPath, "utf8"));
+  const aiTester = await readOptionalJson(process.env.NAVIXA_AI_TESTER_RESULT);
+  const reviewer = await readOptionalJson(process.env.NAVIXA_REVIEWER_RESULT);
+  const reviews = [aiTester, reviewer].filter(Boolean);
+  const assignmentMap = new Map((plan?.review?.assignments || []).map((item) => [item.role, item]));
+  const checks = [
+    { name: "guardian-plan", status: process.env.NAVIXA_PLAN_STEP_STATUS || "success", required: true },
+  ];
+  if (assignmentMap.has("ai-tester")) {
+    checks.push({ name: "ai-tester-step", status: process.env.NAVIXA_AI_TESTER_STEP_STATUS || "unknown", required: Boolean(assignmentMap.get("ai-tester")?.required) });
+  }
+  if (assignmentMap.has("independent-reviewer")) {
+    checks.push({ name: "independent-reviewer-step", status: process.env.NAVIXA_REVIEWER_STEP_STATUS || "unknown", required: Boolean(assignmentMap.get("independent-reviewer")?.required) });
+  }
+
+  const events = await readExecutionEvents(process.env.NAVIXA_EVENT_LOG);
+  const executionGuard = evaluateLiveExecution({ plan, events, files: plan?.contract?.contextPaths || [] });
+  const evidence = aggregateEvidence({ plan, checks, reviews, executionGuard });
+  const summary = formatEvidenceSummary(evidence);
+
+  if (process.env.NAVIXA_EVIDENCE_OUTPUT) await writeFile(process.env.NAVIXA_EVIDENCE_OUTPUT, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`, "utf8");
+  process.stdout.write(`${summary}\n`);
+  if (!evidence.mergeAllowed) process.exitCode = 1;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error(`NAVIXA evidence aggregation failed: ${error.message}`);
+    process.exitCode = 1;
+  });
 }
