@@ -22,6 +22,7 @@ export function buildReviewDispatch({ contract, route, executor } = {}) {
   // read-only providers. Route reviewers such as Claude Code remain valid
   // manual/agent reviewers but are not silently treated as callable bridges.
   const independentReviewer = chooseIndependentReviewer(primaryExecutor, [MANUS, GEMINI]);
+  const securityRequired = Boolean(route?.checks?.includes("security-review"));
   const assignments = [];
 
   if (GEMINI !== primaryExecutor) {
@@ -33,24 +34,15 @@ export function buildReviewDispatch({ contract, route, executor } = {}) {
     });
   }
 
-  if (route?.checks?.includes("security-review")) {
-    const securityAgent = chooseIndependentReviewer(primaryExecutor, [MANUS, GEMINI]);
-    if (securityAgent) {
-      assignments.push({
-        role: "security-reviewer",
-        agent: securityAgent,
-        required: true,
-        objective: "Review the bounded change for authorization, secrets, injection, data exposure, abuse paths, and release risk.",
-      });
-    }
-  }
-
   if (independentReviewer) {
     assignments.push({
       role: "independent-reviewer",
       agent: independentReviewer,
       required: Boolean(contract?.signals?.needsWrite),
-      objective: "Review independently from the executor and classify the result as CLEAR, MINOR, MAJOR, or BLOCKER.",
+      securityRequired,
+      objective: securityRequired
+        ? "Review independently from the executor, include a security threat review, and classify the result as CLEAR, MINOR, MAJOR, or BLOCKER."
+        : "Review independently from the executor and classify the result as CLEAR, MINOR, MAJOR, or BLOCKER.",
     });
   }
 
@@ -60,13 +52,14 @@ export function buildReviewDispatch({ contract, route, executor } = {}) {
     schemaVersion: 1,
     executor: primaryExecutor,
     routeReviewers: Array.isArray(route?.reviewers) ? [...route.reviewers] : [],
+    securityRequired,
     assignments: normalized,
     valid: independenceViolations.length === 0 && (!contract?.signals?.needsWrite || Boolean(independentReviewer)),
     violations: independenceViolations.map((assignment) => `reviewer-matches-executor:${assignment.role}:${assignment.agent}`),
   };
 }
 
-export function roleInstructions(role) {
+export function roleInstructions(role, { securityRequired = false } = {}) {
   if (role === "ai-tester") {
     return [
       "Act as NAVIXA AI Tester in read-only mode.",
@@ -75,18 +68,14 @@ export function roleInstructions(role) {
       "Classify each finding by severity and distinguish evidence from speculation.",
     ].join("\n");
   }
-  if (role === "security-reviewer") {
-    return [
-      "Act as NAVIXA Security Reviewer in read-only mode.",
-      "Prioritize broken access control, IDOR, auth/session errors, injection, XSS, CSRF, SSRF, path traversal, secret exposure, billing/webhook integrity, rate limits, and privacy.",
-      "Do not merge, deploy, rotate secrets, or modify external systems.",
-      "Return CLEAR, MINOR, MAJOR, or BLOCKER with concrete evidence.",
-    ].join("\n");
-  }
-  return [
+  const instructions = [
     "Act as NAVIXA Independent Reviewer in read-only mode.",
     "You must be independent from the implementation agent and review the supplied task contract, bounded context, and evidence.",
-    "Do not implement, merge, or deploy. Identify correctness, maintainability, security, scope, and regression issues.",
-    "End with exactly one verdict: CLEAR, MINOR, MAJOR, or BLOCKER.",
-  ].join("\n");
+    "Do not implement, merge, or deploy. Identify correctness, maintainability, scope, and regression issues.",
+  ];
+  if (securityRequired) {
+    instructions.push("Also perform a security review covering broken access control/IDOR, auth/session handling, injection, XSS, CSRF, SSRF, path traversal, secrets, billing/webhook integrity, rate limits, and privacy where applicable.");
+  }
+  instructions.push("End with exactly one verdict: CLEAR, MINOR, MAJOR, or BLOCKER.");
+  return instructions.join("\n");
 }
