@@ -1,7 +1,7 @@
 import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
 import { deliverDuePrayerAlerts } from "./prayerAlerts";
 import { sendFeaturePush } from "./generalPush";
-import {isUserPushCategoryActive} from "./userPushPreferences.ts";
+import { isUserPushCategoryActive } from "./userPushPreferences.ts";
 
 type Stmt={bind:(...v:unknown[])=>Stmt;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
 type Db={prepare:(sql:string)=>Stmt};
@@ -14,12 +14,12 @@ const retry=60*60_000, maxAttempts=3, scheduleFreshness=10*60_000; const changes
 export async function ensureImportantReminderSchema(db:Db){
  await db.prepare("CREATE TABLE IF NOT EXISTS navixa_important_reminders (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,due_at TEXT NOT NULL,source TEXT NOT NULL DEFAULT 'manual',email_enabled INTEGER NOT NULL DEFAULT 0,telegram_enabled INTEGER NOT NULL DEFAULT 0,push_enabled INTEGER NOT NULL DEFAULT 1,email_status TEXT NOT NULL DEFAULT 'pending',telegram_status TEXT NOT NULL DEFAULT 'pending',push_status TEXT NOT NULL DEFAULT 'pending',email_attempts INTEGER NOT NULL DEFAULT 0,telegram_attempts INTEGER NOT NULL DEFAULT 0,push_attempts INTEGER NOT NULL DEFAULT 0,email_last_attempt_at TEXT NOT NULL DEFAULT '',telegram_last_attempt_at TEXT NOT NULL DEFAULT '',push_last_attempt_at TEXT NOT NULL DEFAULT '',email_sent_at TEXT NOT NULL DEFAULT '',telegram_sent_at TEXT NOT NULL DEFAULT '',push_sent_at TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(user_id,title,due_at))").run();
  const additions=[
+  "ALTER TABLE navixa_important_reminders ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
   "ALTER TABLE navixa_important_reminders ADD COLUMN push_enabled INTEGER NOT NULL DEFAULT 1",
   "ALTER TABLE navixa_important_reminders ADD COLUMN push_status TEXT NOT NULL DEFAULT 'pending'",
   "ALTER TABLE navixa_important_reminders ADD COLUMN push_attempts INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE navixa_important_reminders ADD COLUMN push_last_attempt_at TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE navixa_important_reminders ADD COLUMN push_sent_at TEXT NOT NULL DEFAULT ''",
-  "ALTER TABLE navixa_important_reminders ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
  ];
  for(const sql of additions){try{await db.prepare(sql).run()}catch{/* Existing production column. */}}
  await db.prepare("CREATE INDEX IF NOT EXISTS idx_navixa_important_reminders_due ON navixa_important_reminders(due_at)").run();
@@ -33,8 +33,9 @@ async function telegram(env:Env,db:Db,row:Row){if(!env.NAVIXA_TELEGRAM_BOT_TOKEN
 async function push(db:Db,row:Row){
  const subscriptions=await db.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=? AND enabled=1 LIMIT 8").bind(row.user_id).all<PushSubscription>();
  let sent=false;
+ const schedule=row.source==="schedule";
  for(const subscription of subscriptions.results){
-  const result=await sendFeaturePush(subscription,{kind:"general",title:row.source==="schedule"?"موعد من جدولك":"تذكير مهم من NAVIXA",body:row.title,url:row.source==="schedule"?"/today":"/reminders",tag:`navixa-reminder-${row.id}`,urgency:"high",ttl:3600});
+  const result=await sendFeaturePush(subscription,{kind:"general",title:schedule?"تذكير من جدولك":"تذكير مهم من NAVIXA",body:row.title,url:schedule?"/today":"/reminders",tag:schedule?`navixa-schedule-${row.id}`:`navixa-reminder-${row.id}`,urgency:"high",ttl:schedule?1800:3600});
   if(result.ok){sent=true;continue}
   if(result.status===404||result.status===410)await db.prepare("DELETE FROM navixa_push_subscriptions WHERE endpoint=? AND user_id=?").bind(subscription.endpoint,row.user_id).run();
  }
