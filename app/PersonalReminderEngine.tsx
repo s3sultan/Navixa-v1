@@ -4,6 +4,7 @@ import {useEffect,useRef,useState} from "react";
 import {dismissPersonalReminder,getPersonalReminderPrefs,isPersonalReminderMuted,PersonalReminderKind} from "./reminderPrefs";
 import {readAcademicReminders} from "./academicReminders";
 import {isScreenEnabled} from "./alertPrefs";
+import {sendNavixaFeaturePushEvent,showNavixaDeviceNotification} from "./pushClient";
 
 const MINUTE=60_000;
 const ACTIVITY_KEY="navixa-last-activity-at";
@@ -16,11 +17,32 @@ type Candidate={kind:PersonalReminderKind;title:string;body:string;due:boolean};
 
 export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds}:Props){
   const focusRef=useRef({focusRunning,focusElapsedSeconds});
+  const screenBridgeRef=useRef({signature:"",at:0});
   const [visible,setVisible]=useState<Candidate|null>(null);
   const [notice,setNotice]=useState("");
   useEffect(()=>{focusRef.current={focusRunning,focusElapsedSeconds}},[focusRunning,focusElapsedSeconds]);
 
   const closeReminder=()=>{if(!visible)return;const result=dismissPersonalReminder(visible.kind);setVisible(null);if(result.muted){setNotice(`تم إيقاف ${visible.title}. يمكنك إعادته من إعدادات التنبيهات.`);window.setTimeout(()=>setNotice(""),4200)}};
+
+  useEffect(()=>{
+    const bridgeScreenToast=()=>{
+      const text=document.querySelector(".nx-toast")?.textContent?.replace(/^\s*✓\s*/,"").trim()||"";
+      if(!text)return;
+      let mode:"change"|"ocr"|null=null,detail="";
+      if(text.startsWith("تنبيه متابعة الشاشة:")){mode="change";detail=text.replace("تنبيه متابعة الشاشة:","").trim().slice(0,100)}
+      else if(text.startsWith("OCR: ظهر النص")){mode="ocr";detail=text.replace(/^OCR:\s*ظهر النص\s*/,"").replace(/^\(|\)$/g,"").trim().slice(0,100)}
+      if(!mode)return;
+      const signature=`${mode}:${detail}`,now=Date.now();
+      if(screenBridgeRef.current.signature===signature&&now-screenBridgeRef.current.at<15_000)return;
+      if(now-screenBridgeRef.current.at<8_000)return;
+      screenBridgeRef.current={signature,at:now};
+      void sendNavixaFeaturePushEvent({kind:"screen_watch",mode,detail});
+    };
+    const observer=new MutationObserver(bridgeScreenToast);
+    observer.observe(document.body,{subtree:true,childList:true,characterData:true});
+    bridgeScreenToast();
+    return()=>observer.disconnect();
+  },[]);
 
   useEffect(()=>{
     let lastStored=0;
@@ -46,7 +68,7 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
       ];
       const next=candidates.find(candidate=>candidate.due&&!isPersonalReminderMuted(candidate.kind)&&now-Number(localStorage.getItem(sentKey(candidate.kind))||0)>=quietFor);if(!next)return;
       localStorage.setItem(LAST_ANY_KEY,String(now));localStorage.setItem(sentKey(next.kind),String(now));
-      if(prefs.browser&&"Notification" in window&&Notification.permission==="granted")new Notification(next.title,{body:next.body,tag:`navixa-${next.kind}`});
+      if(prefs.browser)void showNavixaDeviceNotification(next.title,{body:next.body,tag:`navixa-${next.kind}`,url:next.kind==="academic"?"/today":"/"}).catch(()=>false);
       setVisible(next);
     };
     const timer=window.setInterval(maybeRemind,30_000);

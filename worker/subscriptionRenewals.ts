@@ -1,4 +1,5 @@
 import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
+import { sendFeaturePush } from "./generalPush.ts";
 
 type Statement = { bind: (...values: unknown[]) => Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type Database = { prepare: (sql: string) => Statement };
@@ -23,6 +24,8 @@ type DueSubscriber = {
 };
 
 type Delivery = { id: string; status: string; attempts: number; last_attempt_at: string };
+type PushSubscription = { endpoint: string; p256dh: string; auth: string };
+type DeliveryChannel = "email" | "telegram" | "push";
 const FOUR_DAYS = 4 * 24 * 60 * 60_000;
 const ONE_DAY = 24 * 60 * 60_000;
 const RETRY_AFTER = 60 * 60_000;
@@ -53,10 +56,12 @@ function renewalCopy(subscriber: DueSubscriber, type: "four_days" | "one_day") {
     subject: `${headline} على ${isTrial ? "تجربة" : "اشتراك"} NAVIXA هِمّة`,
     text: `أهلًا${name}\n\n${detail}\n\nموعد الانتهاء: ${ending}\n\nإدارة هِمّة وتجديد الاشتراك: https://navixasa.com/plus\n\nNAVIXA SA`,
     telegram: `أهلًا${name}\n\n${headline} على ${isTrial ? "تجربة" : "اشتراك"} NAVIXA هِمّة.\n${detail}\n\nموعد الانتهاء: ${ending}\nإدارة هِمّة: https://navixasa.com/plus`,
+    pushTitle: `${headline} على ${isTrial ? "تجربتك" : "اشتراكك"}`,
+    pushBody: `${detail} موعد الانتهاء: ${ending}`,
   };
 }
 
-async function createOrClaimDelivery(database: Database, subscriber: DueSubscriber, type: "four_days" | "one_day", channel: "email" | "telegram", nowIso: string) {
+async function createOrClaimDelivery(database: Database, subscriber: DueSubscriber, type: "four_days" | "one_day", channel: DeliveryChannel, nowIso: string) {
   await database.prepare("INSERT OR IGNORE INTO navixa_subscription_reminders (id,subscriber_id,subscription_end_at,reminder_type,channel,status,attempts,last_attempt_at,sent_at,error_message,created_at,updated_at) VALUES (?,?,?,?,?,'pending',0,'','','',?,?)").bind(crypto.randomUUID(), subscriber.id, subscriber.ends_at, type, channel, nowIso, nowIso).run();
   const rows = await database.prepare("SELECT id,status,attempts,last_attempt_at FROM navixa_subscription_reminders WHERE subscriber_id=? AND subscription_end_at=? AND reminder_type=? AND channel=? LIMIT 1").bind(subscriber.id, subscriber.ends_at, type, channel).all<Delivery>();
   const row = rows.results[0];
@@ -85,12 +90,25 @@ async function telegramTarget(database: Database, subscriber: DueSubscriber, env
   try { return await decryptTelegramIdentifier(target.chat_id_ciphertext, env.NAVIXA_TELEGRAM_ENCRYPTION_KEY); } catch { return null; }
 }
 
+async function sendPush(database: Database, subscriber: DueSubscriber, title: string, body: string, type: "four_days" | "one_day") {
+  if (!subscriber.user_id) return { ok: false, error: "push_user_missing" };
+  const subscriptions = await database.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=? AND enabled=1 LIMIT 8").bind(subscriber.user_id).all<PushSubscription>();
+  if (!subscriptions.results.length) return { ok: false, error: "push_not_subscribed" };
+  let delivered = 0;
+  for (const subscription of subscriptions.results) {
+    const result = await sendFeaturePush(subscription, { kind: "billing", title, body, url: "/plus", tag: `navixa-renewal-${subscriber.id}-${type}`, urgency: type === "one_day" ? "high" : "normal", ttl: 86400 });
+    if (result.ok) { delivered += 1; continue; }
+    if (result.status === 404 || result.status === 410) await database.prepare("DELETE FROM navixa_push_subscriptions WHERE endpoint=? AND user_id=?").bind(subscription.endpoint, subscriber.user_id).run().catch(() => {});
+  }
+  return { ok: delivered > 0, error: delivered > 0 ? "" : "push_delivery_failed" };
+}
+
 /** Deterministic Worker Cron job. It never relies on a browser being open. */
 export async function deliverDueSubscriptionRenewals(env: RenewalEnv) {
   await ensureRenewalReminderSchema(env.DB);
   const now = Date.now(), nowIso = new Date(now).toISOString(), fourDays = new Date(now + FOUR_DAYS).toISOString();
   const due = await env.DB.prepare("SELECT id,user_id,contact,display_name,plan,status,CASE WHEN status='trial' THEN trial_ends_at ELSE subscription_ends_at END AS ends_at FROM navixa_subscribers WHERE status IN ('trial','active') AND (CASE WHEN status='trial' THEN trial_ends_at ELSE subscription_ends_at END)<>'' AND (CASE WHEN status='trial' THEN trial_ends_at ELSE subscription_ends_at END)>? AND (CASE WHEN status='trial' THEN trial_ends_at ELSE subscription_ends_at END)<=?").bind(nowIso, fourDays).all<DueSubscriber>();
-  let emailSent = 0, telegramSent = 0, skipped = 0;
+  let emailSent = 0, telegramSent = 0, pushSent = 0, skipped = 0;
   for (const subscriber of due.results) {
     const type = reminderType(subscriber.ends_at, now), copy = renewalCopy(subscriber, type);
     const emailDelivery = await createOrClaimDelivery(env.DB, subscriber, type, "email", nowIso);
@@ -108,6 +126,14 @@ export async function deliverDueSubscriptionRenewals(env: RenewalEnv) {
         if (ok) telegramSent += 1;
       }
     }
+    if (subscriber.user_id) {
+      const pushDelivery = await createOrClaimDelivery(env.DB, subscriber, type, "push", nowIso);
+      if (pushDelivery) {
+        const result = await sendPush(env.DB, subscriber, copy.pushTitle, copy.pushBody, type);
+        await finishDelivery(env.DB, pushDelivery, result.ok, result.error, nowIso);
+        if (result.ok) pushSent += 1;
+      }
+    }
   }
-  return { checked: due.results.length, emailSent, telegramSent, skipped };
+  return { checked: due.results.length, emailSent, telegramSent, pushSent, skipped };
 }

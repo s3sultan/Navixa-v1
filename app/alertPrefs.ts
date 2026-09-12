@@ -39,7 +39,15 @@ export const sendTelegramMessage=async(message:string,type?:AlertType):Promise<b
   }catch{return false}
 };
 
+const forwardNamePush=(message:string)=>{
+  const match=message.match(/\(([^()]{1,80})\)\s*$/);
+  const name=(match?.[1]||"").trim();
+  if(!name)return;
+  void import("./pushClient").then(({sendNavixaFeaturePushEvent})=>sendNavixaFeaturePushEvent({kind:"name_heard",name})).catch(()=>{});
+};
+
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
+  if(type==="name")forwardNamePush(fallbackMessage);
   if(!isTelegramEnabled(type))return;
   const custom=getAdminMessages()[type];
   void sendTelegramMessage(custom||fallbackMessage,type);

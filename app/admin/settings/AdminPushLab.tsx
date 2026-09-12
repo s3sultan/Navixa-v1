@@ -1,11 +1,9 @@
 "use client";
 import {useMemo,useState} from "react";
+import {ensureNavixaPushSubscription} from "../../pushClient";
 
 type Kind="general"|"name_heard"|"screen_watch"|"security"|"billing";
 const kinds:[Kind,string][]=[["general","عام"],["name_heard","سماع الاسم"],["screen_watch","مراقبة الشاشة"],["security","أمان"],["billing","اشتراك وفوترة"]];
-function b64(value:string){const padding="=".repeat((4-value.length%4)%4);const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(base64);return Uint8Array.from(raw,c=>c.charCodeAt(0));}
-function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);}
-function isStandalone(){return window.matchMedia("(display-mode: standalone)").matches||(navigator as Navigator & {standalone?:boolean}).standalone===true;}
 
 export default function AdminPushLab(){
   const [title,setTitle]=useState("NAVIXA · تنبيه تجريبي");
@@ -23,18 +21,9 @@ export default function AdminPushLab(){
 
   async function ensureSubscription(){
     setStatus("جاري تجهيز Push...");
-    if(isIOS()&&!isStandalone())throw new Error("على iPhone: افتح NAVIXA في Safari ← مشاركة ← إضافة إلى الشاشة الرئيسية، ثم افتحه من الأيقونة واضغط إرسال تجربة.");
-    if(!("serviceWorker" in navigator)||!("PushManager" in window))throw new Error("هذا المتصفح لا يدعم Push. على iPhone ثبّت NAVIXA على الشاشة الرئيسية أولًا.");
-    const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error("اسمح بتنبيهات NAVIXA من نافذة النظام ثم أعد التجربة.");
-    const registration=await navigator.serviceWorker.register("/navixa-push-sw.js");
-    const config=await fetch("/api/push/config",{cache:"no-store"}).then(r=>r.json()) as {enabled?:boolean;publicKey?:string};
-    if(!config.enabled||!config.publicKey)throw new Error("مفاتيح Push غير مفعلة");
-    let subscription=await registration.pushManager.getSubscription();
-    if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(config.publicKey)});
-    const json=subscription.toJSON();
-    const save=await fetch("/api/push/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:json.endpoint,keys:json.keys,beforeMinutes:10,beforeMinutesList:[10],competitions:[],teams:[]})});
-    if(!save.ok)throw new Error("تعذر حفظ اشتراك Push");
-    setEndpoint(json.endpoint||"");setStatus("جهاز الإدارة جاهز للاختبار 🔔");return json.endpoint||"";
+    const subscription=await ensureNavixaPushSubscription({requestPermission:true});
+    if(!subscription)throw new Error("اسمح بتنبيهات NAVIXA ثم أعد التجربة.");
+    setEndpoint(subscription.endpoint);setStatus("جهاز الإدارة جاهز للاختبار 🔔");return subscription.endpoint;
   }
 
   async function send(){

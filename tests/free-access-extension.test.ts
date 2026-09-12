@@ -8,11 +8,12 @@ const read = (path: string) => readFile(new URL(path, root), "utf8");
 const FREE_ACCESS_END = "2026-09-19T20:59:59.999Z";
 
 test("free access runs through Sep 19 Riyadh without extending paid-only entitlements", async () => {
-  const [login, migration, portfolio, emergency] = await Promise.all([
+  const [login, migration, portfolio, emergency, gate] = await Promise.all([
     read("app/api/account/code/verify/route.ts"),
     read("migrations/0050_extend_free_trial_to_20260919.sql"),
     read("worker/portfolioAccess.ts"),
     read("worker/emergencyEntitlements.ts"),
+    read("app/FeatureAccessGate.tsx"),
   ]);
 
   assert.ok(login.includes(FREE_ACCESS_END));
@@ -20,6 +21,8 @@ test("free access runs through Sep 19 Riyadh without extending paid-only entitle
   assert.match(migration, /WHERE status = 'trial'/);
   assert.ok(migration.includes(FREE_ACCESS_END));
   assert.doesNotMatch(migration, /status\s*=\s*'active'/);
+  assert.match(gate, /2026-09-20T00:00:00\+03:00/);
+  assert.match(gate, /Date\.now\(\) < PUBLIC_FREE_ACCESS_UNTIL/);
 
   // The temporary campaign must not turn free/trial users into paid portfolio
   // members or emergency-mode subscribers.
