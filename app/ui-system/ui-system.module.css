@@ -1,15 +1,16 @@
 .systemRoot {
-  --nx-color-bg: #f7faf9;
+  --nx-color-bg: #f7fbfc;
   --nx-color-surface: #ffffff;
   --nx-color-surface-soft: #f1f6f5;
-  --nx-color-text: #17231d;
-  --nx-color-muted: #66756e;
-  --nx-color-line: #dfe8e4;
+  --nx-color-text: #102f43;
+  --nx-color-muted: #6b7973;
+  --nx-color-line: #e7e9e4;
   --nx-color-primary: #087f83;
-  --nx-color-primary-soft: #e6f3f3;
-  --nx-color-secondary: #8f76ed;
-  --nx-color-danger: #b94747;
-  --nx-color-focus: #5b49b8;
+  --nx-color-primary-soft: #e6fbf7;
+  --nx-color-secondary: #7656d6;
+  --nx-color-secondary-soft: #eee9fb;
+  --nx-color-danger: #b85e55;
+  --nx-color-focus: #7656d6;
   --nx-space-1: 0.25rem;
   --nx-space-2: 0.5rem;
   --nx-space-3: 0.75rem;
@@ -22,8 +23,8 @@
   --nx-radius-md: 1rem;
   --nx-radius-lg: 1.35rem;
   --nx-radius-xl: 1.75rem;
-  --nx-shadow-1: 0 10px 32px rgb(20 47 39 / 8%);
-  --nx-shadow-2: 0 18px 54px rgb(20 47 39 / 16%);
+  --nx-shadow-1: 0 10px 32px rgb(16 47 67 / 8%);
+  --nx-shadow-2: 0 18px 54px rgb(16 47 67 / 16%);
   --nx-control-min: 2.75rem;
   --nx-sidebar-wide: 16.5rem;
   --nx-sidebar-compact: 5.25rem;
@@ -83,7 +84,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  background: linear-gradient(145deg, var(--nx-color-primary), var(--nx-color-secondary));
+  background: var(--nx-color-primary);
+  box-shadow: inset -0.42rem -0.42rem 0 var(--nx-color-secondary);
   color: white;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -170,8 +172,8 @@
   min-width: 1.5rem;
   padding: 0.15rem 0.4rem;
   border-radius: 999px;
-  background: var(--nx-color-surface-soft);
-  color: var(--nx-color-muted);
+  background: var(--nx-color-secondary-soft);
+  color: var(--nx-color-secondary);
   font-size: 0.68rem;
   text-align: center;
 }
@@ -498,7 +500,7 @@
 
   .card {
     border-radius: var(--nx-radius-md);
-    box-shadow: 0 5px 20px rgb(20 47 39 / 7%);
+    box-shadow: 0 5px 20px rgb(16 47 67 / 7%);
   }
 
   .bottomNav {
