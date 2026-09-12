@@ -84,6 +84,7 @@ type BrowserVoiceEngineOptions = {
   interimResults?: boolean;
   localAccuracyFallback?: boolean;
   adaptiveLanguage?: boolean;
+  mediaStream?: MediaStream;
   handlers: NavixaVoiceEngineHandlers;
 };
 
@@ -189,6 +190,7 @@ export function createNavixaBrowserVoiceEngine({
   interimResults = true,
   localAccuracyFallback = true,
   adaptiveLanguage = true,
+  mediaStream,
   handlers,
 }: BrowserVoiceEngineOptions): NavixaVoiceEngine {
   const Recognition = getRecognitionConstructor();
@@ -240,6 +242,7 @@ export function createNavixaBrowserVoiceEngine({
     ? createNavixaLocalNameFallback({
       onTranscript: (text) => emitTranscript({ text, interim: true }, "local"),
       getLanguageHint: localLanguageHint,
+      mediaStream,
     })
     : null;
 
