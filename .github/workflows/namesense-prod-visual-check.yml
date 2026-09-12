@@ -1,0 +1,56 @@
+name: NameSense Production Visual Check
+
+on:
+  push:
+    branches:
+      - ops/namesense-prod-visual-check-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  visual-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify production HTTP
+        run: |
+          set -euo pipefail
+          curl --retry 4 --retry-all-errors --fail --silent --show-error --location \
+            --output home.html https://navixasa.com/
+          curl --retry 4 --retry-all-errors --fail --silent --show-error --location \
+            --output study.html https://navixasa.com/namesense-study
+          test -s home.html
+          test -s study.html
+
+      - name: Capture production with Chrome
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --window-size=1440,1100 --virtual-time-budget=7000 \
+            --screenshot=home.png https://navixasa.com/
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --window-size=1440,1100 --virtual-time-budget=7000 \
+            --screenshot=namesense-study.png https://navixasa.com/namesense-study
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --virtual-time-budget=7000 --dump-dom https://navixasa.com/namesense-study > namesense-study-dom.html
+          test -s home.png
+          test -s namesense-study.png
+          grep -q "NameSense\|مشاركة\|دعوة\|رابط" namesense-study-dom.html
+
+      - name: Upload visual evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: namesense-production-visual-evidence
+          path: |
+            home.png
+            namesense-study.png
+            namesense-study-dom.html
+            home.html
+            study.html
+          if-no-files-found: error
+          retention-days: 1
