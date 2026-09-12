@@ -46,13 +46,35 @@ function roleRequiresVerdict(role) {
   return role === "independent-reviewer" || role === "security-reviewer";
 }
 
-export function aggregateEvidence({ plan, checks = [], reviews = [], executionGuard = { allowed: true } } = {}) {
-  const normalizedChecks = checks.map(normalizeCheck);
+function ciChecks(ciEvidence) {
+  if (!ciEvidence || !Array.isArray(ciEvidence.checks)) return [];
+  return ciEvidence.checks.map((check) => ({
+    name: `ci:${String(check.name || "unknown")}`,
+    status: check.status || "unknown",
+    required: check.required !== false,
+  }));
+}
+
+export function aggregateEvidence({
+  plan,
+  checks = [],
+  reviews = [],
+  executionGuard = { allowed: true },
+  ciEvidence = null,
+  expectedHeadSha = null,
+  requireCiEvidence = false,
+} = {}) {
+  const normalizedChecks = [...checks, ...ciChecks(ciEvidence)].map(normalizeCheck);
   const normalizedReviews = reviews.map(normalizeReview);
   const requiredAssignments = (plan?.review?.assignments || [])
     .filter((item) => item.required)
     .map((item) => ({ role: String(item.role), agent: String(item.agent) }));
   const reasons = [];
+
+  if (requireCiEvidence && !ciEvidence) reasons.push("missing-ci-evidence");
+  if (ciEvidence && expectedHeadSha && String(ciEvidence.headSha || "") !== String(expectedHeadSha)) {
+    reasons.push(`ci-head-mismatch:${ciEvidence.headSha || "missing"}:${expectedHeadSha}`);
+  }
 
   for (const check of normalizedChecks) {
     if (check.required && !check.passed) reasons.push(`check-failed:${check.name}:${check.status}`);
@@ -94,6 +116,7 @@ export function aggregateEvidence({ plan, checks = [], reviews = [], executionGu
     reviews: normalizedReviews,
     requiredRoles: requiredAssignments.map((item) => item.role),
     requiredReviewers: requiredAssignments,
+    ciHeadSha: ciEvidence?.headSha || null,
   };
 }
 
@@ -101,7 +124,7 @@ export function formatEvidenceSummary(evidence) {
   const checks = evidence.checks.map((item) => `- ${item.name}: ${item.status}${item.required ? " (required)" : ""}`).join("\n") || "- none";
   const reviews = evidence.reviews.map((item) => `- ${item.role} / ${item.agent}: ${item.status}, verdict ${item.verdict || "n/a"}`).join("\n") || "- none";
   const reasons = evidence.reasons.map((item) => `- ${item}`).join("\n") || "- none";
-  return `## NAVIXA Dev Guardian evidence\n\n- Verdict: **${evidence.verdict}**\n- Merge allowed by Dev Guardian evidence: **${evidence.mergeAllowed ? "yes" : "no"}**\n\n### Checks\n${checks}\n\n### Reviews\n${reviews}\n\n### Blocking reasons\n${reasons}`;
+  return `## NAVIXA Dev Guardian evidence\n\n- Verdict: **${evidence.verdict}**\n- Merge allowed by Dev Guardian evidence: **${evidence.mergeAllowed ? "yes" : "no"}**\n- CI head: ${evidence.ciHeadSha ? `\`${evidence.ciHeadSha}\`` : "not supplied"}\n\n### Checks\n${checks}\n\n### Reviews\n${reviews}\n\n### Blocking reasons\n${reasons}`;
 }
 
 async function readOptionalJson(filePath) {
@@ -120,6 +143,7 @@ async function main() {
   const plan = JSON.parse(await readFile(planPath, "utf8"));
   const aiTester = await readOptionalJson(process.env.NAVIXA_AI_TESTER_RESULT);
   const reviewer = await readOptionalJson(process.env.NAVIXA_REVIEWER_RESULT);
+  const ciEvidence = await readOptionalJson(process.env.NAVIXA_CI_EVIDENCE_FILE);
   const reviews = [aiTester, reviewer].filter(Boolean);
   const assignmentMap = new Map((plan?.review?.assignments || []).map((item) => [item.role, item]));
   const checks = [
@@ -134,7 +158,15 @@ async function main() {
 
   const events = await readExecutionEvents(process.env.NAVIXA_EVENT_LOG);
   const executionGuard = evaluateLiveExecution({ plan, events, files: plan?.contract?.contextPaths || [] });
-  const evidence = aggregateEvidence({ plan, checks, reviews, executionGuard });
+  const evidence = aggregateEvidence({
+    plan,
+    checks,
+    reviews,
+    executionGuard,
+    ciEvidence,
+    expectedHeadSha: process.env.NAVIXA_EXPECTED_HEAD_SHA || null,
+    requireCiEvidence: process.env.NAVIXA_REQUIRE_CI_EVIDENCE === "true",
+  });
   const summary = formatEvidenceSummary(evidence);
 
   if (process.env.NAVIXA_EVIDENCE_OUTPUT) await writeFile(process.env.NAVIXA_EVIDENCE_OUTPUT, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
