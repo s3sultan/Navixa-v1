@@ -23,6 +23,11 @@ function normalizePatchPath(value) {
   return path.posix.normalize(withoutPrefix.replaceAll("\\", "/"));
 }
 
+function isInsideRoot(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
 export function parsePatchManifest(patchText = "") {
   const text = String(patchText);
   const forbiddenMarkers = [
@@ -65,13 +70,34 @@ export function parsePatchManifest(patchText = "") {
   return { files, violations: [...new Set(violations)] };
 }
 
-async function git(root, args) {
+async function git(root, args, { trim = true } = {}) {
   const result = await execFileAsync("git", args, {
     cwd: root,
     maxBuffer: 2 * 1024 * 1024,
     env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
   });
-  return { stdout: result.stdout.trim(), stderr: result.stderr.trim() };
+  return {
+    stdout: trim ? result.stdout.trim() : result.stdout,
+    stderr: trim ? result.stderr.trim() : result.stderr,
+  };
+}
+
+function parsePorcelainZ(value = "") {
+  return String(value)
+    .split("\0")
+    .filter(Boolean)
+    .map((entry) => entry.length >= 4 ? entry.slice(3) : "")
+    .filter(Boolean);
+}
+
+async function workingTreeFiles(root) {
+  const status = await git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { trim: false });
+  return parsePorcelainZ(status.stdout);
+}
+
+async function restoreCleanTree(root) {
+  await git(root, ["reset", "--hard", "HEAD"]);
+  await git(root, ["clean", "-fd"]);
 }
 
 export async function applyGuardedPatch({
@@ -83,11 +109,9 @@ export async function applyGuardedPatch({
 } = {}) {
   const repositoryRoot = path.resolve(root);
   const absolutePatch = path.resolve(patchPath || "");
-  const relativePatch = path.relative(repositoryRoot, absolutePatch);
   if (!patchPath) throw new Error("patchPath is required.");
-  if (!relativePatch.startsWith("..") && !path.isAbsolute(relativePatch)) {
-    throw new Error("Patch file must live outside the repository working tree.");
-  }
+  if (isInsideRoot(repositoryRoot, absolutePatch)) throw new Error("Patch file must live outside the repository working tree.");
+  if (eventLog && isInsideRoot(repositoryRoot, path.resolve(eventLog))) throw new Error("Event log must live outside the repository working tree.");
 
   const patchText = await readFile(absolutePatch, "utf8");
   const patchBytes = Buffer.byteLength(patchText);
@@ -97,8 +121,9 @@ export async function applyGuardedPatch({
   if (manifest.violations.length) throw new Error(`Patch manifest blocked: ${manifest.violations.join(", ")}`);
 
   const head = (await git(repositoryRoot, ["rev-parse", "HEAD"])).stdout;
-  const status = (await git(repositoryRoot, ["status", "--porcelain=v1", "--untracked-files=all"])).stdout;
-  if (status) throw new Error("Working tree must be clean before guarded patch application.");
+  const initialFiles = await workingTreeFiles(repositoryRoot);
+  if (initialFiles.length) throw new Error("Working tree must be clean before guarded patch application.");
+
   const events = await readExecutionEvents(eventLog);
   const decision = validateExecutorMutation({
     plan,
@@ -128,10 +153,7 @@ export async function applyGuardedPatch({
   await git(repositoryRoot, ["apply", "--check", "--whitespace=error-all", absolutePatch]);
   await git(repositoryRoot, ["apply", "--whitespace=error-all", absolutePatch]);
 
-  const actualFiles = (await git(repositoryRoot, ["diff", "--name-only", "--no-renames"])).stdout
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const actualFiles = await workingTreeFiles(repositoryRoot);
   const postDecision = validateExecutorMutation({
     plan,
     executor,
@@ -140,8 +162,25 @@ export async function applyGuardedPatch({
     events: await readExecutionEvents(eventLog),
   });
   const unexpected = actualFiles.filter((file) => !manifest.files.includes(file));
-  if (!postDecision.allowed || unexpected.length) {
-    throw new Error(`Post-apply guard blocked workspace: ${[...postDecision.reasons, ...unexpected.map((file) => `unexpected-file:${file}`)].join(", ")}`);
+  const missing = manifest.files.filter((file) => !actualFiles.includes(file));
+  if (!postDecision.allowed || unexpected.length || missing.length) {
+    await restoreCleanTree(repositoryRoot);
+    await recordGuardedExecutionEvent({
+      filePath: eventLog,
+      plan,
+      files: manifest.files,
+      event: {
+        role: "developer",
+        agent: executor,
+        action: "patch-rolled-back",
+        target: `${manifest.files.length}-files`,
+        ok: false,
+        error: [...postDecision.reasons, ...unexpected.map((file) => `unexpected-file:${file}`), ...missing.map((file) => `missing-file:${file}`)].join(", "),
+        progressHash: `patch:${fingerprint(patchText)}:rollback`,
+        usageDelta: { steps: 1 },
+      },
+    });
+    throw new Error(`Post-apply guard blocked workspace: ${[...postDecision.reasons, ...unexpected.map((file) => `unexpected-file:${file}`), ...missing.map((file) => `missing-file:${file}`)].join(", ")}`);
   }
 
   const completed = await recordGuardedExecutionEvent({
@@ -158,7 +197,10 @@ export async function applyGuardedPatch({
       usageDelta: { steps: 1 },
     },
   });
-  if (!completed.guard.allowed) throw new Error(`Live guard blocked continuation after patch: ${completed.guard.reasons.join(", ")}`);
+  if (!completed.guard.allowed) {
+    await restoreCleanTree(repositoryRoot);
+    throw new Error(`Live guard blocked continuation after patch; workspace rolled back: ${completed.guard.reasons.join(", ")}`);
+  }
 
   return {
     schemaVersion: 1,
