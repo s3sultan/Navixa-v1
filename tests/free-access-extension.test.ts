@@ -15,10 +15,10 @@ test("free access runs through Sep 19 Riyadh without extending paid-only entitle
     read("worker/emergencyEntitlements.ts"),
   ]);
 
-  assert.match(login, new RegExp(FREE_ACCESS_END.replace(/[.]/g, "\\.")));
+  assert.ok(login.includes(FREE_ACCESS_END));
   assert.match(login, /Date\.now\(\) >= campaignEnd/);
   assert.match(migration, /WHERE status = 'trial'/);
-  assert.match(migration, new RegExp(FREE_ACCESS_END.replace(/[.]/g, "\\.")));
+  assert.ok(migration.includes(FREE_ACCESS_END));
   assert.doesNotMatch(migration, /status\s*=\s*'active'/);
 
   // The temporary campaign must not turn free/trial users into paid portfolio
