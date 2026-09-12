@@ -50,6 +50,8 @@ assert.match(prayerWorker,/isUserPushCategoryActive/);
 assert.match(prayerWorker,/sendFeaturePush/);
 assert.match(prayerWorker,/url:"\/worship"/);
 assert.match(prayerWorker,/event\.type==="adhan"/);
+assert.match(prayerWorker,/dueWithinWindow/);
+assert.match(prayerWorker,/windowMinutes=5/);
 assert.match(syncStyles,/prayer-strip-next-v2/);
 assert.match(syncStyles,/prayer-edit-location/);
 assert.match(azkar,/count.*REPEAT|REPEAT.*count/s);
