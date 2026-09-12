@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeNameSenseSignal, createControlledLiveNameSenseTrial } from "../benchmarks/namesense/collector-core.mjs";
+import {
+  analyzeNameSenseSignal,
+  createControlledLiveNameSenseTrial,
+  deriveNameSenseAdaptiveVadThreshold,
+  isNameSenseNoiseFloorCandidate,
+} from "../benchmarks/namesense/collector-core.mjs";
 
 const protocol = {
   requiredProvenance: "controlled-live",
@@ -53,4 +58,18 @@ test("collector uses the current protocol thresholds rather than any stale quali
     protocol: strictProtocol,
     trial: { id: "strict-threshold", consent: true, expected: "hit", detected: false }
   }), /signal-quality-check-failed/);
+});
+
+test("adaptive benchmark VAD stays inside conservative bounds", () => {
+  assert.equal(deriveNameSenseAdaptiveVadThreshold(0, 0.0035), 0.0035);
+  assert.equal(deriveNameSenseAdaptiveVadThreshold(0.001, 0.0035), 0.0035);
+  assert.ok(deriveNameSenseAdaptiveVadThreshold(0.004, 0.0035) > 0.0035);
+  assert.equal(deriveNameSenseAdaptiveVadThreshold(0.5, 0.0035), 0.01);
+});
+
+test("speech-like or transient frames cannot poison the benchmark noise floor", () => {
+  assert.equal(isNameSenseNoiseFloorCandidate(0.002, 0.0035), true);
+  assert.equal(isNameSenseNoiseFloorCandidate(0.006, 0.0035), true);
+  assert.equal(isNameSenseNoiseFloorCandidate(0.012, 0.0035), false);
+  assert.equal(isNameSenseNoiseFloorCandidate(0.05, 0.0035), false);
 });
