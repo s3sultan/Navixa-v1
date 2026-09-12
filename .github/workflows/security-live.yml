@@ -7,27 +7,69 @@ on:
       - '.github/workflows/security-live.yml'
       - 'security/**'
       - 'NAVIXA_SECURITY_SCAN.md'
-  workflow_run:
-    workflows: ["Deploy NAVIXA Auto"]
-    types: [completed]
+  push:
+    branches: [master]
   schedule:
     - cron: '41 3 * * 0'
   workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: navixa-live-security-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  wait-production:
+    name: Wait for exact-SHA production deploy
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require successful Deploy NAVIXA Auto for this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            run="$(gh api "/repos/${NAVIXA_REPOSITORY}/actions/workflows/deploy-navixa-auto.yml/runs?branch=master&event=push&per_page=20" \
+              --jq '[.workflow_runs[] | select(.head_sha == env.NAVIXA_SHA)] | sort_by(.created_at) | last // empty')"
+
+            if [ -z "$run" ]; then
+              echo "Deploy run for $NAVIXA_SHA not visible yet"
+              sleep 10
+              continue
+            fi
+
+            status="$(jq -r '.status' <<<"$run")"
+            conclusion="$(jq -r '.conclusion // ""' <<<"$run")"
+            echo "Deploy status=$status conclusion=${conclusion:-pending}"
+
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Timed out waiting for production deploy of $NAVIXA_SHA"
+          exit 1
+
   zap-baseline:
     name: OWASP ZAP passive baseline
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')
+    needs: [wait-production]
+    if: always() && (github.event_name != 'push' || needs.wait-production.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Prepare report directory
         shell: bash
@@ -74,9 +116,13 @@ jobs:
 
   nuclei:
     name: Nuclei controlled High/Critical validation
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')
+    needs: [wait-production]
+    if: always() && (github.event_name != 'push' || needs.wait-production.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout for report upload context
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -134,7 +180,7 @@ jobs:
 
       - name: Upload Nuclei SARIF to code scanning
         if: always() && hashFiles('security/reports/nuclei/navixa-nuclei.sarif') != ''
-        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3, resolved 2026-09-12
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4, resolved 2026-09-12
         with:
           sarif_file: security/reports/nuclei/navixa-nuclei.sarif
           category: nuclei-production
