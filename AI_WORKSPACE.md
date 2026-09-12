@@ -7,7 +7,7 @@
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: بناء المرحلة الأولى من `NAVIXA UI System` بنظام واجهة Responsive مملوك للمشروع وقابل للتطوير والاستبدال، دون اعتماد Runtime جديد على مكتبة واجهات خارجية.
 - الحالة: بدء العمل على فرع معزول `feat/navixa-ui-system-20260912`؛ الإنتاج و`master` لن يتأثرا بكود المنتج حتى المراجعة والاعتماد.
-- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
+- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
 
 ## آخر ما اكتمل
 
