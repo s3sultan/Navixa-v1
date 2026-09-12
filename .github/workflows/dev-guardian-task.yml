@@ -1,0 +1,85 @@
+name: NAVIXA Dev Guardian Task
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: GitHub Issue number created from the NAVIXA AI task form
+        required: true
+        type: number
+      approved:
+        description: I approve building the bounded Dev Guardian plan for this issue
+        required: true
+        default: false
+        type: boolean
+      dispatch_external:
+        description: I explicitly approve external read-only AI Tester and Independent Reviewer calls
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: dev-guardian-task-${{ inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  guardian:
+    if: github.actor == github.repository_owner && inputs.approved == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout approved repository snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.13.0"
+
+      - name: Build guarded task contract and route
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          NAVIXA_BASE_COMMIT: ${{ github.sha }}
+          NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
+          NAVIXA_PLAN_OUTPUT: ${{ runner.temp }}/navixa-dev-guardian-plan.json
+        run: node scripts/dev-guardian/guardian-task-runner.mjs
+
+      - name: AI Tester via Gemini
+        if: inputs.dispatch_external == true && steps.plan.outputs.has_ai_tester == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.5-flash
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
+          NAVIXA_PLAN_FILE: ${{ runner.temp }}/navixa-dev-guardian-plan.json
+          NAVIXA_REVIEW_PROVIDER: gemini
+          NAVIXA_REVIEW_ROLE: ai-tester
+        run: node scripts/dev-guardian/external-review-runner.mjs
+
+      - name: Independent Reviewer via Manus
+        if: inputs.dispatch_external == true && steps.plan.outputs.has_independent_reviewer == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MANUS_API_KEY: ${{ secrets.MANUS_API_KEY }}
+          NAVIXA_REPOSITORY: ${{ github.repository }}
+          NAVIXA_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          NAVIXA_TRIGGER_ACTOR: ${{ github.actor }}
+          NAVIXA_PLAN_FILE: ${{ runner.temp }}/navixa-dev-guardian-plan.json
+          NAVIXA_REVIEW_PROVIDER: manus
+          NAVIXA_REVIEW_ROLE: independent-reviewer
+        run: node scripts/dev-guardian/external-review-runner.mjs
+
+      - name: External dispatch remains opt-in
+        if: inputs.dispatch_external != true
+        run: echo "Plan completed. External AI calls were not requested."
