@@ -17,7 +17,7 @@ class MemoryStore implements WebhookEventStore {
   }
   async get(provider: string, eventId: string) { return this.rows.get(this.key(provider, eventId)) ?? null; }
   async takeExpiredLease(input: { provider: string; eventId: string; now: string; leaseUntil: string }) {
-    const row = this.rows.get(this.key(provider, input.eventId));
+    const row = this.rows.get(this.key(input.provider, input.eventId));
     if (!row || !row.leaseUntil || row.leaseUntil >= input.now || !["processing", "failed"].includes(row.status)) return false;
     row.status = "processing"; row.leaseUntil = input.leaseUntil; return true;
   }
