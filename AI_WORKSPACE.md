@@ -4,20 +4,24 @@
 
 ## حالة العمل
 
-- الوكيل النشط: ChatGPT
-- المهمة الحالية: تقوية جامع NameSense البشري داخل PR #184 بعد مراجعة مستقلة كشفت مخاطر iOS Safari وحماية حالة المستخدم وسباق speakerId
-- الحالة: قيد التحقق النهائي بعد الإصلاحات
-- الملفات المحجوزة: `app/voice/localNameFallback.ts`, `app/voice/voiceEngine.ts`, `app/admin/namesense-benchmark/page.tsx`, `app/api/admin/namesense-benchmark/route.ts`, `migrations/0052_namesense_benchmark_trials.sql`, `tests/voice-local-fallback.test.ts`
+- الوكيل النشط: لا يوجد
+- المهمة الحالية: لا توجد مهمة محجوزة؛ جامع NameSense البشري داخل PR #184 اجتاز الفحوص والمراجعة المستقلة النهائية
+- الحالة: جاهز للدمج بعد التحقق من head النهائي
+- الملفات المحجوزة: لا يوجد
 
 ## آخر ما اكتمل
 
 - دُمج PR #179 لبناء بوابة benchmark بشرية صارمة لـNameSense تشمل مجموعات اللهجات/اللكنات المطلوبة، حدود Wilson 95%، متطلبات تنوع صارمة، استبعاد الصوت الاصطناعي من دليل الاعتماد، فحص جودة الإشارة RMS/variance/VAD، ومنع تسرب المتحدثين بين مجموعات اللهجات. لا توجد حتى الآن نسبة دقة بشرية معلنة قبل جمع البيانات المؤهلة.
-- داخل PR #184: عالج ChatGPT مشكلة تعدد طلبات الميكروفون بجعل local fallback يقبل `MediaStream` خارجيًا ولا يوقف الستريم الذي لا يملكه، ثم مرر الجامع نفس الستريم لمحرك NameSense ومسار قياس الجودة.
-- داخل PR #184: ألغى الجامع تعديل `localStorage` الخاص بالمستخدم بالكامل أثناء benchmark؛ صار المحرك يقبل contextual bias مؤقتًا مع تعطيل التعلم وقراءة/حفظ تلميح اللغة في جلسة الاختبار، لذلك crash أو إغلاق الصفحة لا يمكنه مسح حالة NameSense الإنتاجية.
-- داخل PR #184: أضيفت عتبة VAD متكيفة مع ضوضاء الخلفية داخل الجامع لتقليل انحراف endpoint/latency في البيئات المزعجة.
-- داخل PR #184: أضيف جدول ذري `navixa_namesense_benchmark_speakers` يحجز كل `speakerId` لمجموعة لهجة واحدة عبر `INSERT OR IGNORE` قبل حفظ التجارب، لإغلاق سباق الطلبات المتزامنة.
-- داخل PR #184: أضيف اختبار يثبت أن fallback يعيد استخدام الستريم الخارجي دون استدعاء `getUserMedia` مرة ثانية ودون إيقاف tracks التي لا يملكها.
+- جهز PR #184 جامعًا داخليًا محميًا للـNameSense human holdout benchmark داخل `/admin/namesense-benchmark` مع API إدارة وD1 دون حفظ الصوت الخام أو transcript أو هوية الحساب.
+- وحّد PR #184 التقاط الميكروفون: local Whisper fallback يعيد استخدام `MediaStream` نفسه ولا يوقف stream لا يملكه، مع اختبار انحدار يمنع طلب ميكروفون ثانٍ.
+- عزل benchmark عن حالة المستخدم: contextual bias مؤقت مع `learningEnabled=false`, `useStoredLanguageHint=false`, `persistLanguageHint=false` دون مسح أو تعديل watched terms أو aliases أو language hints.
+- أضاف سجلًا ذريًا `navixa_namesense_benchmark_speakers` يحجز كل `speakerId` لمجموعة لهجة واحدة، مع `INSERT OR IGNORE` ثم تحقق accent ورفض mismatch لمنع سباقات الطلبات المتزامنة.
+- شدد endpoint/VAD للـbenchmark: لا تتعلم أرضية الضوضاء من speech/transients، والعتبة المتكيفة محصورة بين protocol minimum `0.0035` و`0.01` مع اختبارات للكلام الهادئ والضوضاء.
+- تسلسل المراجعات المستقلة لجامع PR #184: Issue #185 = `MAJOR`، ثم #186 = `MINOR`، ثم #187 = `CLEAR` بعد الإصلاحات.
+- التحقق على كود head `49542d0590f53e1553f01d5c1a401468a385825b`: نجح Verify NAVIXA Pull Request #423 وNAVIXA Pre-Launch Gate #302 وRelease Gate، شاملًا lint والاختبارات وUI smoke وبناء الإنتاج وتدقيق الاعتماديات والأسرار وGitHub Actions.
+- لا توجد حتى الآن أي نسبة دقة بشرية لـNameSense؛ الخطوة العلمية التالية هي جمع corpus بشري مؤهل وتشغيل scorer الصارم فقط بعد اكتمال الحد الأدنى والتوازن.
 
 ## التالي المقترح
 
-- انتظار Verify + Pre-Launch على head الحالي لـPR #184، ثم إعادة مراجعة مستقلة صارمة على الإصلاحات. إذا لم توجد MAJOR/BLOCKER: تحديث التوثيق، تحرير الحجز، وتجهيز PR للدمج دون ادعاء أي دقة بشرية قبل جمع benchmark فعلي.
+- إعادة تحقق CI على head النهائي بعد تحديثات التوثيق، ثم دمج PR #184 إذا بقيت البوابات خضراء، ومراقبة Deploy NAVIXA Auto وsmoke checks على الإنتاج.
+- بعد نجاح النشر: بدء جمع benchmark البشري الحقيقي حسب بروتوكول PR #179 دون إعلان أي نسبة قبل اكتمال corpus المؤهل.
