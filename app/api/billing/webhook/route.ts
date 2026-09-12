@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server.js";
 import { completeFoundersAward } from "../../../foundersCampaign.ts";
 import { normalizeMoyasarWebhook, verifyMoyasarPayment } from "../../../billing/providers/index.ts";
+import { sendFeaturePush } from "../../../../worker/generalPush.ts";
 
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>; run: () => Promise<unknown> };
 type D1Database = { prepare: (sql: string) => D1Statement };
 type Env = Record<string, string | undefined>;
 type Settings = { provider: string; mode: string; public_checkout: string; test_webhook_enabled: string; live_payments_enabled: string };
+type PushSubscription = { endpoint: string; p256dh: string; auth: string };
 const defaults: Settings = { provider: "moyasar", mode: "test", public_checkout: "false", test_webhook_enabled: "false", live_payments_enabled: "false" };
 const clean = (value: unknown, limit: number) => typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
 const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -26,6 +28,20 @@ async function settings(database: D1Database) {
   return next;
 }
 function webhookSecret(request: Request, body: Record<string, unknown>) { return clean(request.headers.get("x-navixa-webhook-secret") || body.secret_token, 180); }
+
+async function notifyActivation(database: D1Database, userId: string, plan: string, end: string) {
+  const subscriptions = await database.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=? AND enabled=1 LIMIT 8").bind(userId).all<PushSubscription>();
+  if (!subscriptions.results.length) return 0;
+  const label = plan === "sprint" ? "عزم" : "هِمّة";
+  const ending = new Intl.DateTimeFormat("ar-SA", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Riyadh" }).format(new Date(end));
+  let sent = 0;
+  for (const subscription of subscriptions.results) {
+    const result = await sendFeaturePush(subscription, { kind: "billing", title: `تم تفعيل ${label} ✅`, body: `اشتراكك فعّال الآن حتى ${ending}.`, url: "/account", tag: `navixa-billing-activated-${userId}`, urgency: "high", ttl: 3600 });
+    if (result.ok) { sent += 1; continue; }
+    if (result.status === 404 || result.status === 410) await database.prepare("DELETE FROM navixa_push_subscriptions WHERE endpoint=? AND user_id=?").bind(subscription.endpoint, userId).run().catch(() => {});
+  }
+  return sent;
+}
 
 export async function GET() {
   return NextResponse.json({ billing: "disabled", mode: "test", message: "بوابة الدفع مخفية ومقفلة حتى يفعّلها المدير. لا يتم قبول أي دفعات أو بيانات بطاقات الآن." }, { headers: { "Cache-Control": "no-store" } });
@@ -89,5 +105,6 @@ export async function POST(request: Request) {
 
   await database.prepare("INSERT INTO navixa_billing_events (id,provider_event_id,subscriber_id,event_type,mode,payload_json,created_at,processed_at) VALUES (?,?,?,?,?,?,?,?)")
     .bind(crypto.randomUUID(), eventId, requestedLive ? subscriberId : "", eventType, mode, JSON.stringify({ intentId, plan, durationDays: days, provider: "moyasar", foundersAwarded }), now, now).run();
+  if (requestedLive) await notifyActivation(database, userId, plan, end).catch(() => 0);
   return NextResponse.json({ ok: true, mode, activated: requestedLive, plan, durationDays: days });
 }
