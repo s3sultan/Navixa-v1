@@ -17,11 +17,11 @@ jobs:
       - name: Checkout exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 5e833fb205d66893f7e1449664e8a072c2210d35
+          ref: 19c6b2c5cbd71f25714c59bb133e5ab84557ecfe
           persist-credentials: false
 
       - name: Assert exact target SHA
-        run: test "$(git rev-parse HEAD)" = "5e833fb205d66893f7e1449664e8a072c2210d35"
+        run: test "$(git rev-parse HEAD)" = "19c6b2c5cbd71f25714c59bb133e5ab84557ecfe"
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -57,7 +57,7 @@ jobs:
       - name: Checkout exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 5e833fb205d66893f7e1449664e8a072c2210d35
+          ref: 19c6b2c5cbd71f25714c59bb133e5ab84557ecfe
           persist-credentials: false
 
       - name: Install uv
@@ -76,7 +76,7 @@ jobs:
       - name: Checkout exact PR head with full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 5e833fb205d66893f7e1449664e8a072c2210d35
+          ref: 19c6b2c5cbd71f25714c59bb133e5ab84557ecfe
           fetch-depth: 0
           persist-credentials: false
 
