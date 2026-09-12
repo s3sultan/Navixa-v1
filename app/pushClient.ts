@@ -3,6 +3,10 @@ export type NavixaPushSubscriptionResult={
   accountBound:boolean;
 };
 
+export type NavixaFeaturePushEvent=
+  |{kind:"name_heard";name:string}
+  |{kind:"screen_watch";mode:"change"|"ocr";detail?:string};
+
 type PushConfig={enabled?:boolean;publicKey?:string};
 type SubscriptionSaveResult={ok?:boolean;accountBound?:boolean;error?:string};
 
@@ -104,4 +108,21 @@ export async function sendNavixaPushTest(endpoint:string){
   const result=await response.json().catch(()=>({})) as {ok?:boolean;error?:string};
   if(!response.ok)throw new Error(result.error||"تعذر إرسال اختبار Push.");
   return result;
+}
+
+export async function sendNavixaFeaturePushEvent(event:NavixaFeaturePushEvent){
+  try{
+    const response=await fetch("/api/push/events",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      credentials:"same-origin",
+      body:JSON.stringify(event),
+    });
+    const result=await response.json().catch(()=>({})) as {ok?:boolean;delivered?:number;error?:string};
+    return response.ok&&result.ok===true
+      ?{ok:true as const,delivered:Number(result.delivered)||0}
+      :{ok:false as const,delivered:0,error:result.error||"تعذر إرسال التنبيه"};
+  }catch{
+    return {ok:false as const,delivered:0,error:"تعذر الوصول إلى خدمة التنبيهات"};
+  }
 }
