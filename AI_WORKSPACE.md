@@ -29,12 +29,13 @@
 
 - الوكيل: ChatGPT.
 - المهمة: توسيع محرك Web Push الحالي لتنبيهات عالية الأولوية تصل إلى iPhone وApple Watch المقترنة، مع إجراءات سريعة كتحسين تدريجي وFallback آمن عند عدم دعم الأزرار.
-- الحالة: حجز فقط؛ التنفيذ على فرع معزول وPull Request Draft مستقل، دون دمج أو نشر إنتاجي قبل مراجعة المستخدم.
-- الملفات المحجوزة: `worker/generalPush.ts`, `public/navixa-push-sw.js`, `app/pushClient.ts`, `app/admin/settings/AdminPushLab.tsx`, `app/api/admin/push-lab/route.ts`, `tests/admin-push-lab.test.ts`.
-- القيود: لا لمس لملفات UI System أو `package.json`، ولا إنشاء Runtime أو اعتماد جديد، ولا ادعاء تطبيق watchOS أصلي؛ Apple Watch تعتمد في هذه المرحلة على إشعارات Web Push المنعكسة من iPhone.
+- الحالة: التنفيذ والتحقق مكتملان على Draft PR #210 في الفرع `feat/watch-alerts-20260912`، والإنتاج غير متأثر. نجحت `Verify NAVIXA Pull Request` #589 و`NAVIXA Pre-Launch Gate` #490 و`NAVIXA Security Code Scan` #37، بما يشمل CodeQL وTrivy وبوابات High/Critical. التوقف الحالي عند مراجعة المستخدم قبل أي دمج أو نشر أو مرحلة ثانية.
+- الملفات المحجوزة لهذه المهمة: محررة؛ لا يوجد حجز نشط لهذه المهمة حتى يطلب المستخدم المرحلة التالية.
+- القيود: لم تُلمس ملفات UI System أو `package.json`، ولم يُضف Runtime أو اعتماد جديد، ولا يوجد ادعاء تطبيق watchOS أصلي؛ Apple Watch تعتمد في هذه المرحلة على إشعارات Web Push المنعكسة من iPhone. أزرار الإجراءات تحسين تدريجي، ولم يُضف زر غفوة صوري قبل وجود جدولة خلفية حقيقية.
 
 ## آخر ما اكتمل
 
+- اكتملت المرحلة الأولى من NAVIXA Watch Alerts على Draft PR #210 دون نشر: أولوية ذكية حسب نوع التنبيه، إجراءات `فتح NAVIXA` و`تم` مع fallback آمن، تحقق server-side لمدخلات مختبر Push وروابط الإجراءات الداخلية فقط، ونجاح جميع بوابات PR والإطلاق والأمن.
 - دُمج PR #194 وبات NAVIXA Dev Guardian موجودًا على `master` والإنتاج، مع Repo Intelligence وTask Contract وGuards وEvidence Aggregator وDeveloper Bridge وPatch Producer محدود، ونجح Deploy NAVIXA Auto واختبارات الإنتاج.
 - دُمج PR #179 لبناء بوابة benchmark بشرية صارمة لـNameSense تشمل مجموعات اللهجات/اللكنات المطلوبة، حدود Wilson 95%، متطلبات تنوع صارمة، استبعاد الصوت الاصطناعي من دليل الاعتماد، فحص جودة الإشارة RMS/variance/VAD، ومنع تسرب المتحدثين بين مجموعات اللهجات. لا توجد حتى الآن نسبة دقة بشرية معلنة قبل جمع البيانات المؤهلة.
 - دُمج PR #184 ونُشر على الإنتاج بنجاح: جامع داخلي محمي للـNameSense human holdout benchmark داخل `/admin/namesense-benchmark` مع API إدارة وD1 دون حفظ الصوت الخام أو transcript أو هوية الحساب.
@@ -46,6 +47,7 @@
 
 ## التالي
 
+- انتظار مراجعة المستخدم لـDraft PR #210 قبل أي دمج أو نشر أو بدء جدولة غفوة حقيقية/مرحلة ثانية لتنبيهات الساعة.
 - تنفيذ NAVIXA Security Validation على فرع مستقل بفحوص كود واعتماديات وتحقق غير مدمر للموقع وتقارير CI.
 - إعادة `tests/ui-smoke.mjs` لفحصه الأصلي وفصل `/ui-lab` في `tests/ui-system-smoke.mjs` على narrow/medium/wide مع انتظار استقرار الحركة قبل القياس.
 - إكمال GitHub Actions على PR #193 وإصلاح أي فشل حتى تصبح البوابة نظيفة.
