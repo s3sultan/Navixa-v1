@@ -1,5 +1,3 @@
-import {sendNavixaFeaturePushEvent} from "./pushClient.ts";
-
 export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"wird"|"sadaqah"|"task";
 export type Policy="user"|"on"|"off";
 type Channels={screen:boolean;telegram:boolean};
@@ -44,7 +42,8 @@ export const sendTelegramMessage=async(message:string,type?:AlertType):Promise<b
 const forwardNamePush=(message:string)=>{
   const match=message.match(/\(([^()]{1,80})\)\s*$/);
   const name=(match?.[1]||"").trim();
-  if(name)void sendNavixaFeaturePushEvent({kind:"name_heard",name});
+  if(!name)return;
+  void import("./pushClient").then(({sendNavixaFeaturePushEvent})=>sendNavixaFeaturePushEvent({kind:"name_heard",name})).catch(()=>{});
 };
 
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
