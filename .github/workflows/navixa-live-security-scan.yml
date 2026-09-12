@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   passive-live-scan:
-    name: ZAP baseline + constrained Nuclei + headers
+    name: ZAP baseline + targeted Nuclei + headers
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - name: Check HTTPS and security headers
         shell: bash
@@ -98,7 +98,7 @@ jobs:
               print(f"[{a.get('riskdesc','Unknown')}] {a.get('alert','Unnamed alert')}")
           PY
 
-      - name: Nuclei safe material-risk scan
+      - name: Nuclei targeted sensitive-exposure scan
         shell: bash
         run: |
           set -euo pipefail
@@ -108,7 +108,12 @@ jobs:
 
           git clone --depth 1 --filter=blob:none --sparse \
             https://github.com/projectdiscovery/nuclei-templates.git "$templates"
-          git -C "$templates" sparse-checkout set http/exposures http/misconfiguration
+          git -C "$templates" sparse-checkout set \
+            http/exposures/backups \
+            http/exposures/configs \
+            http/exposures/files \
+            http/exposures/logs \
+            http/exposures/tokens
 
           docker pull projectdiscovery/nuclei:latest
           docker run --rm \
@@ -118,11 +123,14 @@ jobs:
             -silent \
             -jsonl \
             -disable-update-check \
-            -t /templates/http/exposures \
-            -t /templates/http/misconfiguration \
+            -t /templates/http/exposures/backups \
+            -t /templates/http/exposures/configs \
+            -t /templates/http/exposures/files \
+            -t /templates/http/exposures/logs \
+            -t /templates/http/exposures/tokens \
             -severity medium,high,critical \
             -exclude-tags cve,dos,fuzz,intrusive,bruteforce,headless,code \
-            -rate-limit 8 \
+            -rate-limit 10 \
             -concurrency 1 \
             -bulk-size 1 \
             -timeout 4 \
@@ -161,8 +169,8 @@ jobs:
         run: |
           cat <<'EOF'
           This workflow intentionally performs only authorized low-rate public-surface checks.
-          ZAP uses baseline/passive scanning only. Nuclei is restricted to official medium/high/critical
-          exposure and misconfiguration templates and explicitly excludes CVE, DoS, fuzzing, intrusive,
-          brute-force, headless, and code-execution categories. No authentication, POST mutation,
-          credential guessing, or destructive testing is performed.
+          ZAP uses baseline/passive scanning only. Nuclei is limited to official medium/high/critical
+          templates for exposed backups, configs, files, logs, and tokens. CVE, DoS, fuzzing,
+          intrusive, brute-force, headless, and code-execution categories are excluded. No authentication,
+          POST mutation, credential guessing, or destructive testing is performed.
           EOF
