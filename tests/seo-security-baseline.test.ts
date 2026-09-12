@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [robots, sitemap, worker, organizer, meetings, reminders, privacy, nextConfig, userAuth, portfolioAuthorize] = await Promise.all([
+const [robots, sitemap, worker, organizer, meetings, reminders, privacy, nextConfig, userAuth, portfolioAuthorize, staticHeaders] = await Promise.all([
   readFile(new URL("../app/robots.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/sitemap.ts", import.meta.url), "utf8"),
   readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
@@ -12,6 +12,7 @@ const [robots, sitemap, worker, organizer, meetings, reminders, privacy, nextCon
   readFile(new URL("../next.config.ts", import.meta.url), "utf8"),
   readFile(new URL("../worker/userAuth.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/api/portfolio/authorize/route.ts", import.meta.url), "utf8"),
+  readFile(new URL("../public/_headers", import.meta.url), "utf8"),
 ]);
 
 assert.match(robots, /https:\/\/navixasa\.com/);
@@ -41,6 +42,12 @@ assert.doesNotMatch(worker, /set\("Content-Security-Policy", CSP_REPORT_ONLY/);
 assert.match(worker, /consumeAuthRateLimit/);
 assert.match(worker, /public-mutation:\$\{url\.pathname\}/);
 assert.match(worker, /await publicMutationGuard\(request, url, env\)/);
+assert.match(staticHeaders, /Strict-Transport-Security: max-age=31536000/);
+assert.match(staticHeaders, /X-Content-Type-Options: nosniff/);
+assert.match(staticHeaders, /X-Frame-Options: SAMEORIGIN/);
+assert.match(staticHeaders, /X-Permitted-Cross-Domain-Policies: none/);
+assert.match(staticHeaders, /Referrer-Policy: strict-origin-when-cross-origin/);
+assert.match(staticHeaders, /Permissions-Policy: geolocation=\(\), usb=\(\), serial=\(\), accelerometer=\(\), gyroscope=\(\), magnetometer=\(\)/);
 for (const page of [organizer, meetings, reminders, privacy]) assert.match(page, /alternates: \{ canonical:/);
 assert.match(organizer, /href="\/guides"/);
 
