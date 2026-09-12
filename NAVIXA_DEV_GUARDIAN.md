@@ -10,25 +10,24 @@
 - كل تغيير كتابي يظل في branch/PR معزولًا حتى اجتياز فحوص NAVIXA الحالية.
 - Dev Guardian لا يستبدل `pr-verify` أو `pre-launch-gate`؛ يعمل قبلهما وفوقهما.
 - أي مخرجات ذكاء خارجي تعامل كمادة غير موثوقة حتى تمر بالمراجعة والفحوص.
+- التخطيط المحلي لا يشغّل أي مزود خارجي. Gemini/Manus يحتاجان موافقة يدوية صريحة مستقلة.
 
 ## خط التنفيذ المستهدف
 
 ```text
 NAVIXA Repo Intelligence
         ↓
-NAVIXA Planner
+NAVIXA Task Contract
         ↓
-NAVIXA Agent Router
+NAVIXA Planner + Agent Router
         ↓
 Developer Agent
         ↓
 Existing NAVIXA Tests
         ↓
-AI Tester
+AI Tester (read-only)
         ↓
-Security Reviewer
-        ↓
-Independent Reviewer
+Independent Reviewer (+ security when required)
         ↓
 NAVIXA Pre-Launch Gate
         ↓
@@ -41,116 +40,118 @@ Merge
 Scope Guard + Budget Guard + Stuck Detector
 ```
 
-## المرحلة الأولى المنفذة في هذا الفرع
+## المرحلة الأولى: الأساس
 
-### 1. Repo Intelligence
+### Repo Intelligence
 
 الملف: `scripts/dev-guardian/repo-intelligence.mjs`
 
-يبني snapshot بنيويًا من المستودع دون أي اتصال خارجي أو اعتماديات جديدة، ويستخرج:
-
-- صفحات وAPI routes.
-- GitHub Actions workflows.
-- migrations.
-- import/dependency graph.
-- reverse dependency graph لمعرفة أثر تغيير ملف على بقية المشروع.
-- ربط الاختبارات بالملفات التي تعتمد عليها.
-- hotspots تقريبية مبنية على الوارد/الصادر/الاختبارات ونقاط الدخول.
-- imports الداخلية غير المحلولة.
-- الاعتماديات الخارجية المرصودة في imports.
-
-يدعم مسار NAVIXA المختصر `@/` إضافة إلى relative imports.
+يبني snapshot بنيويًا من المستودع دون أي اتصال خارجي أو اعتماديات جديدة، ويستخرج الصفحات وAPI routes وworkflows وmigrations وdependency/reverse-dependency graph وروابط الاختبارات وhotspots والاعتماديات المرصودة.
 
 أمثلة تشغيل:
 
 ```bash
 node scripts/dev-guardian/repo-intelligence.mjs --root . --check
 node scripts/dev-guardian/repo-intelligence.mjs --root . --json
-node scripts/dev-guardian/repo-intelligence.mjs --root . --json --output /tmp/navixa-repo-map.json
 ```
 
-هذه الخريطة لا تقرر وحدها أين يعدّل الوكيل؛ هي evidence إضافي للـPlanner والـRouter.
-
-### 2. Scope Guard
+### Scope / Budget / Stuck Guards
 
 الملف: `scripts/dev-guardian/guards.mjs`
 
-يطبق allow/deny patterns على الملفات قبل السماح للوكيل بالاستمرار. أي ملف خارج النطاق أو داخل forbidden scope ينتج قرار توقف واضحًا.
+- Scope Guard يطبق allow/deny patterns ويرفض path traversal والمسارات المطلقة والمسارات الحساسة الافتراضية مثل `.env` والمفاتيح.
+- Budget Guard يفرض حدود `maxSteps`, `maxCostUsd`, `maxTokens`, `maxWallMs`.
+- Stuck Detector يكشف تكرار نفس الفعل/الخطأ، سلسلة الفشل، oscillation، وثبات progress hash دون تقدم.
 
-النطاقات المحظورة الافتراضية تشمل أمثلة حساسة مثل `.env` والمفاتيح الخاصة، ويمكن للمهمة إضافة قيود أشد.
-
-### 3. Budget Guard
-
-يستطيع وقف المهمة عند أحد الحدود التالية:
-
-- `maxSteps`
-- `maxCostUsd`
-- `maxTokens`
-- `maxWallMs`
-
-حدود الوقت في GitHub Actions تبقى موجودة كطبقة ثانية مستقلة.
-
-### 4. Stuck Detector
-
-يكشف أربع حالات أولية:
-
-- تكرار نفس الفعل والنتيجة.
-- تكرار نفس الخطأ.
-- سلسلة فشل متتالية.
-- oscillation من نوع A/B/A/B/A/B.
-- ثبات `progressHash` عدة خطوات دون تقدم.
-
-الهدف أن يتوقف الوكيل ويرجع تقريرًا بدل استهلاك وقت أو تكلفة وهو يدور في الحلقة نفسها.
-
-### 5. Agent Router
+### Agent Router
 
 الملف: `scripts/dev-guardian/router.mjs`
 
-المرحلة الأولى Router حتمي وقابل للمراجعة، وليس LLM يقرر وحده. يعتمد على:
+Router حتمي وقابل للمراجعة يعتمد على مستوى الخطورة، الحاجة للكتابة، حساسية الأمان، UI، التكاملات الخارجية وحجم التغيير. ويعيد الوكيل الأساسي والمراجعين والفحوص وبوابات الاعتماد وحدود التشغيل.
 
+## المرحلة الثانية: Task Contract والربط الفعلي
+
+### Task Contract
+
+الملف: `scripts/dev-guardian/task-contract.mjs`
+
+يحوّل نموذج GitHub Issue المعتمد إلى عقد موحد يتضمن:
+
+- الهدف.
+- معايير القبول.
 - مستوى الخطورة.
-- هل المهمة تحتاج كتابة أم قراءة فقط.
-- حساسية الأمان/المصادقة/الفوترة/الأسرار/webhooks.
-- تأثير UI/visual.
-- التكاملات الخارجية.
-- حجم التغيير المتوقع.
+- الوكيل المقترح.
+- base commit الفعلي والمطلوب.
+- allowed/forbidden scope.
+- الميزانية والمهلة.
+- إشارات حساسية الأمان/UI/التكاملات.
+- ملفات context مختارة من Repo Intelligence.
 
-ويعيد:
+إذا غاب الهدف أو معايير القبول أو النطاق المسموح أو base commit تتوقف المهمة بدل التخمين.
 
-- الوكيل الأساسي المقترح.
-- المراجعين المطلوبين.
-- الفحوص الإلزامية.
-- بوابات اعتماد المستخدم.
-- حدود الخطوات والوقت وسياسات التوقف.
+### Guardian Planner
 
-لا يستدعي الوكلاء بنفسه في هذه المرحلة؛ الربط الفعلي بالـBridges الحالية يأتي بعد اجتياز هذا الأساس للمراجعة.
+الملف: `scripts/dev-guardian/guardian-task-runner.mjs`
+
+يقرأ Issue المفتوح، يبني Repo Intelligence، ينشئ العقد، يشغّل Router وReview Dispatch، يطبق الحد الأكثر تشددًا بين سياسة Router وميزانية المهمة، ثم يكتب Plan JSON ويعلّق ملخصًا قابلًا للتدقيق على Issue.
+
+هذه الخطوة **لا تستدعي أي ذكاء خارجي**.
+
+### Independent Review Dispatch
+
+الملف: `scripts/dev-guardian/review-dispatch.mjs`
+
+- يضمن أن المراجع الخارجي ليس نفس المنفذ.
+- يستخدم Gemini كـAI Tester قراءة فقط عندما تكون هناك مهمة تنفيذية.
+- يستخدم Manus كمراجع مستقل قراءة فقط.
+- إذا كانت المهمة أمنية، تُدمج مراجعة التهديدات في مهمة المراجع المستقل بدل تشغيل استدعاء خارجي ثالث مكرر.
+- تبقى مراجعات Router الأخرى مثل Claude Code مسجلة، لكنها لا تعامل كـBridge قابل للاستدعاء ما لم يكن لها ربط فعلي معتمد.
+
+### External Review Bridge
+
+الملف: `scripts/dev-guardian/external-review-runner.mjs`
+
+يربط الخطة المحكومة مع Gemini أو Manus وفق الدور المعتمد فقط. قبل إرسال أي context:
+
+- يتحقق أن المزود/الدور موجود فعلًا في Plan.
+- يمنع reviewer/executor collision.
+- يطبق Scope Guard.
+- يمنع `.env`, private keys والمسارات الحساسة.
+- يرفض symlinks والمسارات الخارجة عن جذر المستودع.
+- يحد حجم كل ملف وإجمالي context.
+- يعامل الكود والنص كمدخل غير موثوق.
+- النتيجة تقرير مراجعة فقط ولا تطبق أو تدمج أو تنشر.
+
+### Workflow اليدوي
+
+`.github/workflows/dev-guardian-task.yml`
+
+مدخلاته:
+
+- `issue_number`
+- `approved`
+- `dispatch_external`
+
+`approved=true` يسمح ببناء الخطة فقط. ولا يتم استدعاء Gemini/Manus إلا عندما يكون `dispatch_external=true` أيضًا، ويجب أن يكون المشغل مالك المستودع.
 
 ## التحقق
 
-`tests/dev-guardian.test.mjs` يغطي:
-
-- allow/deny scope.
-- حدود الميزانية.
-- repeated-error وoscillation.
-- مسار صحي غير عالق.
-- تصعيد المهمة الأمنية لمراجعة مستقلة.
-- Repo Intelligence على مستودع fixture يشمل route وalias وreverse dependencies وربط test.
-
-`.github/workflows/dev-guardian-verify.yml` يشغل هذه الاختبارات ويبني Repo Intelligence snapshot للمستودع الحقيقي ويتحقق من عقد JSON، دون `npm install` ودون مفاتيح أو اتصالات خارجية.
+- `tests/dev-guardian.test.mjs`: Repo Intelligence والـguards والـrouter.
+- `tests/dev-guardian-stage2.test.mjs`: Task Contract، الميزانية، استقلال المراجع، bounded context، منع الأسرار، prompts وخطة المرحلة الثانية.
+- `.github/workflows/dev-guardian-verify.yml`: يشغل المجموعتين، يفحص syntax للـrunners ويبني Repo Intelligence snapshot للمستودع الحقيقي.
+- `pr-verify` و`pre-launch-gate` يبقيان كما هما ولا يتم تخفيف أي فحص موجود.
 
 ## ما لم يتم بعد عمدًا
 
-- لا تعديل على `package.json` بسبب حجزه حاليًا لمهمة UI System الموازية.
-- لا استدعاء تلقائي لـCodex/Claude/Manus/Gemini من Router حتى نعتمد عقد التنفيذ بعد نجاح المرحلة الأولى.
-- لا AI Tester يكتب أو يصلح تلقائيًا بعد.
-- لا تعديل على `pr-verify` أو `pre-launch-gate`.
-- لا دمج ولا نشر إنتاجي ضمن هذه المرحلة.
+- لا تعديل على `package.json` بسبب مهمة UI System الموازية.
+- لا تشغيل خارجي تلقائي بسبب label أو push أو PR.
+- لا AI Tester أو Reviewer يكتب في المستودع.
+- لا دمج أو نشر إنتاجي من Dev Guardian.
+- لا يصبح Dev Guardian بوابة merge إلزامية حتى يثبت عبر PR والمراجعة المستقلة.
 
-## المرحلة التالية بعد نجاح الأساس
+## المرحلة التالية بعد اعتماد المرحلة الثانية
 
-1. إضافة Task Contract موحد يربط بيانات Issue مع Repo Intelligence وRouter.
-2. تمرير `allowed_scope`, `forbidden_scope`, budget وbase commit آليًا لكل Bridge.
-3. إضافة سجل أحداث موحد لكي يعمل Stuck Detector أثناء التنفيذ الفعلي.
-4. بناء Independent Review dispatcher يضمن اختلاف المراجع عن المنفذ.
-5. إضافة AI Tester محدود القراءة/التنفيذ يركز على الفجوات التي لا تغطيها الاختبارات الحالية.
-6. بعد إثبات الثبات فقط، إدخال Dev Guardian كفحص مطلوب قبل `pre-launch-gate` دون تخفيف أي بوابة حالية.
+1. إضافة سجل أحداث موحد للتنفيذ الحي كي يطبق Stuck Detector بين الوكلاء وليس في الاختبارات فقط.
+2. إضافة Evidence Aggregator يجمع نتيجة الاختبارات وAI Tester والمراجع المستقل في حكم واحد قابل للتدقيق.
+3. ربط منفذ التطوير الفعلي بعقد المهمة بحيث لا يستطيع تعديل ملف خارج scope.
+4. بعد إثبات الثبات، جعل Dev Guardian فحصًا مطلوبًا قبل الدمج دون تخفيف Pre-Launch Gate.
