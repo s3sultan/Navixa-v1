@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { validateNameSenseBenchmarkTrial } from "../app/api/admin/namesense-benchmark/schema.ts";
+import {
+  getNameSenseStudyPrompt,
+  nameSenseStudyPromptMatchesAssignment,
+  nextNameSenseStudyAssignment,
+} from "../benchmarks/namesense/study.ts";
 
 const base = {
   id: "trial-12345678-abcd",
@@ -75,4 +81,74 @@ test("rejects unsupported cohort labels and non-pseudonymous speaker ids", () =>
   assert.equal(validateNameSenseBenchmarkTrial({ ...base, browser: "unknown" }).ok, false);
   assert.equal(validateNameSenseBenchmarkTrial({ ...base, noise: "party" }).ok, false);
   assert.equal(validateNameSenseBenchmarkTrial({ ...base, speakerId: "Sultan Alharbi" }).ok, false);
+});
+
+test("study assignment alternates hit and miss while rotating names", () => {
+  assert.deepEqual(nextNameSenseStudyAssignment(0), { expected: "hit", nameId: "sultan" });
+  assert.deepEqual(nextNameSenseStudyAssignment(1), { expected: "miss", nameId: "mohammed" });
+  assert.deepEqual(nextNameSenseStudyAssignment(2), { expected: "hit", nameId: "alharbi" });
+  assert.deepEqual(nextNameSenseStudyAssignment(3), { expected: "miss", nameId: "sultan" });
+  assert.deepEqual(nextNameSenseStudyAssignment(-1), { expected: "hit", nameId: "sultan" });
+});
+
+test("study prompt must match the server-owned name and expected class", () => {
+  const positive = { expected: "hit" as const, nameId: "sultan" as const };
+  const negative = { expected: "miss" as const, nameId: "mohammed" as const };
+  assert.equal(nameSenseStudyPromptMatchesAssignment("name-only-sultan", positive), true);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("negative-sultan-1", positive), false);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("negative-mohammed-2", negative), true);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("direct-question-mohammed", negative), false);
+  assert.equal(nameSenseStudyPromptMatchesAssignment("negative-sultan-2", negative), false);
+});
+
+test("study prompt content and latency eligibility are deterministic and server-owned", () => {
+  assert.deepEqual(getNameSenseStudyPrompt(0, "en-IN"), {
+    id: "name-only-sultan",
+    text: "Sultan",
+    latencyEligible: true,
+  });
+  assert.deepEqual(getNameSenseStudyPrompt(1, "en-IN"), {
+    id: "negative-mohammed-1",
+    text: "Please ask Mahmoud to answer",
+    latencyEligible: false,
+  });
+  assert.deepEqual(getNameSenseStudyPrompt(2, "ar-GULF"), {
+    id: "direct-question-alharbi",
+    text: "يا الحربي تسمعني؟",
+    latencyEligible: false,
+  });
+});
+
+test("study invite token stays out of request URLs and browser address after activation", () => {
+  const adminInviteRoute = readFileSync(new URL("../app/api/admin/namesense-benchmark/invites/route.ts", import.meta.url), "utf8");
+  const publicRoute = readFileSync(new URL("../app/api/namesense-study/route.ts", import.meta.url), "utf8");
+  const participantPage = readFileSync(new URL("../app/namesense-study/page.tsx", import.meta.url), "utf8");
+
+  assert.match(adminInviteRoute, /invitePath:\s*`\/namesense-study#invite=\$\{token\}`/);
+  assert.doesNotMatch(adminInviteRoute, /namesense-study\?invite=/);
+  assert.match(publicRoute, /export async function PUT\(/);
+  assert.doesNotMatch(publicRoute, /searchParams\.get\(["']invite["']\)/);
+  assert.match(participantPage, /window\.location\.hash/);
+  assert.match(participantPage, /history\.replaceState/);
+  assert.doesNotMatch(participantPage, /\/api\/namesense-study\?invite=/);
+});
+
+test("study invite is browser-bound and failed storage never rolls the usage counter backward", () => {
+  const publicRoute = readFileSync(new URL("../app/api/namesense-study/route.ts", import.meta.url), "utf8");
+  const migration = readFileSync(new URL("../migrations/0053_namesense_study_invites.sql", import.meta.url), "utf8");
+
+  assert.match(migration, /client_hash TEXT/);
+  assert.match(publicRoute, /client_hash=\?/);
+  assert.match(publicRoute, /client_hash IS NULL/);
+  assert.match(publicRoute, /client_hash=\? AND revoked=0/);
+  assert.doesNotMatch(publicRoute, /used_trials=CASE WHEN used_trials>0 THEN used_trials-1/);
+});
+
+test("public study API overrides client ground truth and requires the exact server prompt", () => {
+  const publicRoute = readFileSync(new URL("../app/api/namesense-study/route.ts", import.meta.url), "utf8");
+  assert.match(publicRoute, /rawTrial\.promptId !== prompt\.id/);
+  assert.match(publicRoute, /expected:\s*assignment\.expected/);
+  assert.match(publicRoute, /watchedNameId:\s*assignment\.nameId/);
+  assert.match(publicRoute, /promptId:\s*prompt\.id/);
+  assert.match(publicRoute, /latencyEligible:\s*prompt\.latencyEligible/);
 });
