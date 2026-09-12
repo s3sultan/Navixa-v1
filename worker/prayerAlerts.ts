@@ -1,6 +1,6 @@
 import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
 import {sendFeaturePush} from "./generalPush.ts";
-import {isUserPushCategoryActive} from "./userPushPreferences.ts";
+import {ensureUserPushPreferenceSchema,isUserPushCategoryActive} from "./userPushPreferences.ts";
 
 type Stmt={bind:(...v:unknown[])=>Stmt;all:<T=Record<string,unknown>>()=>Promise<{results:T[]}>;run:()=>Promise<unknown>};
 type Db={prepare:(sql:string)=>Stmt};
@@ -40,6 +40,7 @@ async function reserve(db:Db,userId:string,eventKey:string){const result=await d
 async function release(db:Db,userId:string,eventKey:string){await db.prepare("DELETE FROM navixa_prayer_alert_delivery WHERE user_id=? AND event_key=?").bind(userId,eventKey).run()}
 
 export async function deliverDuePrayerAlerts(env:Env,now=new Date()){
+  await ensureUserPushPreferenceSchema(env.DB);
   const rows=await env.DB.prepare("WITH users AS (SELECT user_id FROM navixa_user_telegram_preferences WHERE notification_type IN ('adhan','iqama') AND enabled=1 UNION SELECT user_id FROM navixa_user_push_preferences WHERE category='adhan' AND enabled=1) SELECT u.user_id,COALESCE((SELECT MAX(CASE WHEN p.notification_type='adhan' AND p.enabled=1 THEN 1 ELSE 0 END) FROM navixa_user_telegram_preferences p WHERE p.user_id=u.user_id),0) AS adhan_enabled,COALESCE((SELECT MAX(CASE WHEN p.notification_type='iqama' AND p.enabled=1 THEN 1 ELSE 0 END) FROM navixa_user_telegram_preferences p WHERE p.user_id=u.user_id),0) AS iqama_enabled,s.location_mode,s.city,s.country,s.latitude,s.longitude,s.label,s.adjustments_json,s.iqama_json FROM users u LEFT JOIN navixa_prayer_alert_settings s ON s.user_id=u.user_id").all<UserRow>();
   if(!rows.results.length)return{checked:0,due:0,telegramDelivered:0,pushDelivered:0};
   const cache=new Map<string,Awaited<ReturnType<typeof fetchTimings>>>();let due=0,telegramDelivered=0,pushDelivered=0;
