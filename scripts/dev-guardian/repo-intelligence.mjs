@@ -4,7 +4,7 @@ import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SOURCE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json"];
+const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".json"];
 const TEXT_EXTENSIONS = new Set([
   ...SOURCE_EXTENSIONS,
   ".md",
@@ -34,7 +34,7 @@ function toPosix(value) {
 }
 
 function classifyFile(relativePath) {
-  if (/^app\/.+\/route\.(?:ts|tsx|js|jsx)$/.test(relativePath)) return "api-route";
+  if (/^app\/(?:.+\/)?route\.(?:ts|tsx|js|jsx)$/.test(relativePath)) return "api-route";
   if (/^app\/(?:.+\/)?page\.(?:ts|tsx|js|jsx)$/.test(relativePath)) return "page";
   if (/^app\/(?:.+\/)?layout\.(?:ts|tsx|js|jsx)$/.test(relativePath)) return "layout";
   if (/^tests?\//.test(relativePath) || /(?:^|\/).+\.(?:test|spec)\.[^.]+$/.test(relativePath)) return "test";
@@ -60,12 +60,15 @@ function extractImportSpecifiers(content) {
 
 function routePathFromFile(relativePath) {
   if (!/^app\//.test(relativePath)) return null;
-  const withoutApp = relativePath.replace(/^app\//, "").replace(/\/(?:route|page)\.(?:ts|tsx|js|jsx)$/, "");
+  const withoutApp = relativePath
+    .replace(/^app\//, "")
+    .replace(/(?:^|\/)(?:route|page)\.(?:ts|tsx|js|jsx)$/, "");
   const clean = withoutApp
     .split("/")
+    .filter(Boolean)
     .filter((segment) => !/^\(.+\)$/.test(segment))
     .join("/");
-  return `/${clean}`.replace(/\/$/, "") || "/";
+  return clean ? `/${clean}` : "/";
 }
 
 async function walk(root, current = root, output = []) {
@@ -90,29 +93,35 @@ async function walk(root, current = root, output = []) {
   return output;
 }
 
-function buildCandidatePaths(importerRelative, specifier) {
-  if (!specifier.startsWith(".")) return [];
-  const importerDir = path.posix.dirname(importerRelative);
-  const base = path.posix.normalize(path.posix.join(importerDir, specifier));
+function candidatePathsFromBase(baseInput) {
+  const base = path.posix.normalize(baseInput).replace(/^\.\//, "");
   const extension = path.posix.extname(base);
+  if (extension) return [base];
   const candidates = [];
-  if (extension) candidates.push(base);
-  else {
-    for (const ext of SOURCE_EXTENSIONS) candidates.push(`${base}${ext}`);
-    for (const ext of SOURCE_EXTENSIONS) candidates.push(`${base}/index${ext}`);
-  }
+  for (const ext of SOURCE_EXTENSIONS) candidates.push(`${base}${ext}`);
+  for (const ext of SOURCE_EXTENSIONS) candidates.push(`${base}/index${ext}`);
   return candidates;
 }
 
-function resolveRelativeImport(importerRelative, specifier, fileSet) {
-  for (const candidate of buildCandidatePaths(importerRelative, specifier)) {
+function resolveInternalImport(importerRelative, specifier, fileSet) {
+  let base = null;
+  if (specifier.startsWith(".")) {
+    base = path.posix.join(path.posix.dirname(importerRelative), specifier);
+  } else if (specifier.startsWith("@/")) {
+    base = specifier.slice(2);
+  }
+  if (!base) return null;
+  for (const candidate of candidatePathsFromBase(base)) {
     if (fileSet.has(candidate)) return candidate;
   }
   return null;
 }
 
 function basenameStem(relativePath) {
-  return path.posix.basename(relativePath).replace(/\.(?:test|spec)?\.?[cm]?[jt]sx?$/, "").replace(/\.[^.]+$/, "");
+  return path.posix.basename(relativePath)
+    .replace(/\.(?:test|spec)\.[cm]?[jt]sx?$/, "")
+    .replace(/\.[cm]?[jt]sx?$/, "")
+    .replace(/\.[^.]+$/, "");
 }
 
 function linkTests(files, dependencyGraph) {
@@ -129,7 +138,11 @@ function linkTests(files, dependencyGraph) {
       if (basenameStem(source.path) === testStem) links.get(source.path).add(test.path);
     }
   }
-  return Object.fromEntries([...links.entries()].filter(([, value]) => value.size).map(([key, value]) => [key, [...value].sort()]));
+  return Object.fromEntries(
+    [...links.entries()]
+      .filter(([, value]) => value.size)
+      .map(([key, value]) => [key, [...value].sort()]),
+  );
 }
 
 function calculateHotspots(files, graph, reverseGraph, testLinks) {
@@ -163,7 +176,7 @@ export async function buildRepositoryMap(rootInput = process.cwd()) {
   const files = [];
   const dependencyGraph = {};
   const externalDependencies = new Set();
-  const unresolvedRelativeImports = [];
+  const unresolvedInternalImports = [];
 
   for (const file of walked) {
     let content = "";
@@ -175,10 +188,11 @@ export async function buildRepositoryMap(rootInput = process.cwd()) {
     const imports = SOURCE_EXTENSIONS.includes(file.extension) ? extractImportSpecifiers(content) : [];
     const resolved = [];
     for (const specifier of imports) {
-      if (specifier.startsWith(".")) {
-        const target = resolveRelativeImport(file.relative, specifier, fileSet);
+      const isInternal = specifier.startsWith(".") || specifier.startsWith("@/");
+      if (isInternal) {
+        const target = resolveInternalImport(file.relative, specifier, fileSet);
         if (target) resolved.push(target);
-        else unresolvedRelativeImports.push({ importer: file.relative, specifier });
+        else unresolvedInternalImports.push({ importer: file.relative, specifier });
       } else if (!specifier.startsWith("node:")) {
         externalDependencies.add(specifier.split("/").slice(0, specifier.startsWith("@") ? 2 : 1).join("/"));
       }
@@ -217,16 +231,18 @@ export async function buildRepositoryMap(rootInput = process.cwd()) {
       files: files.length,
       kinds: kindCounts,
       externalDependencies: externalDependencies.size,
-      unresolvedRelativeImports: unresolvedRelativeImports.length,
+      unresolvedInternalImports: unresolvedInternalImports.length,
     },
-    routes: files.filter((file) => file.route).map(({ path: filePath, kind, route }) => ({ path: filePath, kind, route })),
+    routes: files
+      .filter((file) => file.route)
+      .map(({ path: filePath, kind, route }) => ({ path: filePath, kind, route })),
     workflows: files.filter((file) => file.kind === "workflow").map((file) => file.path),
     migrations: files.filter((file) => file.kind === "migration").map((file) => file.path),
     hotspots: calculateHotspots(files, dependencyGraph, reverseGraph, testLinks),
     testLinks,
     dependencyGraph,
     reverseDependencyGraph: reverseGraph,
-    unresolvedRelativeImports,
+    unresolvedInternalImports,
     externalDependencies: [...externalDependencies].sort(),
   };
 }
@@ -245,14 +261,20 @@ function parseArgs(argv) {
 }
 
 function humanSummary(map) {
-  const kinds = Object.entries(map.summary.kinds).sort((a, b) => b[1] - a[1]).map(([kind, count]) => `${kind}=${count}`).join(", ");
-  const hotspots = map.hotspots.slice(0, 12).map((item) => `- ${item.path} (${item.kind}, score ${item.score}, in ${item.incoming}, out ${item.outgoing}, tests ${item.tests})`).join("\n");
+  const kinds = Object.entries(map.summary.kinds)
+    .sort((a, b) => b[1] - a[1])
+    .map(([kind, count]) => `${kind}=${count}`)
+    .join(", ");
+  const hotspots = map.hotspots
+    .slice(0, 12)
+    .map((item) => `- ${item.path} (${item.kind}, score ${item.score}, in ${item.incoming}, out ${item.outgoing}, tests ${item.tests})`)
+    .join("\n");
   return [
     "NAVIXA Repo Intelligence",
     `files: ${map.summary.files}`,
     `kinds: ${kinds}`,
     `external dependencies: ${map.summary.externalDependencies}`,
-    `unresolved relative imports: ${map.summary.unresolvedRelativeImports}`,
+    `unresolved internal imports: ${map.summary.unresolvedInternalImports}`,
     "hotspots:",
     hotspots || "- none",
   ].join("\n");
