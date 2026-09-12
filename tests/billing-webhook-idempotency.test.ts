@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { claimWebhookEvent, processWebhookOnce, type StoredWebhookEvent, type WebhookEventStore } from "../app/billing/webhookIdempotency.ts";
 
 const hash = (value: string) => value.repeat(64).slice(0, 64);
@@ -16,7 +17,7 @@ class MemoryStore implements WebhookEventStore {
   }
   async get(provider: string, eventId: string) { return this.rows.get(this.key(provider, eventId)) ?? null; }
   async takeExpiredLease(input: { provider: string; eventId: string; now: string; leaseUntil: string }) {
-    const row = this.rows.get(this.key(input.provider, input.eventId));
+    const row = this.rows.get(this.key(provider, input.eventId));
     if (!row || !row.leaseUntil || row.leaseUntil >= input.now || !["processing", "failed"].includes(row.status)) return false;
     row.status = "processing"; row.leaseUntil = input.leaseUntil; return true;
   }
@@ -83,4 +84,13 @@ test("بعد انتهاء lease يسمح الاستحواذ الآمن لإعا�
   const store = new MemoryStore(); const start = new Date("2026-08-26T12:00:00Z");
   assert.equal(await claimWebhookEvent(store, { provider: "tap", eventId: "charge:002", eventType: "charge.CAPTURED", payloadHash: hash("1"), now: start }), "owner");
   assert.equal(await claimWebhookEvent(store, { provider: "tap", eventId: "charge:002", eventType: "charge.CAPTURED", payloadHash: hash("1"), now: new Date("2026-08-26T12:02:00Z") }), "owner");
+});
+
+test("Push تفعيل الاشتراك لا يسبق التحقق الحي ولا يستطيع كسر تسوية الدفع", async () => {
+  const route = await readFile(new URL("../app/api/billing/webhook/route.ts", import.meta.url), "utf8");
+  assert.match(route, /async function notifyActivation/);
+  assert.match(route, /kind: "billing"/);
+  assert.match(route, /if \(requestedLive\) await notifyActivation\(database, userId, plan, end\)\.catch\(\(\) => 0\)/);
+  assert.ok(route.indexOf("verified.status !== \"paid\"") < route.indexOf("notifyActivation(database, userId, plan, end)"));
+  assert.doesNotMatch(route, /body\.userId|body\.user_id/);
 });
