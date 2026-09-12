@@ -144,6 +144,9 @@ export async function POST(request: Request) {
   }
 
   const first = createdInvites[0];
+  if (!first) {
+    return NextResponse.json({ error: "تعذر إنشاء الدفعة" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+  }
   return NextResponse.json({
     ok: true,
     count: createdInvites.length,
