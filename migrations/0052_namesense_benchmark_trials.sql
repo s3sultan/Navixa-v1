@@ -1,3 +1,8 @@
+CREATE TABLE IF NOT EXISTS navixa_namesense_benchmark_speakers (
+  speaker_id TEXT PRIMARY KEY,
+  accent TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS navixa_namesense_benchmark_trials (
   trial_id TEXT PRIMARY KEY,
   speaker_id TEXT NOT NULL,
@@ -23,7 +28,8 @@ CREATE TABLE IF NOT EXISTS navixa_namesense_benchmark_trials (
   raw_audio_retained INTEGER NOT NULL CHECK(raw_audio_retained = 0),
   match_method TEXT,
   match_score REAL,
-  captured_at TEXT NOT NULL
+  captured_at TEXT NOT NULL,
+  FOREIGN KEY (speaker_id) REFERENCES navixa_namesense_benchmark_speakers(speaker_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_namesense_benchmark_accent ON navixa_namesense_benchmark_trials(accent, captured_at);
