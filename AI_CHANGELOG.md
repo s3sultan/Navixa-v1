@@ -2,6 +2,17 @@
 
 لا تُعدّل السجلات السابقة. أضف السجل الأحدث في الأعلى تحت هذا السطر.
 
+## 2026-09-12 — ChatGPT
+
+- أنشأ جامعًا داخليًا محميًا للـNameSense human holdout benchmark داخل `/admin/namesense-benchmark` مع API إدارة محمي وD1، دون حفظ الصوت الخام أو transcript أو هوية الحساب.
+- وحّد التقاط الميكروفون بحيث يعيد local Whisper fallback استخدام `MediaStream` نفسه، مع ملكية صريحة تمنع إيقاف track خارجي، وعزل benchmark عن watched terms والتعلم وتلميح اللغة الخاص بالمستخدم.
+- أضاف سجلًا ذريًا لمجموعة كل `speakerId` لمنع دخوله في لهجتين متعارضتين تحت الطلبات المتزامنة، مع تحقق accent بعد `INSERT OR IGNORE` ورفض mismatch.
+- شدد VAD الخاص بقياس endpoint: لا تتعلم أرضية الضوضاء من speech/transients، والعتبة المتكيفة محصورة بين protocol minimum `0.0035` و`0.01` مع اختبارات انحدار للكلام الهادئ والضوضاء.
+- المراجعة المستقلة انتقلت من `MAJOR` في Issue #185 إلى `MINOR` في #186 ثم `CLEAR` في #187 بعد الإصلاحات.
+- التحقق على head `49542d0590f53e1553f01d5c1a401468a385825b`: نجح Verify NAVIXA Pull Request #423 وNAVIXA Pre-Launch Gate #302 وRelease Gate، شاملًا lint والاختبارات وUI smoke وبناء الإنتاج وتدقيق الاعتماديات والأسرار وGitHub Actions.
+- لا توجد حتى الآن أي نسبة دقة بشرية لـNameSense؛ الاعتماد يتطلب corpus بشريًا مؤهلًا حسب بروتوكول PR #179.
+- الملفات: `app/admin/namesense-benchmark/*`, `app/api/admin/namesense-benchmark/*`, `app/voice/voiceEngine.ts`, `app/voice/localNameFallback.ts`, `benchmarks/namesense/collector-core.mjs`, `migrations/0052_namesense_benchmark_trials.sql`, `tests/namesense-collector-core.test.mjs`, `tests/namesense-benchmark-api.test.ts`, `tests/voice-local-fallback.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+
 ## 2026-09-11 — ChatGPT
 
 - طوّر المرحلة الأولى من NAVIXA NameSense لرفع تحمل اختلافات نطق وكتابة الأسماء دون إضافة اعتماديات خارجية أو توسيع غير منضبط للمطابقة.
