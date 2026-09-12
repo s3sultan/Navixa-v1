@@ -56,6 +56,14 @@ function nextAssignment(usedTrials: number): { expected: NextExpected; nameId: N
   };
 }
 
+function promptMatchesAssignment(promptId: unknown, assignment: { expected: NextExpected; nameId: NextNameId }) {
+  if (typeof promptId !== "string") return false;
+  const normalized = promptId.trim().toLowerCase();
+  const nameMarker = `-${assignment.nameId}`;
+  if (!normalized.includes(nameMarker)) return false;
+  return assignment.expected === "miss" ? normalized.startsWith("negative-") : !normalized.startsWith("negative-");
+}
+
 async function findInvite(database: NameSenseDb, token: string) {
   if (!tokenPattern.test(token)) return null;
   await ensureInviteSchema(database);
@@ -118,15 +126,20 @@ export async function POST(request: Request) {
   }
 
   const assignment = nextAssignment(invite!.used_trials);
-  const trialInput = body?.trial && typeof body.trial === "object" && !Array.isArray(body.trial)
-    ? {
-      ...(body.trial as Record<string, unknown>),
-      accent: invite!.accent,
-      speakerId: invite!.speaker_id,
-      expected: assignment.expected,
-      watchedNameId: assignment.nameId,
-    }
+  const rawTrial = body?.trial && typeof body.trial === "object" && !Array.isArray(body.trial)
+    ? body.trial as Record<string, unknown>
     : null;
+  if (!rawTrial || !promptMatchesAssignment(rawTrial.promptId, assignment)) {
+    return NextResponse.json({ error: "الجملة لا تطابق الجولة الحالية؛ أعد تحميل الصفحة" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  }
+
+  const trialInput = {
+    ...rawTrial,
+    accent: invite!.accent,
+    speakerId: invite!.speaker_id,
+    expected: assignment.expected,
+    watchedNameId: assignment.nameId,
+  };
   const parsed = validateNameSenseBenchmarkTrial(trialInput);
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400, headers: { "Cache-Control": "no-store" } });
