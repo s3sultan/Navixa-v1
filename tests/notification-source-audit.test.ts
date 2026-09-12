@@ -13,9 +13,9 @@ const [healthNudge, personal, renewals, billing, matches] = await Promise.all([
 // another timer beside PersonalReminderEngine.
 assert.doesNotMatch(healthNudge, /setTimeout|navixa-health-nudge|حان وقت الحركة/);
 assert.match(healthNudge, /return null/);
-assert.match(personal, /type:"break"/);
-assert.match(personal, /type:"water"/);
-assert.match(personal, /type:"eye"/);
+assert.match(personal, /kind:"break"/);
+assert.match(personal, /kind:"water"/);
+assert.match(personal, /kind:"eye"/);
 assert.match(personal, /showNavixaDeviceNotification/);
 
 // Subscription renewal is a deterministic server event and therefore supports
