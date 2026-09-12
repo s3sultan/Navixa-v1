@@ -6,8 +6,8 @@
 
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: بناء المرحلة الأولى من `NAVIXA UI System` بنظام واجهة Responsive مملوك للمشروع وقابل للتطوير والاستبدال، دون اعتماد Runtime جديد على مكتبة واجهات خارجية.
-- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. أول فحص كشف lint على رابط داخلي وتم إصلاحه، وتجري إعادة الفحوص على أحدث head.
-- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
+- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. أول فحص كشف lint على رابط داخلي وتم إصلاحه؛ الفحص التالي أثبت نجاح 245 اختبارًا وكشف أن قياس Drawer تم أثناء حركة الدخول، لذلك يُفصل فحص الـUI System في smoke مستقل أكثر ثباتًا.
+- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
 
 ## آخر ما اكتمل
 
@@ -21,7 +21,7 @@
 
 ## التالي
 
-- توسيع UI smoke للمختبر `/ui-lab` على narrow/medium/wide مع فحص overflow وتبدل أنماط التنقل.
+- إعادة `tests/ui-smoke.mjs` لفحصه الأصلي وفصل `/ui-lab` في `tests/ui-system-smoke.mjs` على narrow/medium/wide مع انتظار استقرار الحركة قبل القياس.
 - إكمال GitHub Actions على PR #193 وإصلاح أي فشل حتى تصبح البوابة نظيفة.
 - توثيق التسليم وإبقاء PR Draft دون دمج حتى مراجعة المستخدم.
 - تبقى متابعة PR #188 ونشر NameSense مسارًا مستقلًا ولا تتداخل ملفاته مع هذه المهمة.
