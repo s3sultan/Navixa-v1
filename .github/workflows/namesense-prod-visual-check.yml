@@ -26,6 +26,10 @@ jobs:
           ADMIN_STATUS="$(curl --retry 4 --retry-all-errors --silent --show-error \
             --output admin-invites.json --write-out '%{http_code}' \
             https://navixasa.com/api/admin/namesense-benchmark/invites)"
+          echo "Admin endpoint status: ${ADMIN_STATUS}"
+          echo "Admin endpoint body:"
+          cat admin-invites.json
+          echo
           test -s home.html
           test -s study.html
           test "$ADMIN_STATUS" = "401"
