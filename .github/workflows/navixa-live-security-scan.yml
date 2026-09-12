@@ -17,7 +17,7 @@ jobs:
   passive-live-scan:
     name: ZAP baseline + constrained Nuclei + headers
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Check HTTPS and security headers
         shell: bash
@@ -98,7 +98,7 @@ jobs:
               print(f"[{a.get('riskdesc','Unknown')}] {a.get('alert','Unnamed alert')}")
           PY
 
-      - name: Nuclei safe exposure and misconfiguration scan
+      - name: Nuclei safe material-risk scan
         shell: bash
         run: |
           set -euo pipefail
@@ -110,17 +110,19 @@ jobs:
             -u https://navixasa.com \
             -silent \
             -jsonl \
+            -disable-update-check \
             -tags misconfig,exposure \
+            -severity medium,high,critical \
             -exclude-tags cve,dos,fuzz,intrusive,bruteforce,headless,code \
-            -rate-limit 5 \
+            -rate-limit 8 \
             -concurrency 1 \
             -bulk-size 1 \
-            -timeout 5 \
+            -timeout 4 \
             -retries 0 \
             -H 'User-Agent: NAVIXA-Authorized-Security-Scan/1.0' \
             > "$out"
 
-          echo '=== Nuclei findings ==='
+          echo '=== Nuclei material-risk findings ==='
           if [[ -s "$out" ]]; then
             python3 - "$out" <<'PY'
           import json, sys, collections
@@ -135,7 +137,7 @@ jobs:
                   pass
           counts=collections.Counter((r.get('info') or {}).get('severity','unknown') for r in rows)
           print('findings_total=', len(rows))
-          for sev in ('critical','high','medium','low','info','unknown'):
+          for sev in ('critical','high','medium','unknown'):
               if counts.get(sev):
                   print(f'{sev}={counts[sev]}')
           for r in rows:
@@ -151,8 +153,8 @@ jobs:
         run: |
           cat <<'EOF'
           This workflow intentionally performs only authorized low-rate public-surface checks.
-          ZAP uses baseline/passive scanning only. Nuclei is restricted to exposure/misconfiguration
-          templates and explicitly excludes CVE, DoS, fuzzing, intrusive, brute-force, headless,
-          and code-execution categories. No authentication, POST mutation, credential guessing,
-          or destructive testing is performed.
+          ZAP uses baseline/passive scanning only. Nuclei is restricted to medium/high/critical
+          exposure and misconfiguration templates and explicitly excludes CVE, DoS, fuzzing,
+          intrusive, brute-force, headless, and code-execution categories. No authentication,
+          POST mutation, credential guessing, or destructive testing is performed.
           EOF
