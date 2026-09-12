@@ -51,6 +51,14 @@ test("emergency mode is admin-only and sends only approved Hِmmah continuity al
   assert.match(notifications, /attempts=attempts\+1/);
   assert.match(notifications, /input\.state === "outage"/);
   assert.match(notifications, /input\.state === "recovery"/);
+  assert.match(notifications, /DeliveryChannel = "email" \| "telegram" \| "push"/);
+  assert.match(notifications, /sendFeaturePush/);
+  assert.match(notifications, /navixa_push_subscriptions/);
+  assert.match(notifications, /kind, "push"/);
+  assert.match(notifications, /url: "\/"/);
+  assert.match(notifications, /pushTitle/);
+  assert.match(notifications, /pushBody/);
+  assert.doesNotMatch(notifications, /pushTitle:[^\n]*accessUrl|pushBody:[^\n]*accessUrl/);
   assert.doesNotMatch(notifications, /status IN \('trial','active'\)|moyasar|payment/i);
 
   assert.match(planBAccess, /NAVIXA_ROOT_HOST = "navixasa\.com"/);

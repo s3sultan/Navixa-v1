@@ -2,6 +2,7 @@ import { buildEmergencyEntitlementSnapshot } from "./emergencyEntitlements";
 import { type EmergencyDatabase, type EmergencyState } from "./emergencyMode";
 import { issuePlanBGrant, resolvePlanBUrl } from "./planBAccess";
 import { decryptTelegramIdentifier, sendOfficialTelegramMessage } from "./telegramBot";
+import { sendFeaturePush } from "./generalPush.ts";
 
 type Statement = {
   bind: (...values: unknown[]) => Statement;
@@ -30,7 +31,8 @@ type ActivePlusSubscriber = {
   display_name: string;
 };
 
-type DeliveryChannel = "email" | "telegram";
+type PushSubscription = { endpoint: string; p256dh: string; auth: string };
+type DeliveryChannel = "email" | "telegram" | "push";
 type DeliveryKind = "start" | "recovery";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -91,12 +93,16 @@ function copy(kind: DeliveryKind, name: string, accessUrl: string | null) {
       subject: "NAVIXA هِمّة: تم تفعيل المنصة الاحتياطية",
       email: `${greeting}\n\nرصدنا تعطلًا مؤكدًا في خدمة NAVIXA الأساسية، وتم تفعيل وضع الطوارئ لمشتركي هِمّة.\n\nاستخدم تصريح الطوارئ المؤقت من هذا الرابط:\n${accessUrl}\n\nالتصريح قصير العمر ومخصص لهذا الحادث فقط. سنبلغك عند استقرار الخدمة الأساسية وعودتها.\n\nNAVIXA SA`,
       telegram: `${greeting}\n\nتم تفعيل وضع الطوارئ لمشتركي NAVIXA هِمّة بعد تعطل مؤكد في الخدمة الأساسية.\n\nرابط الدخول المؤقت:\n${accessUrl}\n\nالتصريح قصير العمر ومخصص لهذا الحادث فقط. سنبلغك عند عودة الخدمة الأساسية واستقرارها.`,
+      pushTitle: "NAVIXA هِمّة: وضع الطوارئ مفعّل",
+      pushBody: "رصدنا تعطلًا مؤكدًا في الخدمة الأساسية. افتح بريدك أو Telegram للحصول على تصريح الدخول المؤقت.",
     };
   }
   return {
     subject: "NAVIXA هِمّة: عادت الخدمة الأساسية",
     email: `${greeting}\n\nعادت خدمة NAVIXA الأساسية واستقرت. يمكنك الرجوع الآن إلى الموقع الرسمي:\nhttps://navixasa.com\n\nشكرًا لصبرك.\n\nNAVIXA SA`,
     telegram: `${greeting}\n\nعادت خدمة NAVIXA الأساسية واستقرت ✅\nيمكنك الرجوع الآن إلى:\nhttps://navixasa.com`,
+    pushTitle: "NAVIXA هِمّة: عادت الخدمة ✅",
+    pushBody: "عادت خدمة NAVIXA الأساسية واستقرت. يمكنك الرجوع إلى الموقع الرسمي الآن.",
   };
 }
 
@@ -130,25 +136,47 @@ async function telegramTarget(db: Database, subscriber: ActivePlusSubscriber, en
   catch { return null; }
 }
 
+async function sendPush(db: Database, subscriber: ActivePlusSubscriber, kind: DeliveryKind, title: string, body: string) {
+  if (!subscriber.user_id) return false;
+  const rows = await db.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=? AND enabled=1 LIMIT 8").bind(subscriber.user_id).all<PushSubscription>();
+  let sent = false;
+  for (const subscription of rows.results) {
+    const result = await sendFeaturePush(subscription, {
+      kind: "general",
+      title,
+      body,
+      url: "/",
+      tag: `navixa-emergency-${kind}-${subscriber.id}`,
+      requireInteraction: true,
+      urgency: "high",
+      ttl: 1800,
+    });
+    if (result.ok) { sent = true; continue; }
+    if (result.status === 404 || result.status === 410) await db.prepare("DELETE FROM navixa_push_subscriptions WHERE endpoint=? AND user_id=?").bind(subscription.endpoint, subscriber.user_id).run().catch(() => {});
+  }
+  return sent;
+}
+
 export async function deliverEmergencyIncidentNotifications(env: EmergencyNotificationEnv, input: { incidentId: string; state: EmergencyState }) {
   const kind: DeliveryKind | null = input.state === "outage" ? "start" : input.state === "recovery" ? "recovery" : null;
-  if (!kind || !input.incidentId) return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0 };
+  if (!kind || !input.incidentId) return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, pushSent: 0, failed: 0 };
 
   const planBUrl = kind === "start" ? resolvePlanBUrl(env.NAVIXA_PLAN_B_URL) : null;
   if (kind === "start" && !planBUrl) {
-    return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0, blocked: "plan_b_url_not_ready" as const };
+    return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, pushSent: 0, failed: 0, blocked: "plan_b_url_not_ready" as const };
   }
 
   const entitlementSecret = env.NAVIXA_EMERGENCY_ENTITLEMENT_SECRET?.trim() || "";
   const signingSecret = env.NAVIXA_PLAN_B_SIGNING_SECRET?.trim() || "";
   if (kind === "start" && (entitlementSecret.length < 32 || signingSecret.length < 32)) {
-    return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, failed: 0, blocked: "plan_b_grants_not_ready" as const };
+    return { claimed: false, checked: 0, emailSent: 0, telegramSent: 0, pushSent: 0, failed: 0, blocked: "plan_b_grants_not_ready" as const };
   }
 
   const subscribers = await activePlusSubscribers(env.DB);
   const snapshot = kind === "start" ? await buildEmergencyEntitlementSnapshot(env.DB, entitlementSecret) : null;
   let emailSent = 0;
   let telegramSent = 0;
+  let pushSent = 0;
   let failed = 0;
 
   for (const subscriber of subscribers) {
@@ -191,9 +219,18 @@ export async function deliverEmergencyIncidentNotifications(env: EmergencyNotifi
         else failed += 1;
       }
     }
+
+    if (subscriber.user_id) {
+      const pushDelivery = await claimDelivery(env.DB, input.incidentId, subscriber.id, kind, "push");
+      if (pushDelivery) {
+        const ok = await sendPush(env.DB, subscriber, kind, message.pushTitle, message.pushBody);
+        await finishDelivery(env.DB, pushDelivery, ok, ok ? "" : "push_delivery_failed");
+        if (ok) pushSent += 1;
+      }
+    }
   }
 
-  return { claimed: true, checked: subscribers.length, emailSent, telegramSent, failed };
+  return { claimed: true, checked: subscribers.length, emailSent, telegramSent, pushSent, failed };
 }
 
 export function configuredEmergencyPlanBUrl(env: Pick<EmergencyNotificationEnv, "NAVIXA_PLAN_B_URL">) {
