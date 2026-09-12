@@ -12,7 +12,7 @@
 - CycloneDX SBOM من Trivy.
 - Gate يمنع High/Critical في Trivy، ويمنع CodeQL runtime security-severity >= 7.0.
 - التقارير الكاملة لا تُختزل في نتيجة الـgate: كل finding يُراجع ويُسجّل في `security/ALERT_REGISTER.md` حتى لو كان Low أو Informational أو داخل أدوات التطوير/الاختبارات.
-- `package-lock.json` يبقى قفل الاعتماديات الفعلي لأن CI والإنتاج يستخدمان `npm ci`. لا تُحذف lockfiles الأخرى عرضًا ضمن مهمة الأمان؛ أي تنظيف اعتماديات له تغيير مستقل.
+- `package-lock.json` هو قفل الاعتماديات الوحيد المعتمد لأن CI والإنتاج يستخدمان `npm ci`. أزيل `pnpm-lock.yaml` القديم بعد ثبوت أنه غير مستخدم ويحمل نسخًا قديمة، لمنع وجود مصدر قفل ثانٍ يضلل فحوص الأمان أو صيانة الاعتماديات.
 
 ## الفحص الحي
 
