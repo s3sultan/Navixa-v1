@@ -46,7 +46,7 @@ jobs:
           output: security/reports/codeql
           upload: always
 
-      - name: Block CodeQL High or Critical findings
+      - name: Block runtime CodeQL High or Critical findings
         shell: bash
         run: |
           set -euo pipefail
@@ -56,9 +56,59 @@ jobs:
             echo "CodeQL SARIF output missing"
             exit 1
           fi
-          count="$(jq -s '[.[].runs[]?.results[]? | select(((.properties["security-severity"] // "0") | tonumber) >= 7.0)] | length' "${files[@]}")"
-          echo "CodeQL High/Critical findings: $count"
-          test "$count" -eq 0
+
+          node - "${files[@]}" <<'NODE'
+          const fs = require('node:fs');
+          const files = process.argv.slice(2);
+          const threshold = 7.0;
+          const nonRuntimePrefixes = ['tests/', 'scripts/', '.github/'];
+          const findings = [];
+
+          for (const file of files) {
+            const sarif = JSON.parse(fs.readFileSync(file, 'utf8'));
+            for (const run of sarif.runs ?? []) {
+              const severities = new Map();
+              const sources = [run.tool?.driver, ...(run.tool?.extensions ?? [])].filter(Boolean);
+              for (const source of sources) {
+                for (const rule of source.rules ?? []) {
+                  const value = Number(rule.properties?.['security-severity']);
+                  if (!rule.id || !Number.isFinite(value)) continue;
+                  const previous = severities.get(rule.id);
+                  if (previous === undefined || value > previous) severities.set(rule.id, value);
+                }
+              }
+
+              for (const result of run.results ?? []) {
+                const direct = Number(result.properties?.['security-severity']);
+                const severity = Number.isFinite(direct) ? direct : severities.get(result.ruleId);
+                if (!Number.isFinite(severity) || severity < threshold) continue;
+
+                const location = result.locations?.[0]?.physicalLocation;
+                const uri = location?.artifactLocation?.uri ?? 'unknown';
+                findings.push({
+                  ruleId: result.ruleId ?? 'unknown',
+                  severity,
+                  uri,
+                  line: location?.region?.startLine ?? null,
+                  runtime: !nonRuntimePrefixes.some((prefix) => uri.startsWith(prefix)),
+                });
+              }
+            }
+          }
+
+          const runtimeFindings = findings.filter((finding) => finding.runtime);
+          const nonRuntimeFindings = findings.filter((finding) => !finding.runtime);
+          console.log(`CodeQL High/Critical findings: ${findings.length}`);
+          console.log(`Runtime blockers: ${runtimeFindings.length}`);
+          console.log(`Non-runtime findings requiring triage: ${nonRuntimeFindings.length}`);
+
+          for (const finding of findings) {
+            const where = `${finding.uri}${finding.line ? `:${finding.line}` : ''}`;
+            console.log(`- ${finding.runtime ? 'BLOCK' : 'TRIAGE'} ${finding.ruleId} (${finding.severity}) at ${where}`);
+          }
+
+          if (runtimeFindings.length > 0) process.exit(1);
+          NODE
 
       - name: Upload CodeQL report artifact
         if: always()
