@@ -6,7 +6,7 @@ import { isFeatureAccessActive, type FeatureAccessSession } from "./featureAcces
 import UsageTracker from "./UsageTracker";
 import "./feature-access.css";
 
-const PUBLIC_FREE_ACCESS_UNTIL = Date.parse("2026-09-12T16:00:00+03:00");
+const PUBLIC_FREE_ACCESS_UNTIL = Date.parse("2026-09-20T00:00:00+03:00");
 
 type AccountSession = FeatureAccessSession & {
   user?: { email?: string } | null;
