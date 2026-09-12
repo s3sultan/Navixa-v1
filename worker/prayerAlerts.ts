@@ -18,6 +18,8 @@ const changes=(v:unknown)=>((v as {meta?:{changes?:number}})?.meta?.changes||0);
 
 function clean(value:string|undefined){const match=String(value||"").match(/\b([01]\d|2[0-3]):[0-5]\d\b/);return match?.[0]||""}
 function addMinutes(value:string,minutes:number){const [h,m]=value.split(":").map(Number);if(!Number.isFinite(h)||!Number.isFinite(m))return "";const total=((h*60+m+minutes)%1440+1440)%1440;return `${String(Math.floor(total/60)).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`}
+function minuteOfDay(value:string){const[h,m]=value.split(":").map(Number);return h*60+m}
+function dueWithinWindow(eventTime:string,currentTime:string,windowMinutes=5){const event=minuteOfDay(eventTime),current=minuteOfDay(currentTime);return Number.isFinite(event)&&Number.isFinite(current)&&current>=event&&current-event<=windowMinutes}
 function jsonMap<T>(value:string|null|undefined){try{const parsed=JSON.parse(value||"{}");return parsed&&typeof parsed==="object"?parsed as Record<string,T>:{} }catch{return {}}}
 function localParts(timeZone:string,now:Date){const parts=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(now),get=(type:string)=>parts.find(part=>part.type===type)?.value||"";return{date:`${get("year")}-${get("month")}-${get("day")}`,hhmm:`${get("hour")}:${get("minute")}`}}
 function locationKey(row:UserRow){return row.location_mode==="city"&&row.city&&row.country?`city:${row.city.toLowerCase()}:${row.country.toLowerCase()}`:row.latitude!=null&&row.longitude!=null?`coords:${row.latitude.toFixed(4)}:${row.longitude.toFixed(4)}`:"coords:24.7136:46.6753"}
@@ -27,7 +29,7 @@ async function sendTelegram(env:Env,userId:string,text:string){if(!env.NAVIXA_TE
   if(!env.NAVIXA_TELEGRAM_BOT_TOKEN)return false;const link=(await env.DB.prepare("SELECT chat_id_ciphertext FROM navixa_user_telegram_links WHERE user_id=? AND revoked_at='' LIMIT 1").bind(userId).all<Link>()).results[0];if(!link)return false;try{return await sendOfficialTelegramMessage({chatId:await decryptTelegramIdentifier(link.chat_id_ciphertext,env.NAVIXA_TELEGRAM_ENCRYPTION_KEY),token:env.NAVIXA_TELEGRAM_BOT_TOKEN,text})}catch{return false}}
 async function sendPush(env:Env,userId:string,title:string,body:string,eventKey:string){
   if(!await isUserPushCategoryActive(env.DB,userId,"adhan"))return 0;
-  const subscriptions=(await env.DB.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=?").bind(userId).all<PushSub>()).results;
+  const subscriptions=(await env.DB.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=? AND enabled=1").bind(userId).all<PushSub>()).results;
   let delivered=0;
   for(const subscription of subscriptions){
     const result=await sendFeaturePush(subscription,{kind:"general",title,body,url:"/worship",tag:`adhan-${eventKey}`,urgency:"high",ttl:600});
@@ -55,7 +57,7 @@ export async function deliverDuePrayerAlerts(env:Env,now=new Date()){
         {type:"iqama",time:iqama,telegramEnabled:row.iqama_enabled===1,title:`حانت إقامة ${labels[prayer]}`,message:`🕌 حانت الآن إقامة ${labels[prayer]} · ${iqama}`},
       ];
       for(const event of events){
-        if(event.time!==hhmm)continue;
+        if(!dueWithinWindow(event.time,hhmm))continue;
         const baseKey=`${date}:${event.type}:${prayer}`;
         const pushActive=event.type==="adhan"&&await isUserPushCategoryActive(env.DB,row.user_id,"adhan");
         if(!event.telegramEnabled&&!pushActive)continue;
