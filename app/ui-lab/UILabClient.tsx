@@ -70,7 +70,7 @@ export default function UILabClient() {
             <p className={styles.eyebrow}>اليوم في NAVIXA</p>
             <h1 className={styles.heroTitle}>المهم أولًا، والباقي يظهر وقت الحاجة.</h1>
             <p className={styles.heroCopy}>
-              هذه معاينة للنظام الجديد: نفس المحتوى يعيد ترتيب نفسه للجوال والتابلت والكمبيوتر، بدون نسخة منفصلة لكل جهاز وبدون مكتبة واجهات خارجية تتحكم في المشروع.
+              هذه معاينة للنظام الجديد. نفس المحتوى يعيد ترتيب نفسه بوضوح على الجوال والتابلت والكمبيوتر، مع الحفاظ على هوية NAVIXA وتجربة واحدة متناسقة.
             </p>
             <div className={styles.actionRow}>
               <NavixaButton onClick={() => setDetailsOpen(true)}>كيف يعمل؟</NavixaButton>
@@ -97,7 +97,7 @@ export default function UILabClient() {
           <h2>نظرة سريعة</h2>
           <p>بطاقات تتغير أولويتها وحجمها حسب الشاشة.</p>
         </div>
-        <span>Responsive by design</span>
+        <span>يتكيف مع كل شاشة</span>
       </div>
 
       <NavixaGrid>
@@ -157,7 +157,7 @@ export default function UILabClient() {
           </div>
           <ul className={styles.featureList}>
             <li><span className={styles.check} aria-hidden="true">✓</span><span>التنقل والاستجابة للشاشات من كود NAVIXA نفسه.</span></li>
-            <li><span className={styles.check} aria-hidden="true">✓</span><span>الجوال يحصل على Bottom Navigation وقائمة سحب مستقلة.</span></li>
+            <li><span className={styles.check} aria-hidden="true">✓</span><span>الجوال يحصل على شريط تنقل سفلي وقائمة سحب مستقلة.</span></li>
             <li><span className={styles.check} aria-hidden="true">✓</span><span>التابلت له تخطيط متوسط بدل نسخة كمبيوتر مصغرة.</span></li>
           </ul>
         </NavixaCard>
@@ -167,8 +167,8 @@ export default function UILabClient() {
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
         variant="modal"
-        title="NAVIXA UI System"
-        description="نواة واجهة نملكها ونطورها بدون ربط تشغيل NAVIXA بمكتبة UI خارجية."
+        title="نظام واجهة NAVIXA"
+        description="نواة واجهة نملكها ونطورها بدون ربط تشغيل NAVIXA بمكتبة واجهات خارجية."
       >
         <div className={styles.modalBody}>
           <p className={styles.modalNote}>الجوال والتابلت والكمبيوتر يستخدمون المكونات نفسها، لكن كل حجم شاشة يأخذ ترتيبًا وتفاعلًا يناسبه.</p>
