@@ -148,7 +148,7 @@ async function assertNonceProbeHeaders(url) {
   if (url.pathname === "/admin/login") {
     assert.equal(response.headers.get("x-navixa-csp-style-exception"), "google-identity", "Google Identity style exception was not explicitly marked");
     assert.match(styleElements, /'unsafe-inline'/i, "Google Identity inline styles are not isolated to the documented login exception");
-    assert.match(styleElements, /https:\/\/accounts\.google\.com/i, "Google Identity stylesheet origin is missing from the login exception");
+    assert.ok(styleElements.toLowerCase().includes("https://accounts.google.com"), "Google Identity stylesheet origin is missing from the login exception");
   } else {
     assert.equal(response.headers.get("x-navixa-csp-style-exception"), null, `Unexpected style exception on ${url.pathname}`);
     assert.match(styleElements, /'nonce-[a-f0-9]{32}'/i, `Nonce is missing from style-src-elem for ${url.pathname}`);
