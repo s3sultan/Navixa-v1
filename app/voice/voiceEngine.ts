@@ -85,6 +85,10 @@ type BrowserVoiceEngineOptions = {
   localAccuracyFallback?: boolean;
   adaptiveLanguage?: boolean;
   mediaStream?: MediaStream;
+  contextualBiasTerms?: string;
+  learningEnabled?: boolean;
+  useStoredLanguageHint?: boolean;
+  persistLanguageHint?: boolean;
   handlers: NavixaVoiceEngineHandlers;
 };
 
@@ -123,7 +127,7 @@ const getRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
   return browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition || null;
 };
 
-const applyStoredContextualBias = (recognition: BrowserSpeechRecognition) => {
+const applyContextualBias = (recognition: BrowserSpeechRecognition, overrideTerms?: string) => {
   if (typeof window === "undefined") return;
   try {
     const browserWindow = window as typeof window & {
@@ -131,8 +135,10 @@ const applyStoredContextualBias = (recognition: BrowserSpeechRecognition) => {
     };
     const Phrase = browserWindow.SpeechRecognitionPhrase;
     if (!Phrase) return;
-    const storedTerms = window.localStorage?.getItem("navixa-watch-terms") || "";
-    const biasInput = buildNavixaVoiceBiasInput(storedTerms);
+    const watchTerms = overrideTerms !== undefined
+      ? overrideTerms
+      : window.localStorage?.getItem("navixa-watch-terms") || "";
+    const biasInput = overrideTerms !== undefined ? watchTerms : buildNavixaVoiceBiasInput(watchTerms);
     const phrases = buildNavixaVoiceBiasPhrases(biasInput);
     if (!phrases.length) return;
     recognition.phrases = phrases.map((phrase) => new Phrase(phrase, 5.5));
@@ -191,6 +197,10 @@ export function createNavixaBrowserVoiceEngine({
   localAccuracyFallback = true,
   adaptiveLanguage = true,
   mediaStream,
+  contextualBiasTerms,
+  learningEnabled = true,
+  useStoredLanguageHint = true,
+  persistLanguageHint = true,
   handlers,
 }: BrowserVoiceEngineOptions): NavixaVoiceEngine {
   const Recognition = getRecognitionConstructor();
@@ -205,7 +215,8 @@ export function createNavixaBrowserVoiceEngine({
   }
 
   const recognition = new Recognition();
-  const initialLanguage = adaptiveLanguage ? readStoredLanguageHint() || language : language;
+  const storedLanguageHint = useStoredLanguageHint ? readStoredLanguageHint() : null;
+  const initialLanguage = adaptiveLanguage ? storedLanguageHint || language : language;
   let languageIndex = Math.max(0, ADAPTIVE_LANGUAGES.indexOf(initialLanguage));
   let lastDetectedFamily: NavixaVoiceLanguageFamily | null = null;
   const currentLanguage = () => adaptiveLanguage ? ADAPTIVE_LANGUAGES[languageIndex] : language;
@@ -213,10 +224,12 @@ export function createNavixaBrowserVoiceEngine({
   recognition.continuous = continuous;
   recognition.interimResults = interimResults;
   recognition.maxAlternatives = 5;
-  applyStoredContextualBias(recognition);
+  applyContextualBias(recognition, contextualBiasTerms);
 
   const emitTranscript = (transcript: NavixaVoiceTranscript, source: NavixaVoiceAliasSource) => {
-    if (learnNavixaVoiceTranscript(transcript.text, source)) applyStoredContextualBias(recognition);
+    if (learningEnabled && learnNavixaVoiceTranscript(transcript.text, source)) {
+      applyContextualBias(recognition, contextualBiasTerms);
+    }
     handlers.onTranscript(transcript);
   };
 
@@ -342,7 +355,7 @@ export function createNavixaBrowserVoiceEngine({
       armLanguageProbe(LOW_CONFIDENCE_PROBE_MS);
       return;
     }
-    rememberLanguageHint(activeLanguage);
+    if (persistLanguageHint) rememberLanguageHint(activeLanguage);
     armLanguageProbe(ACTIVE_LANGUAGE_PROBE_MS);
   };
 
