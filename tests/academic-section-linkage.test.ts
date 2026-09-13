@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import "./academic-memory.test.ts";
+import "./academic-ingestion.test.ts";
 import {
   flattenAcademicRegistrationOptionMeetings,
   isTrustedAcademicLinkage,
