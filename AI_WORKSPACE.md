@@ -38,7 +38,7 @@
 - الوكيل: ChatGPT.
 - المهمة: بناء الأساس الذي يربط المقرر وطرحه بالشعبة ومكوّناتها التابعة مثل المحاضرة والمعمل والتمارين، مع تمثيل العلاقات الإلزامية بين المكونات حتى لا يقترح NAVIXA تركيبات غير قابلة للتسجيل.
 - الحالة: حجز وبدء تدقيق البنية الحالية؛ التنفيذ سيكون على فرع معزول وPull Request مستقل، والإنتاج غير متأثر.
-- الملفات المحجوزة: `app/config/class-schedule-pilot.ts`, `app/SultanClassPilot.tsx`, `app/api/pilots/class-schedule/route.ts`, `app/api/pilots/class-schedule/calendar/route.ts`, `app/education/academic-section-linkage.ts`, `tests/academic-section-linkage.test.ts`.
+- الملفات المحجوزة: `app/config/class-schedule-pilot.ts`, `app/SultanClassPilot.tsx`, `app/api/pilots/class-schedule/route.ts`, `app/api/pilots/class-schedule/calendar/route.ts`, `app/education/academic-section-linkage.ts`, `tests/academic-section-linkage.test.ts`, `tests/academic-suggestions.test.ts`.
 - القيود: لا تعديل لملفات UI System أو `package.json`؛ لا افتراض أن نمط الدراسة ثابت للمقرر أو المنطقة؛ نمط الحضور/عن بعد يكون على مستوى مكوّن الشعبة، والعلاقات الإلزامية تُفصل عن التوقعات التاريخية.
 
 ## آخر ما اكتمل
