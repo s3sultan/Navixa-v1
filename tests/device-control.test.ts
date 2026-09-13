@@ -7,9 +7,12 @@ const route=fs.readFileSync(new URL("app/api/device-control/route.ts",root),"utf
 const agent=fs.readFileSync(new URL("app/DeviceControlAgent.tsx",root),"utf8");
 const panel=fs.readFileSync(new URL("app/account/DeviceControlPanel.tsx",root),"utf8");
 const migration=fs.readFileSync(new URL("migrations/0056_device_control.sql",root),"utf8");
+const layout=fs.readFileSync(new URL("app/layout.tsx",root),"utf8");
+const account=fs.readFileSync(new URL("app/account/page.tsx",root),"utf8");
 
 test("device control is an allowlisted short-lived queue",()=>{
   assert.match(migration,/navixa_device_control_requests/);
+  assert.match(migration,/user_id TEXT NOT NULL/);
   assert.match(migration,/prepare_name_listener/);
   assert.match(migration,/prepare_screen_watch/);
   assert.match(migration,/open_alerts/);
@@ -39,6 +42,21 @@ test("mutations are same-origin and every request remains user scoped",()=>{
   assert.match(route,/Vary": "Cookie/);
 });
 
+test("duplicate live commands are coalesced and expired commands are explicit",()=>{
+  assert.match(route,/reused: true/);
+  assert.match(route,/status: "expired"/);
+  assert.match(route,/command=\? AND status='pending' AND expires_at>\?/);
+  assert.match(panel,/انتهت المهلة/);
+  assert.match(panel,/لم نكرر إرساله/);
+});
+
+test("computer agent polls only an authenticated computer while visible",()=>{
+  assert.match(agent,/\/api\/account\/session/);
+  assert.match(agent,/if\(!cancelled&&computer\)timer=window\.setInterval/);
+  assert.match(agent,/document\.visibilityState===\"visible\"/);
+  assert.match(agent,/if\(p\.deviceClass!==\"computer\"\)return false/);
+});
+
 test("computer agent requires a visible user action for sensitive tools",()=>{
   assert.doesNotMatch(agent,/getDisplayMedia|getUserMedia|MediaRecorder|SpeechRecognition/);
   assert.match(agent,/اختيار الشاشة أو التبويب يجب أن يتم منك/);
@@ -52,4 +70,9 @@ test("mobile account panel never sends sync credentials through device control",
   assert.match(panel,/action:"create",command/);
   assert.match(panel,/كلمة تشفير المزامنة لا تنتقل بين الجهازين/);
   assert.doesNotMatch(panel,/passphrase|syncPassphrase|cipher|iv:/);
+});
+
+test("device control surfaces are mounted in the real app",()=>{
+  assert.match(layout,/DeviceControlAgent/);
+  assert.match(account,/DeviceControlPanel/);
 });
