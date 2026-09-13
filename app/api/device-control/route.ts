@@ -3,10 +3,12 @@ import { hashOpaqueValue, readUserSessionToken, resolveUserSession, trustedUserM
 
 type Database = D1Database;
 type DeviceCommand = "prepare_name_listener" | "prepare_screen_watch" | "open_alerts" | "open_account_sync";
+type StoredStatus = "pending" | "acknowledged" | "dismissed";
+type PublicStatus = StoredStatus | "expired";
 type ControlRow = {
   id: string;
   command: DeviceCommand;
-  status: "pending" | "acknowledged" | "dismissed";
+  status: StoredStatus;
   source_device_class: UserDeviceClass;
   target_device_class: UserDeviceClass;
   created_at: string;
@@ -37,6 +39,11 @@ async function computerSessionExists(db: Database, userId: string, now: string) 
   return Boolean(rows.results[0]);
 }
 
+function exposeRow(row: ControlRow, now: string): ControlRow & { status: PublicStatus } {
+  if (row.status === "pending" && row.expires_at <= now) return { ...row, status: "expired" };
+  return row;
+}
+
 export async function GET(request: Request) {
   const db = await database();
   if (!db) return reply({ error: "التخزين غير مهيأ" }, 503);
@@ -49,10 +56,10 @@ export async function GET(request: Request) {
   const pending = deviceClass === "computer"
     ? (await db.prepare("SELECT id,command,status,source_device_class,target_device_class,created_at,expires_at,acknowledged_at FROM navixa_device_control_requests WHERE user_id=? AND target_device_class='computer' AND status='pending' AND expires_at>? ORDER BY created_at ASC LIMIT 8").bind(session.userId, now).all<ControlRow>()).results
     : [];
-  const recent = deviceClass === "mobile"
+  const recentRows = deviceClass === "mobile"
     ? (await db.prepare("SELECT id,command,status,source_device_class,target_device_class,created_at,expires_at,acknowledged_at FROM navixa_device_control_requests WHERE user_id=? AND source_device_class='mobile' ORDER BY created_at DESC LIMIT 8").bind(session.userId).all<ControlRow>()).results
     : [];
-  return reply({ deviceClass, computerSessionAvailable, pending, recent });
+  return reply({ deviceClass, computerSessionAvailable, pending, recent: recentRows.map(row => exposeRow(row, now)) });
 }
 
 export async function POST(request: Request) {
@@ -74,12 +81,16 @@ export async function POST(request: Request) {
     if (!command) return reply({ error: "أمر غير مسموح" }, 400);
     const available = await computerSessionExists(db, session.userId, nowIso);
     if (!available) return reply({ error: "لا توجد جلسة كمبيوتر صالحة لهذا الحساب حاليًا" }, 409);
+
+    const existing = (await db.prepare("SELECT id,command,status,source_device_class,target_device_class,created_at,expires_at,acknowledged_at FROM navixa_device_control_requests WHERE user_id=? AND source_device_class='mobile' AND target_device_class='computer' AND command=? AND status='pending' AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(session.userId, command, nowIso).all<ControlRow>()).results[0];
+    if (existing) return reply({ ok: true, reused: true, request: existing });
+
     const pendingRows = await db.prepare("SELECT id FROM navixa_device_control_requests WHERE user_id=? AND source_device_class='mobile' AND target_device_class='computer' AND status='pending' AND expires_at>? LIMIT ?").bind(session.userId, nowIso, MAX_PENDING).all<{ id: string }>();
     if (pendingRows.results.length >= MAX_PENDING) return reply({ error: "يوجد عدد كافٍ من الطلبات المعلقة. عالجها على الكمبيوتر أولًا" }, 429);
     const id = crypto.randomUUID();
     const expiresAt = new Date(now.getTime() + REQUEST_TTL_MS).toISOString();
     await db.prepare("INSERT INTO navixa_device_control_requests(id,user_id,source_device_class,target_device_class,command,status,created_at,expires_at,acknowledged_at) VALUES (?,?, 'mobile','computer',?,'pending',?,?, '')").bind(id, session.userId, command, nowIso, expiresAt).run();
-    return reply({ ok: true, request: { id, command, status: "pending", expiresAt } }, 201);
+    return reply({ ok: true, reused: false, request: { id, command, status: "pending", expiresAt } }, 201);
   }
 
   if (action === "acknowledge") {
