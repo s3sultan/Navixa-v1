@@ -16,7 +16,7 @@ const info:Record<Command,{title:string;body:string;action:string;href:string;ic
 export default function DeviceControlAgent(){
   const [item,setItem]=useState<RequestItem|null>(null);
   const poll=useCallback(async()=>{try{const r=await fetch("/api/device-control",{cache:"no-store"});if(!r.ok)return;const p=await r.json() as Payload;if(p.deviceClass!=="computer")return;setItem(current=>current||p.pending?.[0]||null)}catch{}},[]);
-  useEffect(()=>{void poll();const timer=window.setInterval(()=>void poll(),12000);return()=>window.clearInterval(timer)},[poll]);
+  useEffect(()=>{let timer:number|null=null,cancelled=false;const boot=async()=>{try{const session=await fetch("/api/account/session",{cache:"no-store"});if(!session.ok)return;const data=await session.json() as {signedIn?:boolean};if(cancelled||!data.signedIn)return;await poll();if(!cancelled)timer=window.setInterval(()=>void poll(),12000)}catch{}};void boot();return()=>{cancelled=true;if(timer!==null)window.clearInterval(timer)}},[poll]);
   const finish=async(outcome:"acknowledged"|"dismissed",navigate=false)=>{if(!item)return;const href=info[item.command].href;try{await fetch("/api/device-control",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"acknowledge",requestId:item.id,outcome})})}catch{}setItem(null);if(navigate)window.location.assign(href)};
   if(!item)return null;
   const copy=info[item.command];
