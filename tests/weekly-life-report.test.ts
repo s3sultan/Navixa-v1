@@ -3,12 +3,19 @@ import fs from "node:fs";
 import test from "node:test";
 import {
   buildWeeklyLifeReport,
+  localDateKey,
   movementTrackingKey,
   prayerTrackingKey,
   readPrayerCompletions,
   readWeeklyLifeDay,
   waterTrackingKey,
 } from "../app/weeklyLifeReport.ts";
+
+test("daily tracking uses the device calendar date instead of a UTC slice", () => {
+  const localMidnight = new Date(2026, 8, 13, 0, 30, 0);
+  assert.equal(localDateKey(0, localMidnight), "2026-09-13");
+  assert.equal(localDateKey(-1, localMidnight), "2026-09-12");
+});
 
 test("prayer tracking keeps only the five supported prayers", () => {
   assert.deepEqual(readPrayerCompletions('["Fajr","Asr","Unknown","Fajr"]'), ["Fajr", "Asr"]);
@@ -57,10 +64,13 @@ test("worship, health, and progress pages are wired to the same weekly data mode
   const health = fs.readFileSync(new URL("app/HealthMonitor.tsx", root), "utf8");
   const progress = fs.readFileSync(new URL("app/progress/page.tsx", root), "utf8");
   assert.match(worship, /prayerTrackingKey/);
+  assert.match(worship, /localDateKey/);
   assert.match(worship, /سجّل الصلاة/);
   assert.match(health, /movementTrackingKey/);
+  assert.match(health, /localDateKey/);
   assert.match(health, /completeMovement\(\)/);
   assert.match(progress, /buildWeeklyLifeReport/);
+  assert.match(progress, /localDateKey/);
   assert.match(progress, /الصلاة · الماء · الحركة/);
   assert.match(progress, /لا توجد تسجيلات بعد/);
   assert.equal(movementTrackingKey("2026-09-13"), "navixa-movement-2026-09-13");
