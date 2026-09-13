@@ -7,13 +7,10 @@ import {
 } from "./adminAuth.ts";
 
 export const adminPermissionCatalog = [
-  { key: "dashboard.read", label: "لوحة الإدارة", detail: "عرض المؤشرات والحالة التشغيلية." },
+  { key: "dashboard.read", label: "لوحة الإدارة", detail: "عرض المؤشرات والحالة التشغيلية ضمن جلسة الإدارة المحمية." },
   { key: "activity.read", label: "سجل النشاط", detail: "قراءة سجل الإجراءات الإدارية الموثق." },
-  { key: "runtime.manage", label: "مفاتيح التشغيل", detail: "تعديل الميزات التشغيلية الثانوية." },
-  { key: "settings.manage", label: "إعدادات المنصة", detail: "إدارة الإعدادات المتصلة المحمية." },
-  { key: "support.manage", label: "الدعم", detail: "مراجعة ومعالجة طلبات الدعم." },
-  { key: "emergency.manage", label: "الطوارئ", detail: "إدارة أدوات وإجراءات الطوارئ." },
-  { key: "push.test", label: "اختبارات Push", detail: "تشغيل اختبارات الإشعارات الإدارية." },
+  { key: "runtime.manage", label: "مفاتيح التشغيل", detail: "تعديل الميزات التشغيلية الثانوية بتحقق صريح من الخادم." },
+  { key: "push.test", label: "اختبارات Push", detail: "تشغيل اختبارات الإشعارات الإدارية بتحقق صريح من الخادم." },
 ] as const;
 
 export type AdminPermission = (typeof adminPermissionCatalog)[number]["key"];
