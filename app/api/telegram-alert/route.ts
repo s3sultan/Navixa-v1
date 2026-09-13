@@ -6,7 +6,7 @@ import { decryptTelegramIdentifier, sendOfficialTelegramMessage, telegramRuntime
 type D1Statement = { bind: (...values: unknown[]) => D1Statement; all: <T = Record<string, unknown>>() => Promise<{ results: T[] }> };
 type Database = D1Database & { prepare: (sql: string) => D1Statement };
 const telegramLimiter = createMemoryRateLimiter();
-const alertTypes = new Set(["adhan","iqama","water","break","focus","name","wird","sadaqah","task"]);
+const alertTypes = new Set(["adhan","iqama","water","break","focus","name","screen","wird","sadaqah","task"]);
 
 async function db(): Promise<Database | null> { try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; } catch { return (globalThis as { DB?: Database }).DB || null; } }
 function clientKey(request: Request) { return request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"; }

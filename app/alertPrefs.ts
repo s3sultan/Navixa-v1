@@ -1,12 +1,13 @@
-export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"wird"|"sadaqah"|"task";
+export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"screen"|"wird"|"sadaqah"|"task";
 export type Policy="user"|"on"|"off";
 type Channels={screen:boolean;telegram:boolean};
 type PolicyChannels={screen:Policy;telegram:Policy};
+export type FeatureAlertEvent={kind:"name_heard";name:string}|{kind:"screen_watch";mode:"change"|"ocr";detail?:string};
 
-export const ALERT_TYPES:AlertType[]=["adhan","iqama","water","break","focus","name","wird","sadaqah","task"];
+export const ALERT_TYPES:AlertType[]=["adhan","iqama","water","break","focus","name","screen","wird","sadaqah","task"];
 export const ALERT_LABELS:Record<AlertType,string>={
   adhan:"تنبيه الأذان",iqama:"تنبيه الإقامة",water:"تذكير الماء",break:"تذكير الحركة",
-  focus:"انتهاء جلسة التركيز",name:"سماع الاسم",wird:"إتمام الورد اليومي",sadaqah:"تذكير الصدقة",task:"إنجاز مهمة"
+  focus:"انتهاء جلسة التركيز",name:"سماع الاسم",screen:"متابعة الشاشة",wird:"إتمام الورد اليومي",sadaqah:"تذكير الصدقة",task:"إنجاز مهمة"
 };
 
 const defaultUserPrefs=():Record<AlertType,Channels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:true,telegram:true}])) as Record<AlertType,Channels>;
@@ -39,15 +40,27 @@ export const sendTelegramMessage=async(message:string,type?:AlertType):Promise<b
   }catch{return false}
 };
 
-const forwardNamePush=(message:string)=>{
+const forwardFeaturePush=(event:FeatureAlertEvent)=>{
+  void import("./pushClient").then(({sendNavixaFeaturePushEvent})=>sendNavixaFeaturePushEvent(event)).catch(()=>{});
+};
+
+export const sendFeatureAlert=(type:"name"|"screen",fallbackMessage:string,event:FeatureAlertEvent)=>{
+  forwardFeaturePush(event);
+  if(!isTelegramEnabled(type))return;
+  const custom=getAdminMessages()[type];
+  void sendTelegramMessage(custom||fallbackMessage,type);
+};
+
+const forwardNameAlert=(message:string)=>{
   const match=message.match(/\(([^()]{1,80})\)\s*$/);
   const name=(match?.[1]||"").trim();
-  if(!name)return;
-  void import("./pushClient").then(({sendNavixaFeaturePushEvent})=>sendNavixaFeaturePushEvent({kind:"name_heard",name})).catch(()=>{});
+  if(!name)return false;
+  sendFeatureAlert("name",message,{kind:"name_heard",name});
+  return true;
 };
 
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
-  if(type==="name")forwardNamePush(fallbackMessage);
+  if(type==="name"&&forwardNameAlert(fallbackMessage))return;
   if(!isTelegramEnabled(type))return;
   const custom=getAdminMessages()[type];
   void sendTelegramMessage(custom||fallbackMessage,type);
