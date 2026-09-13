@@ -8,11 +8,11 @@ import QuranReader,{dayPage} from "./QuranReader";
 import {sendTelegramAlert} from "./alertPrefs";
 import {RIYADH,addMinutes,applyAdjustments,defaultIqamaOffset,parseTime,prayerApiUrl,prayerLabels,prayerOrder,readAdjustments,type Timings} from "./prayerTimeModel";
 import {prayerLocationRequest,readSharedPrayerLocation,subscribePrayerLocation,writeSharedPrayerLocation,type SharedPrayerLocation} from "./prayerLocationModel";
-import {prayerTrackingKey,readPrayerCompletions,type TrackedPrayer} from "./weeklyLifeReport";
+import {localDateKey,prayerTrackingKey,readPrayerCompletions,type TrackedPrayer} from "./weeklyLifeReport";
 
 type AzkarItem={ID:number;ARABIC_TEXT:string;REPEAT:number};
 type LocStatus="idle"|"loading"|"denied"|"unavailable"|"timeout"|"error"|"ready";
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>localDateKey();
 const fmt=(date:Date)=>date.toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit",hour12:true});
 
 export default function WorshipCenter(){
