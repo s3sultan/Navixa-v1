@@ -21,6 +21,14 @@ test("listener keeps the local fallback reachable when browser speech recognitio
   assert.match(engine, /if \(localFallback\?\.supported\)[\s\S]*localFallback\.start\(\)/);
   assert.match(engine, /return browserStarted/);
 });
+test("listener UI switches to the active state as soon as a start request is accepted", () => {
+  assert.match(engine, /const notifyStarted = \(\) => \{[\s\S]*handlers\.onStart\?\.\(\)/);
+  assert.match(engine, /recognition\.start\(\);[\s\S]*browserStarted = true;[\s\S]*notifyStarted\(\)/);
+  assert.match(engine, /starting = true;[\s\S]*notifyStarted\(\);[\s\S]*localFallback\.start\(\)/);
+  assert.match(page, /onStart:\(\)=>setListening\(true\)/);
+  assert.match(page, /listening\?"إيقاف الاستماع":"تشغيل الاستماع"/);
+  assert.match(page, /listening\?"● يستمع الآن"/);
+});
 test("listener micro interactions respect reduced motion", () => {
   assert.match(css, /NAVIXA Micro Interactions: listener/);
   assert.match(css, /navixa-listener-pulse/);

@@ -198,6 +198,25 @@ function createLocalOnlyVoiceEngine({
   let destroyed = false;
   let active = false;
   let starting = false;
+  let startNotified = false;
+
+  const notifyStarted = () => {
+    if (destroyed || startNotified) return;
+    startNotified = true;
+    handlers.onStart?.();
+  };
+
+  const resetStartNotification = () => {
+    startNotified = false;
+  };
+
+  const failStart = () => {
+    if (destroyed) return;
+    starting = false;
+    active = false;
+    resetStartNotification();
+    handlers.onError?.("voice-recognition-error");
+  };
 
   const localFallback = createNavixaLocalNameFallback({
     onTranscript: (text) => {
@@ -214,23 +233,24 @@ function createLocalOnlyVoiceEngine({
     start: () => {
       if (!localFallback.supported || destroyed || active || starting) return false;
       starting = true;
+      notifyStarted();
       void localFallback.start().then((started) => {
         starting = false;
         if (destroyed) return;
         if (!started) {
-          handlers.onError?.("voice-recognition-error");
+          failStart();
           return;
         }
         active = true;
-        handlers.onStart?.();
-      });
+      }).catch(failStart);
       return true;
     },
     stop: () => {
       if (destroyed) return;
-      const wasRunning = active || starting;
+      const wasRunning = active || starting || startNotified;
       active = false;
       starting = false;
+      resetStartNotification();
       localFallback.stop();
       if (wasRunning) handlers.onEnd?.();
     },
@@ -239,6 +259,7 @@ function createLocalOnlyVoiceEngine({
       destroyed = true;
       active = false;
       starting = false;
+      resetStartNotification();
       localFallback.destroy();
     },
   };
@@ -318,7 +339,18 @@ export function createNavixaBrowserVoiceEngine({
 
   let destroyed = false;
   let active = false;
+  let startNotified = false;
   let languageProbeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const notifyStarted = () => {
+    if (destroyed || startNotified) return;
+    startNotified = true;
+    handlers.onStart?.();
+  };
+
+  const resetStartNotification = () => {
+    startNotified = false;
+  };
 
   const clearLanguageProbe = () => {
     if (languageProbeTimer) clearTimeout(languageProbeTimer);
@@ -347,7 +379,7 @@ export function createNavixaBrowserVoiceEngine({
     if (destroyed) return;
     active = true;
     armLanguageProbe();
-    handlers.onStart?.();
+    notifyStarted();
   };
 
   recognition.onresult = (event) => {
@@ -421,6 +453,7 @@ export function createNavixaBrowserVoiceEngine({
     const error = typeof event?.error === "string" ? event.error : "voice-recognition-error";
     if (adaptiveLanguage && error === "no-speech") advanceLanguage();
     if (localFallback?.supported && error !== "not-allowed" && error !== "audio-capture") return;
+    resetStartNotification();
     handlers.onError?.(error);
   };
 
@@ -431,6 +464,7 @@ export function createNavixaBrowserVoiceEngine({
 
   recognition.onend = () => {
     active = false;
+    resetStartNotification();
     clearLanguageProbe();
     if (!destroyed) handlers.onEnd?.();
   };
@@ -445,19 +479,25 @@ export function createNavixaBrowserVoiceEngine({
         recognition.lang = currentLanguage();
         recognition.start();
         browserStarted = true;
+        notifyStarted();
       } catch {
         // A local fallback can still keep name listening available if the browser recognizer refuses to start.
       }
 
       if (localFallback?.supported) {
+        if (!browserStarted) notifyStarted();
         void localFallback.start().then((localStarted) => {
           if (destroyed || browserStarted) return;
           if (localStarted) {
             active = true;
-            handlers.onStart?.();
           } else {
+            resetStartNotification();
             handlers.onError?.("voice-recognition-error");
           }
+        }).catch(() => {
+          if (destroyed || browserStarted) return;
+          resetStartNotification();
+          handlers.onError?.("voice-recognition-error");
         });
         return true;
       }
@@ -467,6 +507,7 @@ export function createNavixaBrowserVoiceEngine({
     stop: () => {
       if (destroyed) return;
       clearLanguageProbe();
+      resetStartNotification();
       localFallback?.stop();
       try {
         recognition.stop();
@@ -478,6 +519,7 @@ export function createNavixaBrowserVoiceEngine({
       if (destroyed) return;
       destroyed = true;
       active = false;
+      resetStartNotification();
       clearLanguageProbe();
       localFallback?.destroy();
       recognition.onstart = null;
