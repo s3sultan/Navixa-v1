@@ -84,7 +84,8 @@ export type AcademicInstitutionRegistryIssueCode =
   | "duplicate_institution_id"
   | "duplicate_source_id"
   | "invalid_official_domain"
-  | "official_source_without_host";
+  | "official_source_without_host"
+  | "source_host_outside_institution_domain";
 
 export type AcademicInstitutionRegistryIssue = {
   code: AcademicInstitutionRegistryIssueCode;
@@ -92,6 +93,7 @@ export type AcademicInstitutionRegistryIssue = {
 };
 
 export type AcademicIngestionReasonCode =
+  | "registry_invalid"
   | "missing_candidate_id"
   | "missing_institution"
   | "unknown_institution"
@@ -111,6 +113,7 @@ export type AcademicIngestionReasonCode =
   | "context_mismatch"
   | "unresolved_context"
   | "invalid_extraction_confidence"
+  | "invalid_observed_at"
   | "ocr_requires_review"
   | "manual_requires_review"
   | "untrusted_source_requires_review";
@@ -134,7 +137,6 @@ type RegisteredSource = {
   source: AcademicInstitutionSourceRegistration;
 };
 
-const DATE_TIME_INVALID = Number.NaN;
 const IDENTIFIER_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 
 function clean(value: string | undefined) {
@@ -157,11 +159,11 @@ function hostMatchesDomain(host: string, domain: string) {
   return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
 }
 
-function parsedHttpUrl(value: string | undefined) {
+function parsedHttpsUrl(value: string | undefined) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    if (parsed.protocol !== "https:") return null;
     return parsed;
   } catch {
     return null;
@@ -217,6 +219,13 @@ export function validateAcademicInstitutionRegistry(
       for (const host of source.allowedHosts || []) {
         if (!validHost(host)) {
           issues.push({ code: "invalid_official_domain", detail: `${institution.institutionId}:${source.sourceId}:${host}` });
+          continue;
+        }
+        if (source.authority === "official" && !institution.officialDomains.some(domain => hostMatchesDomain(host, domain))) {
+          issues.push({
+            code: "source_host_outside_institution_domain",
+            detail: `${institution.institutionId}:${source.sourceId}:${host}`,
+          });
         }
       }
     }
@@ -284,6 +293,21 @@ export function evaluateAcademicIngestion(
   const candidateId = clean(candidate.candidateId) || "unknown-candidate";
   const institutionId = clean(candidate.institutionId) || "";
 
+  const registryIssues = validateAcademicInstitutionRegistry(registry);
+  if (registryIssues.length) {
+    return {
+      status: "reject",
+      candidateId,
+      institutionId,
+      sourceAuthority: null,
+      sourceKind: null,
+      reasons: [{
+        code: "registry_invalid",
+        detail: registryIssues.map(issue => `${issue.code}:${issue.detail}`).join(","),
+      }],
+    };
+  }
+
   if (!clean(candidate.candidateId)) rejectReasons.push({ code: "missing_candidate_id", detail: "candidateId" });
   if (!institutionId) rejectReasons.push({ code: "missing_institution", detail: "institutionId" });
 
@@ -314,7 +338,7 @@ export function evaluateAcademicIngestion(
       if (!candidate.source.sourceUri) {
         rejectReasons.push({ code: "source_uri_required", detail: registered.source.sourceId });
       } else {
-        const parsed = parsedHttpUrl(candidate.source.sourceUri);
+        const parsed = parsedHttpsUrl(candidate.source.sourceUri);
         if (!parsed) {
           rejectReasons.push({ code: "source_uri_invalid", detail: candidate.source.sourceUri });
         } else if (!(registered.source.allowedHosts || []).some(host => hostMatchesDomain(parsed.hostname, host))) {
@@ -333,15 +357,21 @@ export function evaluateAcademicIngestion(
   if (!clean(candidate.courseName)) reviewReasons.push({ code: "missing_course_name", detail: "courseName" });
   if (!candidate.offering) reviewReasons.push({ code: "missing_offering", detail: "offering" });
 
-  if (candidate.extraction.confidence !== undefined && (
-    !Number.isFinite(candidate.extraction.confidence) ||
-    candidate.extraction.confidence < 0 ||
-    candidate.extraction.confidence > 1
-  )) {
+  const confidenceValid = candidate.extraction.confidence === undefined || (
+    Number.isFinite(candidate.extraction.confidence) &&
+    candidate.extraction.confidence >= 0 &&
+    candidate.extraction.confidence <= 1
+  );
+  if (!confidenceValid) {
     rejectReasons.push({ code: "invalid_extraction_confidence", detail: String(candidate.extraction.confidence) });
   }
 
-  if (candidate.extraction.method === "ocr") {
+  const observedAtValid = Number.isFinite(Date.parse(candidate.source.observedAt));
+  if (!observedAtValid) {
+    rejectReasons.push({ code: "invalid_observed_at", detail: candidate.source.observedAt });
+  }
+
+  if (candidate.extraction.method === "ocr" && registered?.source.authority !== "reviewed") {
     reviewReasons.push({ code: "ocr_requires_review", detail: candidate.source.channel });
   }
   if (candidate.extraction.method === "manual" && registered?.source.authority !== "reviewed") {
@@ -371,7 +401,7 @@ export function evaluateAcademicIngestion(
     rejectReasons.push({ code: "context_mismatch", detail: mismatches.join(",") });
   }
 
-  if (registered && registered.institution.institutionId === institutionId) {
+  if (registered && registered.institution.institutionId === institutionId && observedAtValid && confidenceValid) {
     const observation = provisionalObservation(candidate, registered);
     if (observation) {
       const observationIssues = validateAcademicObservation(observation);
@@ -382,10 +412,6 @@ export function evaluateAcademicIngestion(
         });
       }
     }
-  }
-
-  if (!Number.isFinite(Date.parse(candidate.source.observedAt))) {
-    rejectReasons.push({ code: "source_uri_invalid", detail: `observedAt:${candidate.source.observedAt}` });
   }
 
   const sourceAuthority = registered?.source.authority || null;
