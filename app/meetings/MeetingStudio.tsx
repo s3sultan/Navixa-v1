@@ -8,6 +8,7 @@ import { summarizeMeetingTranscript } from "./meetingAutomation";
 import { applyGlossary, detectSingleWordCorrection, extractFrequentTerms, mergeGlossaries, parseGlossaryInput, type GlossaryTerm } from "./meetingGlossary";
 import { academicSuggestions, type AcademicSuggestion } from "./academicSuggestions";
 import { saveAcademicReminder } from "../academicReminders";
+import { MEETING_RECORDER_TIMESLICE_MS, getMeetingChunkDurationMs, hasLiveMeetingAudio, shouldRotateMeetingRecorder } from "./recordingLifecycle";
 import "./meetings.css";
 
 type StudioState = "ready" | "recording" | "processing" | "review";
@@ -160,8 +161,10 @@ export default function MeetingStudio() {
   const startedAtRef = useRef(0);
   const partStartedAtRef = useRef(0);
   const timerRef = useRef<number | null>(null);
+  const rotationTimerRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const flushRequestedRef = useRef(false);
+  const stopRequestedRef = useRef(false);
+  const rotationPendingRef = useRef(false);
   const workerRef = useRef<Worker | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const draftRef = useRef<MeetingSession | null>(null);
@@ -179,13 +182,16 @@ export default function MeetingStudio() {
   useEffect(() => { currentModelRef.current = model; }, [model]);
   useEffect(() => () => {
     if (timerRef.current) window.clearInterval(timerRef.current);
+    if (rotationTimerRef.current) window.clearTimeout(rotationTimerRef.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
     workerRef.current?.terminate();
   }, []);
   useEffect(() => {
     const flushBeforeBackground = () => {
       const recorder = recorderRef.current;
-      if (document.visibilityState === "hidden" && recorder?.state === "recording") { flushRequestedRef.current = true; recorder.requestData(); }
+      // Flush encoded bytes into the current part without splitting it.
+      // A tab switch must never create a tiny standalone WebM fragment.
+      if (document.visibilityState === "hidden" && recorder?.state === "recording") recorder.requestData();
     };
     document.addEventListener("visibilitychange", flushBeforeBackground);
     return () => document.removeEventListener("visibilitychange", flushBeforeBackground);
@@ -237,18 +243,94 @@ export default function MeetingStudio() {
     parts: [], chunkMinutes: nextChunkMinutes, glossary: parseGlossaryInput(glossaryInput), globalLearningConsent,
   });
 
-  const appendRecordedPart = (final = false) => {
+  const clearRotationTimer = () => {
+    if (rotationTimerRef.current) window.clearTimeout(rotationTimerRef.current);
+    rotationTimerRef.current = null;
+  };
+
+  const appendRecordedPart = (recorder: MediaRecorder, final = false) => {
     const items = chunksRef.current;
     const current = draftRef.current;
     if (!items.length || !current) return;
     chunksRef.current = [];
-    const durationMs = Math.max(1000, Date.now() - partStartedAtRef.current);
-    const audio = new Blob(items, { type: recorderRef.current?.mimeType || "audio/webm" });
+    const endedAt = Date.now();
+    const durationMs = Math.max(1000, endedAt - partStartedAtRef.current);
+    const audio = new Blob(items, { type: recorder.mimeType || "audio/webm" });
     const normalized = normalizeSession(current);
     const part = createPart(normalized.parts?.length || 0, Math.max(0, partStartedAtRef.current - startedAtRef.current), durationMs, audio);
-    const next: MeetingSession = { ...normalized, title: title.trim() || normalized.title, durationMs: Math.max(Date.now() - startedAtRef.current, normalized.durationMs), parts: [...(normalized.parts || []), part], chunkMinutes };
+    const next: MeetingSession = { ...normalized, title: title.trim() || normalized.title, durationMs: Math.max(endedAt - startedAtRef.current, normalized.durationMs), parts: [...(normalized.parts || []), part], chunkMinutes };
+    persist(next, final ? "اكتمل الحفظ المحلي. يمكنك الآن تفريغ الأجزاء بالتتابع أو العودة لاحقًا." : `حُفظ الجزء ${part.index + 1} كملف مستقل، والتسجيل مستمر تلقائيًا.`);
+  };
+
+  const startRecorderPart = (stream: MediaStream, mimeType?: string) => {
+    if (!hasLiveMeetingAudio(stream)) throw new Error("meeting-audio-track-ended");
+    chunksRef.current = [];
+    rotationPendingRef.current = false;
     partStartedAtRef.current = Date.now();
-    persist(next, final ? "اكتمل الحفظ المحلي. يمكنك الآن تفريغ الأجزاء بالتتابع أو العودة لاحقًا." : `حُفظ الجزء ${part.index + 1} محليًا، والتسجيل مستمر.`);
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    recorderRef.current = recorder;
+
+    const rotate = () => {
+      if (!shouldRotateMeetingRecorder({
+        partStartedAt: partStartedAtRef.current,
+        now: Date.now(),
+        chunkMinutes,
+        stopRequested: stopRequestedRef.current,
+        rotationPending: rotationPendingRef.current,
+        recorderState: recorder.state,
+      })) return;
+      rotationPendingRef.current = true;
+      clearRotationTimer();
+      recorder.stop();
+    };
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunksRef.current.push(event.data);
+      rotate();
+    };
+    recorder.onerror = () => {
+      stopRequestedRef.current = true;
+      clearRotationTimer();
+      stream.getTracks().forEach((track) => track.stop());
+      streamRef.current = null; recorderRef.current = null;
+      setState("review");
+      setNotice("تعذر استمرار التسجيل المحلي. حُفظت الأجزاء المكتملة ويمكنك استئناف جلسة جديدة.");
+    };
+    recorder.onstop = () => {
+      clearRotationTimer();
+      const final = stopRequestedRef.current;
+      appendRecordedPart(recorder, final);
+      if (final) {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null; recorderRef.current = null;
+        rotationPendingRef.current = false;
+        stopRequestedRef.current = false;
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        timerRef.current = null;
+        setState("review");
+        return;
+      }
+      if (!hasLiveMeetingAudio(stream)) {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null; recorderRef.current = null;
+        rotationPendingRef.current = false;
+        setState("review");
+        setNotice("انقطع مصدر الصوت بعد حفظ الجزء الأخير. الأجزاء المكتملة ما زالت محفوظة على جهازك.");
+        return;
+      }
+      try {
+        startRecorderPart(stream, mimeType);
+      } catch {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null; recorderRef.current = null;
+        rotationPendingRef.current = false;
+        setState("review");
+        setNotice("حُفظ الجزء الحالي، لكن تعذر بدء الجزء التالي. يمكنك بدء جلسة جديدة دون فقد الأجزاء المحفوظة.");
+      }
+    };
+
+    recorder.start(MEETING_RECORDER_TIMESLICE_MS);
+    rotationTimerRef.current = window.setTimeout(rotate, getMeetingChunkDurationMs(chunkMinutes) + 250);
   };
 
   const finishCapture = (audio: Blob, durationMs: number) => {
@@ -265,28 +347,21 @@ export default function MeetingStudio() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       const mimeType = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((candidate) => MediaRecorder.isTypeSupported(candidate));
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       const session = createSession(title, chunkMinutes);
+      const now = Date.now();
+      startedAtRef.current = now;
+      partStartedAtRef.current = now;
+      stopRequestedRef.current = false;
+      rotationPendingRef.current = false;
       chunksRef.current = [];
-      flushRequestedRef.current = false;
+      streamRef.current = stream;
       persist(session);
-      recorder.ondataavailable = (event) => {
-        if (!event.data.size) return;
-        chunksRef.current.push(event.data);
-        if (flushRequestedRef.current || Date.now() - partStartedAtRef.current >= chunkMinutes * 60 * 1000) { flushRequestedRef.current = false; appendRecordedPart(false); }
-      };
-      recorder.onstop = () => {
-        appendRecordedPart(true);
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null; recorderRef.current = null;
-        if (timerRef.current) window.clearInterval(timerRef.current);
-        timerRef.current = null;
-        setState("review");
-      };
-      recorder.start(10_000); recorderRef.current = recorder; streamRef.current = stream; startedAtRef.current = Date.now(); partStartedAtRef.current = startedAtRef.current;
-      setElapsed(0); setState("recording"); setNotice(`يُحفظ جزء مستقل كل ${chunkMinutes} دقيقة على جهازك.`);
+      startRecorderPart(stream, mimeType);
+      setElapsed(0); setState("recording"); setNotice(`التسجيل مستمر. كل ${chunkMinutes} دقيقة يُنشأ ملف صوت مستقل تلقائيًا، وتغيير التبويب لا يقسم التسجيل.`);
       timerRef.current = window.setInterval(() => setElapsed(Date.now() - startedAtRef.current), 250);
     } catch (error) {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null; recorderRef.current = null;
       setNotice(error instanceof DOMException && error.name === "NotAllowedError" ? "لم تُمنح صلاحية الميكروفون. غيّرها من إعدادات المتصفح ثم حاول مجددًا." : "تعذر بدء التسجيل. تحقق من الميكروفون ثم حاول مجددًا.");
     }
   };
@@ -294,8 +369,11 @@ export default function MeetingStudio() {
   const stopRecording = () => {
     if (timerRef.current) window.clearInterval(timerRef.current);
     timerRef.current = null;
-    setState("processing"); setNotice("جارٍ حفظ الجزء الأخير محليًا…");
-    recorderRef.current?.stop();
+    clearRotationTimer();
+    stopRequestedRef.current = true;
+    setState("processing"); setNotice("جارٍ إغلاق ملف الجزء الأخير وحفظه محليًا…");
+    const recorder = recorderRef.current;
+    if (recorder?.state === "recording") recorder.stop();
   };
 
   const importAudio = async (event: ChangeEvent<HTMLInputElement>) => {
