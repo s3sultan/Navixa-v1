@@ -513,7 +513,7 @@ export function createNavixaBrowserVoiceEngine({
     browserStarting = false;
     clearLanguageProbe();
     if (destroyed || !keepListening) return;
-    scheduleBrowserRestart();
+    if (!startBrowserSession()) scheduleBrowserRestart();
   };
 
   return {
