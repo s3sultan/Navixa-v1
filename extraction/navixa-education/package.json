@@ -1,0 +1,13 @@
+{
+  "name": "navixa-education",
+  "version": "0.1.0-extraction",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "verify": "npm test"
+  }
+}
