@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  flattenAcademicOfferingMeetings,
+  flattenAcademicRegistrationOptionMeetings,
   isTrustedAcademicLinkage,
   matchAcademicRegistrationOption,
+  matchTrustedAcademicRegistrationOption,
   validateAcademicOffering,
   type AcademicCourseOffering,
 } from "../app/education/academic-section-linkage.ts";
@@ -60,8 +61,11 @@ test("academic linkage accepts only complete official lecture/lab combinations",
   assert.equal(matchAcademicRegistrationOption(LINKED_OFFERING, ["lecture-01"]), null);
 });
 
-test("academic linkage keeps delivery mode on each meeting instead of the course name", () => {
-  const meetings = flattenAcademicOfferingMeetings(LINKED_OFFERING);
+test("selected registration option keeps its own lecture/lab meetings and delivery modes", () => {
+  const option = matchTrustedAcademicRegistrationOption(LINKED_OFFERING, ["lecture-01", "lab-01"]);
+  assert.ok(option);
+  const meetings = flattenAcademicRegistrationOptionMeetings(LINKED_OFFERING, option);
+  assert.deepEqual(meetings.map(item => item.componentId).sort(), ["lab-01", "lecture-01"]);
   assert.equal(meetings.find(item => item.componentId === "lecture-01")?.deliveryMode, "online");
   assert.equal(meetings.find(item => item.componentId === "lab-01")?.deliveryMode, "in_person");
   assert.equal(meetings.find(item => item.componentId === "lab-01")?.locationLabel, "معمل 4");
@@ -72,6 +76,13 @@ test("only official or reviewed linkage is trusted for automatic recommendations
   assert.equal(isTrustedAcademicLinkage({ optionId: "reviewed", componentIds: ["a"], evidence: "reviewed" }), true);
   assert.equal(isTrustedAcademicLinkage({ optionId: "inferred", componentIds: ["a"], evidence: "inferred" }), false);
   assert.equal(isTrustedAcademicLinkage({ optionId: "unknown", componentIds: ["a"], evidence: "unknown" }), false);
+
+  const inferred: AcademicCourseOffering = {
+    ...LINKED_OFFERING,
+    registrationOptions: [{ optionId: "guess", componentIds: ["lecture-01", "lab-01"], evidence: "inferred" }],
+  };
+  assert.equal(matchAcademicRegistrationOption(inferred, ["lecture-01", "lab-01"])?.optionId, "guess");
+  assert.equal(matchTrustedAcademicRegistrationOption(inferred, ["lecture-01", "lab-01"]), null);
 });
 
 test("academic model rejects links to components that do not exist", () => {
