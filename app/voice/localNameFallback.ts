@@ -7,6 +7,7 @@ export type NavixaLocalNameFallback = {
 
 export type NavixaLocalSpeechLanguage = "auto" | "ar" | "en";
 export type NavixaVoiceFlushReason = "endpoint" | "window";
+export type NavixaVoiceCaptureSource = "shared-audio" | "microphone";
 
 type LocalNameFallbackOptions = {
   onTranscript: (text: string) => void;
@@ -179,6 +180,36 @@ const hasLiveAudioTrack = (stream: MediaStream | undefined | null) => Boolean(
   stream?.getAudioTracks().some((track) => track.readyState === "live"),
 );
 
+const stopStreamTracks = (stream: MediaStream | undefined | null) => {
+  stream?.getTracks().forEach((track) => {
+    try { track.stop(); } catch {}
+  });
+};
+
+export async function acquireNavixaVoiceAudioStream(mediaDevices: MediaDevices): Promise<{
+  stream: MediaStream;
+  source: NavixaVoiceCaptureSource;
+}> {
+  if (typeof mediaDevices.getDisplayMedia === "function") {
+    let sharedStream: MediaStream | null = null;
+    try {
+      sharedStream = await mediaDevices.getDisplayMedia({ video: true, audio: true });
+      if (hasLiveAudioTrack(sharedStream)) {
+        return { stream: sharedStream, source: "shared-audio" };
+      }
+    } catch {
+      // The user may cancel sharing or the browser may not expose system/tab audio.
+    }
+    stopStreamTracks(sharedStream);
+  }
+
+  const microphoneStream = await mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    video: false,
+  });
+  return { stream: microphoneStream, source: "microphone" };
+}
+
 export function createNavixaLocalNameFallback({
   onTranscript,
   windowSeconds = DEFAULT_WINDOW_SECONDS,
@@ -187,9 +218,10 @@ export function createNavixaLocalNameFallback({
   mediaStream,
 }: LocalNameFallbackOptions): NavixaLocalNameFallback {
   const AudioContextClass = getAudioContextConstructor();
+  const mediaDevices = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
   const supported = Boolean(
     typeof window !== "undefined"
-    && (hasLiveAudioTrack(mediaStream) || navigator.mediaDevices?.getUserMedia)
+    && (hasLiveAudioTrack(mediaStream) || mediaDevices?.getDisplayMedia || mediaDevices?.getUserMedia)
     && typeof Worker !== "undefined"
     && AudioContextClass,
   );
@@ -316,7 +348,7 @@ export function createNavixaLocalNameFallback({
       try { source.disconnect(); } catch {}
       source = null;
     }
-    if (ownsStream) stream?.getTracks().forEach((track) => track.stop());
+    if (ownsStream) stopStreamTracks(stream);
     stream = null;
     ownsStream = false;
     if (context && context.state !== "closed") void context.close().catch(() => undefined);
@@ -336,15 +368,14 @@ export function createNavixaLocalNameFallback({
           stream = mediaStream || null;
           ownsStream = false;
         } else {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-            video: false,
-          });
+          if (!mediaDevices) throw new Error("voice-media-devices-unavailable");
+          const acquired = await acquireNavixaVoiceAudioStream(mediaDevices);
+          stream = acquired.stream;
           ownsStream = true;
         }
         if (!stream || !hasLiveAudioTrack(stream)) throw new Error("voice-stream-unavailable");
         if (destroyed) {
-          if (ownsStream) stream.getTracks().forEach((track) => track.stop());
+          if (ownsStream) stopStreamTracks(stream);
           stream = null;
           ownsStream = false;
           return false;
