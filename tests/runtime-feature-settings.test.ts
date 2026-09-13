@@ -16,9 +16,10 @@ test("مفاتيح التشغيل الجديدة مغلقة افتراضيًا �
 });
 
 test("مسارات مفاتيح التشغيل تفصل القراءة العامة عن التعديل الإداري المحمي", async () => {
-  const [publicRoute, adminRoute, home, tracker, usageRoute, statsRoute, adminUi, adminPage] = await Promise.all([
+  const [publicRoute, adminRoute, adminAccess, home, tracker, usageRoute, statsRoute, adminUi, adminPage] = await Promise.all([
     readFile(new URL("../app/api/runtime-features/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/admin/runtime-features/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/adminAccess.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/UsageTracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/usage/event/route.ts", import.meta.url), "utf8"),
@@ -29,8 +30,9 @@ test("مسارات مفاتيح التشغيل تفصل القراءة العا�
   assert.match(publicRoute, /publicRuntimeFeatures/);
   assert.match(publicRoute, /Cache-Control.*no-store/);
   assert.doesNotMatch(publicRoute, /SECRET|KEY|TOKEN/i);
-  assert.match(adminRoute, /verifyAdminSessionToken/);
-  assert.match(adminRoute, /isTrustedSameOriginRequest/);
+  assert.match(adminRoute, /requireAdminPermission\(request, "runtime\.manage"\)/);
+  assert.match(adminAccess, /verifyAdminSessionToken/);
+  assert.match(adminAccess, /isTrustedSameOriginRequest/);
   assert.match(adminRoute, /Cache-Control.*no-store/);
   assert.match(home, /runtimeFeatures\.matchesHomeEnabled/);
   assert.match(home, /runtimeFeatures\.floatingAssistantEnabled/);
