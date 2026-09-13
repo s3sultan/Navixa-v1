@@ -1,9 +1,12 @@
 export const PRAYER_LOCATION_STORAGE_KEY="navixa-prayer-location-v3";
 export const PRAYER_LOCATION_EVENT="navixa:prayer-location-changed";
+const LEGACY_PRAYER_LOCATION_STORAGE_KEY="navixa-prayer-location-v2";
 
 export type SharedPrayerLocation=
   | {mode:"coords";lat:number;lng:number;label:string;source:"device"|"fallback"}
   | {mode:"city";city:string;country:string;label:string;source:"manual"};
+
+let sessionPrayerLocation:SharedPrayerLocation|null=null;
 
 export const normalizePrayerLocation=(value:any):SharedPrayerLocation|null=>{
   if(!value||typeof value!=="object")return null;
@@ -20,29 +23,66 @@ export const normalizePrayerLocation=(value:any):SharedPrayerLocation|null=>{
   return null;
 };
 
+const persistCityPrayerLocation=(location:Extract<SharedPrayerLocation,{mode:"city"}>)=>{
+  localStorage.setItem(PRAYER_LOCATION_STORAGE_KEY,JSON.stringify({
+    mode:"city",
+    city:location.city,
+    country:location.country,
+    label:location.label,
+    source:"manual",
+  }));
+};
+
 export const readSharedPrayerLocation=():SharedPrayerLocation|null=>{
   if(typeof window==="undefined")return null;
+  if(sessionPrayerLocation?.mode==="coords")return sessionPrayerLocation;
   try{
     const current=normalizePrayerLocation(JSON.parse(localStorage.getItem(PRAYER_LOCATION_STORAGE_KEY)||"null"));
-    if(current)return current;
-    const legacy=normalizePrayerLocation(JSON.parse(localStorage.getItem("navixa-prayer-location-v2")||"null"));
-    if(legacy){localStorage.setItem(PRAYER_LOCATION_STORAGE_KEY,JSON.stringify(legacy));return legacy}
+    if(current?.mode==="coords"){
+      // Precise device coordinates are deliberately session-memory only.
+      localStorage.removeItem(PRAYER_LOCATION_STORAGE_KEY);
+    }else if(current){
+      sessionPrayerLocation=current;
+      localStorage.removeItem(LEGACY_PRAYER_LOCATION_STORAGE_KEY);
+      return current;
+    }
+
+    const legacy=normalizePrayerLocation(JSON.parse(localStorage.getItem(LEGACY_PRAYER_LOCATION_STORAGE_KEY)||"null"));
+    localStorage.removeItem(LEGACY_PRAYER_LOCATION_STORAGE_KEY);
+    if(legacy?.mode==="city"){
+      persistCityPrayerLocation(legacy);
+      sessionPrayerLocation=legacy;
+      return legacy;
+    }
   }catch{}
-  return null;
+  return sessionPrayerLocation;
 };
 
 export const writeSharedPrayerLocation=(location:SharedPrayerLocation)=>{
   if(typeof window==="undefined")return;
-  localStorage.setItem(PRAYER_LOCATION_STORAGE_KEY,JSON.stringify(location));
-  if(location.mode==="coords")localStorage.setItem("navixa-prayer-location-v2",JSON.stringify({lat:location.lat,lng:location.lng,source:location.source,label:location.label}));
-  else localStorage.removeItem("navixa-prayer-location-v2");
+  sessionPrayerLocation=location;
+  if(location.mode==="city")persistCityPrayerLocation(location);
+  else localStorage.removeItem(PRAYER_LOCATION_STORAGE_KEY);
+  localStorage.removeItem(LEGACY_PRAYER_LOCATION_STORAGE_KEY);
   window.dispatchEvent(new CustomEvent(PRAYER_LOCATION_EVENT,{detail:location}));
 };
 
 export const subscribePrayerLocation=(handler:(location:SharedPrayerLocation)=>void)=>{
   if(typeof window==="undefined")return()=>{};
   const onCustom=(event:Event)=>{const location=normalizePrayerLocation((event as CustomEvent).detail);if(location)handler(location)};
-  const onStorage=(event:StorageEvent)=>{if(event.key!==PRAYER_LOCATION_STORAGE_KEY||!event.newValue)return;try{const location=normalizePrayerLocation(JSON.parse(event.newValue));if(location)handler(location)}catch{}};
+  const onStorage=(event:StorageEvent)=>{
+    if(event.key!==PRAYER_LOCATION_STORAGE_KEY||!event.newValue)return;
+    try{
+      const location=normalizePrayerLocation(JSON.parse(event.newValue));
+      if(!location)return;
+      if(location.mode==="coords"){
+        localStorage.removeItem(PRAYER_LOCATION_STORAGE_KEY);
+        return;
+      }
+      sessionPrayerLocation=location;
+      handler(location);
+    }catch{}
+  };
   window.addEventListener(PRAYER_LOCATION_EVENT,onCustom as EventListener);
   window.addEventListener("storage",onStorage);
   return()=>{window.removeEventListener(PRAYER_LOCATION_EVENT,onCustom as EventListener);window.removeEventListener("storage",onStorage)};
