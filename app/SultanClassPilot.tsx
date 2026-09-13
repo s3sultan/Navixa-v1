@@ -1,9 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  academicComponentTypeLabel,
+  academicDeliveryModeLabel,
+  type AcademicComponentType,
+  type AcademicDeliveryMode,
+} from "./education/academic-section-linkage";
 import "./sultan-class-pilot.css";
 
-type ClassItem={code:string;name:string;days:number[];start:string;end:string};
+type ClassItem={
+  code:string;
+  name:string;
+  componentId:string;
+  meetingId:string;
+  componentType:AcademicComponentType;
+  deliveryMode:AcademicDeliveryMode;
+  locationLabel?:string;
+  days:number[];
+  start:string;
+  end:string;
+};
 type PilotResponse={enabled?:boolean;classes?:ClassItem[];reminders?:number[]};
 const DEFAULT_REMINDERS=[60,30,10];
 const dayNames=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
@@ -23,13 +40,14 @@ export default function SultanClassPilot(){
   const next=useMemo(()=>classes.map(item=>({item,date:nextOccurrence(item,now)})).filter(x=>x.date).sort((a,b)=>+a.date!-+b.date!)[0],[classes,now]);
   useEffect(()=>{
     if(!authorized||!next?.date)return;const mins=Math.ceil((+next.date-+now)/60000);if(!reminders.includes(mins))return;
-    const key=`navixa-class-alert-${next.item.code}-${next.date.toISOString().slice(0,10)}-${mins}`;if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,"1");
-    const text=`باقي ${mins} دقيقة على ${next.item.name}`;setNotice(text);
+    const key=`navixa-class-alert-${next.item.meetingId}-${next.date.toISOString().slice(0,10)}-${mins}`;if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,"1");
+    const component=academicComponentTypeLabel(next.item.componentType);const text=`باقي ${mins} دقيقة على ${next.item.name} · ${component}`;setNotice(text);
     if("Notification" in window&&Notification.permission==="granted")new Notification("NAVIXA · كلاسك قريب",{body:text,tag:key});
   },[authorized,next,now,reminders]);
   if(!checked||!authorized||!next?.date)return null;
   const mins=Math.max(0,Math.ceil((+next.date-+now)/60000));
+  const component=academicComponentTypeLabel(next.item.componentType);const delivery=academicDeliveryModeLabel(next.item.deliveryMode);const location=next.item.locationLabel?` · ${next.item.locationLabel}`:"";
   const enableNotifications=async()=>{if(!("Notification" in window)){setPermission("unsupported");return}const result=await Notification.requestPermission();setPermission(result);if(result==="granted")setNotice("تم تفعيل تنبيهات الكلاسات على هذا الجهاز")};
   const addCalendar=()=>{const a=document.createElement("a");a.href="/api/pilots/class-schedule/calendar";a.download="NAVIXA-class-schedule-2026.ics";document.body.appendChild(a);a.click();a.remove()};
-  return <section className="nx-class-pilot" aria-label="كلاسي القادم"><div><small>تجربة خاصة · كلاسي القادم</small><strong>{next.item.name}</strong><span>{dayNames[next.date.getDay()]} · {next.item.start} - {next.item.end} · عن بُعد</span><b>{mins<60?`باقي ${mins} دقيقة`:`الساعة ${next.item.start}`}</b><span>تقويم iPhone يُنشأ من السيرفر بتوقيت الرياض ويتوقف قبل فترة الاختبارات النهائية.</span>{notice&&<em role="status">🔔 {notice}</em>}</div><div className="nx-class-actions"><button onClick={addCalendar}>إضافة الجدول لتقويم iPhone</button>{permission!=="granted"&&permission!=="unsupported"&&<button className="nx-class-secondary" onClick={()=>void enableNotifications()}>فعّل تنبيهات NAVIXA</button>}</div></section>;
+  return <section className="nx-class-pilot" aria-label="كلاسي القادم"><div><small>تجربة خاصة · كلاسي القادم</small><strong>{next.item.name}</strong><span>{component} · {dayNames[next.date.getDay()]} · {next.item.start} - {next.item.end} · {delivery}{location}</span><b>{mins<60?`باقي ${mins} دقيقة`:`الساعة ${next.item.start}`}</b><span>تقويم iPhone يُنشأ من السيرفر بتوقيت الرياض ويتوقف قبل فترة الاختبارات النهائية.</span>{notice&&<em role="status">🔔 {notice}</em>}</div><div className="nx-class-actions"><button onClick={addCalendar}>إضافة الجدول لتقويم iPhone</button>{permission!=="granted"&&permission!=="unsupported"&&<button className="nx-class-secondary" onClick={()=>void enableNotifications()}>فعّل تنبيهات NAVIXA</button>}</div></section>;
 }
