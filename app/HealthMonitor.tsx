@@ -2,7 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import type {PoseLandmarker} from "@mediapipe/tasks-vision";
 import {isScreenEnabled,sendTelegramAlert} from "./alertPrefs";
-import {movementTrackingKey} from "./weeklyLifeReport";
+import {localDateKey,movementTrackingKey} from "./weeklyLifeReport";
 import EyeRestClock from "./EyeRestClock";
 import BreathingExercise from "./BreathingExercise";
 import "./health.css";
@@ -17,7 +17,7 @@ export default function HealthMonitor(){
   const [monitoring,setMonitoring]=useState(false),[posture,setPosture]=useState<Posture>("idle"),[seconds,setSeconds]=useState(0),[breakMinutes,setBreakMinutes]=useState(30),[waterMinutes,setWaterMinutes]=useState(60),[cups,setCups]=useState(0),[lastWaterAt,setLastWaterAt]=useState<string|null>(null),[waterSound,setWaterSound]=useState(true),[sessionAlert,setSessionAlert]=useState<string|null>(null),[privacyNotice,setPrivacyNotice]=useState(false),[message,setMessage]=useState("جاهز لبدء جلسة صحية"),[exercise,setExercise]=useState(false),[exerciseIndex,setExerciseIndex]=useState(0),[exerciseSeconds,setExerciseSeconds]=useState(30),[movementSessions,setMovementSessions]=useState(0);
   useEffect(()=>{if(!exercise)return;const timer=window.setInterval(()=>setExerciseSeconds(s=>{if(s<=1)return 0;return s-1}),1000);return()=>window.clearInterval(timer)},[exercise]);
   const startExercise=()=>{setExerciseIndex(0);setExerciseSeconds(exercises[0].duration);setExercise(true)};
-  const today=()=>new Date().toISOString().slice(0,10);
+  const today=()=>localDateKey();
   useEffect(()=>{const day=today(),waterKey=`navixa-water-${day}`;setSeconds(Number(localStorage.getItem(`navixa-sitting-${day}`)||0));setCups(Number(localStorage.getItem(waterKey)||0));setLastWaterAt(localStorage.getItem(`${waterKey}-last`));setWaterSound(localStorage.getItem("navixa-water-sound")!=="off");setMovementSessions(Number(localStorage.getItem(movementTrackingKey(day))||0))},[]);
   const notify=(title:string,body:string)=>{if("Notification" in window&&Notification.permission==="granted")new Notification(title,{body})};
   useEffect(()=>{if(!monitoring)return;const timer=window.setInterval(()=>setSeconds(current=>{const next=current+1;localStorage.setItem(`navixa-sitting-${today()}`,String(next));const moveAt=breakMinutes*60;if(next>=moveAt&&next%moveAt===0&&lastBreak.current!==next){lastBreak.current=next;if(isScreenEnabled("break")){setMessage("حان وقت الحركة — خذ استراحة واقعية");startExercise();notify("وقت الحركة","انهض بهدوء ومدد كتفيك لدقيقة")}sendTelegramAlert("break","⏰ تذكير NAVIXA: حان وقت الحركة — دقيقة واحدة تكفي")}const drinkAt=waterMinutes*60;if(next>=drinkAt&&next%drinkAt===0&&lastWater.current!==next){lastWater.current=next;if(isScreenEnabled("water"))notify("تذكير الماء","خذ كوب ماء وحافظ على نشاطك");sendTelegramAlert("water","💧 تذكير NAVIXA: وقت شرب كوب ماء")}if(next>0&&next%300===0){const minutes=Math.floor(next/60);setSessionAlert(`أكملت ${minutes} دقائق — خذ نفسًا وراجع وضعيتك`);notify("جلسة صحية",`أكملت ${minutes} دقائق من الجلسة`)}return next}),1000);return()=>clearInterval(timer)},[monitoring,breakMinutes,waterMinutes]);
