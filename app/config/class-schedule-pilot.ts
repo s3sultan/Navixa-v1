@@ -1,23 +1,74 @@
-export type ClassScheduleItem = {
-  code: string;
-  name: string;
-  days: readonly number[];
-  start: string;
-  end: string;
-};
+import {
+  flattenAcademicRegistrationOptionMeetings,
+  isTrustedAcademicLinkage,
+  validateAcademicOffering,
+  type AcademicCourseOffering,
+  type AcademicScheduledMeeting,
+} from "../education/academic-section-linkage.ts";
+
+export type ClassScheduleItem = AcademicScheduledMeeting;
 
 export const CLASS_SCHEDULE_TIMEZONE = "Asia/Riyadh";
 export const CLASS_SCHEDULE_REMINDERS = [60, 30, 10] as const;
 
-// Weekly lectures stop recurring before the university final-exam period begins.
+// Weekly classes stop recurring before the university final-exam period begins.
 // 2026-12-12 23:59:59 Asia/Riyadh = 2026-12-12 20:59:59 UTC.
 export const CLASS_SCHEDULE_RECURRENCE_UNTIL_UTC = "20261212T205959Z";
 export const CLASS_SCHEDULE_LAST_LECTURE_DATE = "2026-12-12";
 
-export const CLASS_SCHEDULE_CLASSES: readonly ClassScheduleItem[] = [
-  { code: "101", name: "الفيزياء العامة 1", days: [0, 2], start: "15:00", end: "15:50" },
-  { code: "232", name: "البرمجة كائنية التوجه", days: [1, 3], start: "16:00", end: "16:50" },
-  { code: "231", name: "مقدمة في تقنية ونظم المعلومات", days: [0, 3], start: "17:00", end: "17:50" },
-  { code: "150", name: "الرياضيات المتقطعة", days: [1, 3], start: "18:00", end: "18:50" },
-  { code: "233", name: "تنظيم الحاسب", days: [1, 3], start: "19:00", end: "19:50" },
+function lectureOffering(
+  code: string,
+  name: string,
+  days: readonly number[],
+  start: string,
+  end: string,
+): AcademicCourseOffering {
+  const componentId = `${code}-lecture`;
+  return {
+    offeringId: `pilot-${code}`,
+    courseCode: code,
+    courseName: name,
+    components: [{
+      componentId,
+      componentType: "lecture",
+      meetings: [{
+        meetingId: `${componentId}-weekly`,
+        days,
+        start,
+        end,
+        deliveryMode: "online",
+      }],
+    }],
+    registrationOptions: [{
+      optionId: `${code}-primary`,
+      componentIds: [componentId],
+      evidence: "reviewed",
+    }],
+  };
+}
+
+export const CLASS_SCHEDULE_OFFERINGS: readonly AcademicCourseOffering[] = [
+  lectureOffering("101", "الفيزياء العامة 1", [0, 2], "15:00", "15:50"),
+  lectureOffering("232", "البرمجة كائنية التوجه", [1, 3], "16:00", "16:50"),
+  lectureOffering("231", "مقدمة في تقنية ونظم المعلومات", [0, 3], "17:00", "17:50"),
+  lectureOffering("150", "الرياضيات المتقطعة", [1, 3], "18:00", "18:50"),
+  lectureOffering("233", "تنظيم الحاسب", [1, 3], "19:00", "19:50"),
 ];
+
+const scheduleIssues = CLASS_SCHEDULE_OFFERINGS.flatMap(validateAcademicOffering);
+if (scheduleIssues.length) {
+  throw new Error(`Invalid academic schedule model: ${scheduleIssues.map(issue => `${issue.code}:${issue.detail}`).join(", ")}`);
+}
+
+function selectedPilotMeetings(offering: AcademicCourseOffering) {
+  if (offering.registrationOptions.length !== 1) {
+    throw new Error(`Pilot offering ${offering.offeringId} must have exactly one selected registration option`);
+  }
+  const option = offering.registrationOptions[0];
+  if (!isTrustedAcademicLinkage(option)) {
+    throw new Error(`Pilot offering ${offering.offeringId} uses untrusted section linkage`);
+  }
+  return flattenAcademicRegistrationOptionMeetings(offering, option);
+}
+
+export const CLASS_SCHEDULE_CLASSES: readonly ClassScheduleItem[] = CLASS_SCHEDULE_OFFERINGS.flatMap(selectedPilotMeetings);
