@@ -8,8 +8,6 @@ type PushDatabase=D1Database&{prepare:(sql:string)=>D1Statement};
 type PushSubscriptionRow={endpoint:string;p256dh:string;auth:string};
 type EventPayload={kind?:unknown;name?:unknown;mode?:unknown;detail?:unknown};
 
-type SupportedEventKind="name_heard"|"screen_watch";
-
 const clean=(value:unknown,max:number)=>typeof value==="string"?value.replace(/\s+/g," ").trim().slice(0,max):"";
 
 async function db():Promise<PushDatabase|null>{
@@ -44,7 +42,8 @@ export async function POST(request:Request){
   const notification=buildNotification(body);
   if(!notification)return NextResponse.json({error:"حدث التنبيه غير صالح"},{status:400,headers:{"Cache-Control":"no-store"}});
 
-  const rows=await database.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE user_id=? AND enabled=1 ORDER BY updated_at DESC LIMIT 8").bind(session.userId).all<PushSubscriptionRow>();
+  const now=new Date().toISOString();
+  const rows=await database.prepare("SELECT p.endpoint,p.p256dh,p.auth FROM navixa_push_subscriptions p JOIN navixa_user_sessions s ON s.id=p.device_session_id WHERE p.user_id=? AND p.enabled=1 AND p.device_session_id<>'' AND s.user_id=p.user_id AND s.device_class IN ('computer','mobile') AND s.revoked_at='' AND s.expires_at>? ORDER BY p.updated_at DESC LIMIT 8").bind(session.userId,now).all<PushSubscriptionRow>();
   let delivered=0;
   for(const subscription of rows.results){
     const result=await sendFeaturePush(subscription,{...notification,urgency:"high",ttl:300});

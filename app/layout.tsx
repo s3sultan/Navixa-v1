@@ -9,6 +9,7 @@ import PricingHeaderShortcut from "./PricingHeaderShortcut";
 import ClassScheduleShortcut from "./ClassScheduleShortcut";
 import PrayerAlertSync from "./PrayerAlertSync";
 import DeviceControlAgent from "./DeviceControlAgent";
+import PushSubscriptionBootstrap from "./PushSubscriptionBootstrap";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
 import "./direct-entry.css";
@@ -52,5 +53,5 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter /><VisitorReporter /><PrayerAlertSync /><ClassScheduleShortcut /><DeviceControlAgent />{children}<VisitorCounter /><PricingHeaderShortcut /></body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter /><VisitorReporter /><PrayerAlertSync /><PushSubscriptionBootstrap /><ClassScheduleShortcut /><DeviceControlAgent />{children}<VisitorCounter /><PricingHeaderShortcut /></body></html>;
 }
