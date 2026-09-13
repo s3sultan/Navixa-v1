@@ -75,6 +75,22 @@ function minutes(value: string) {
   return hours * 60 + mins;
 }
 
+function flattenComponents(
+  offering: AcademicCourseOffering,
+  components: readonly AcademicSectionComponent[],
+): AcademicScheduledMeeting[] {
+  return components.flatMap(component => component.meetings.map(meeting => ({
+    ...meeting,
+    offeringId: offering.offeringId,
+    code: offering.courseCode,
+    name: offering.courseName,
+    componentId: component.componentId,
+    componentType: component.componentType,
+    sectionCode: component.sectionCode,
+    crn: component.crn,
+  })));
+}
+
 export function academicDeliveryModeLabel(mode: AcademicDeliveryMode) {
   if (mode === "in_person") return "حضوري";
   if (mode === "hybrid") return "مدمج";
@@ -165,15 +181,22 @@ export function matchAcademicRegistrationOption(
   ) || null;
 }
 
+export function matchTrustedAcademicRegistrationOption(
+  offering: AcademicCourseOffering,
+  selectedComponentIds: readonly string[],
+): AcademicRegistrationOption | null {
+  const option = matchAcademicRegistrationOption(offering, selectedComponentIds);
+  return option && isTrustedAcademicLinkage(option) ? option : null;
+}
+
+export function flattenAcademicRegistrationOptionMeetings(
+  offering: AcademicCourseOffering,
+  option: AcademicRegistrationOption,
+): AcademicScheduledMeeting[] {
+  const selected = new Set(option.componentIds);
+  return flattenComponents(offering, offering.components.filter(component => selected.has(component.componentId)));
+}
+
 export function flattenAcademicOfferingMeetings(offering: AcademicCourseOffering): AcademicScheduledMeeting[] {
-  return offering.components.flatMap(component => component.meetings.map(meeting => ({
-    ...meeting,
-    offeringId: offering.offeringId,
-    code: offering.courseCode,
-    name: offering.courseName,
-    componentId: component.componentId,
-    componentType: component.componentType,
-    sectionCode: component.sectionCode,
-    crn: component.crn,
-  })));
+  return flattenComponents(offering, offering.components);
 }
