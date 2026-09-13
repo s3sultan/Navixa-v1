@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server.js";
-import { resolveUserDeviceClass, resolveUserSession, trustedUserMutation, type D1Database, type UserDeviceClass } from "../../../worker/userAuth.ts";
+import { hashOpaqueValue, readUserSessionToken, resolveUserSession, trustedUserMutation, type D1Database, type UserDeviceClass } from "../../../worker/userAuth.ts";
 
 type Database = D1Database;
 type DeviceCommand = "prepare_name_listener" | "prepare_screen_watch" | "open_alerts" | "open_account_sync";
@@ -25,6 +25,13 @@ async function database(): Promise<Database | null> {
 
 const reply = (body: Record<string, unknown>, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", "Vary": "Cookie" } });
 
+async function persistedDeviceClass(db: Database, request: Request, userId: string): Promise<UserDeviceClass | null> {
+  const token = readUserSessionToken(request);
+  if (!token || token.length < 30) return null;
+  const rows = await db.prepare("SELECT device_class FROM navixa_user_sessions WHERE token_hash=? AND user_id=? AND revoked_at='' AND expires_at>? AND device_class IN ('computer','mobile') LIMIT 1").bind(await hashOpaqueValue(token), userId, new Date().toISOString()).all<{ device_class: UserDeviceClass }>();
+  return rows.results[0]?.device_class || null;
+}
+
 async function computerSessionExists(db: Database, userId: string, now: string) {
   const rows = await db.prepare("SELECT id FROM navixa_user_sessions WHERE user_id=? AND device_class='computer' AND revoked_at='' AND expires_at>? LIMIT 1").bind(userId, now).all<{ id: string }>();
   return Boolean(rows.results[0]);
@@ -35,7 +42,8 @@ export async function GET(request: Request) {
   if (!db) return reply({ error: "التخزين غير مهيأ" }, 503);
   const session = await resolveUserSession(request, db);
   if (!session) return reply({ error: "سجّل الدخول أولًا" }, 401);
-  const deviceClass = resolveUserDeviceClass(request);
+  const deviceClass = await persistedDeviceClass(db, request, session.userId);
+  if (!deviceClass) return reply({ error: "جلسة الجهاز غير صالحة" }, 401);
   const now = new Date().toISOString();
   const computerSessionAvailable = await computerSessionExists(db, session.userId, now);
   const pending = deviceClass === "computer"
@@ -53,7 +61,8 @@ export async function POST(request: Request) {
   if (!db) return reply({ error: "التخزين غير مهيأ" }, 503);
   const session = await resolveUserSession(request, db);
   if (!session) return reply({ error: "سجّل الدخول أولًا" }, 401);
-  const deviceClass = resolveUserDeviceClass(request);
+  const deviceClass = await persistedDeviceClass(db, request, session.userId);
+  if (!deviceClass) return reply({ error: "جلسة الجهاز غير صالحة" }, 401);
   const body = await request.json().catch(() => ({})) as { action?: unknown; command?: unknown; requestId?: unknown; outcome?: unknown };
   const action = typeof body.action === "string" ? body.action : "";
   const now = new Date();
