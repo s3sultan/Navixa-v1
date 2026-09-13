@@ -8,6 +8,10 @@ import {
   CLASS_SCHEDULE_TIMEZONE,
   type ClassScheduleItem,
 } from "../../../../config/class-schedule-pilot.ts";
+import {
+  academicComponentTypeLabel,
+  academicDeliveryModeLabel,
+} from "../../../../education/academic-section-linkage.ts";
 
 type WorkerBinding = { env?: { DB?: D1Database } };
 type RiyadhNow = { year: number; month: number; day: number; hour: number; minute: number };
@@ -18,6 +22,7 @@ const dateKey = ({ year, month, day }: CalendarDate) => `${year}-${pad(month)}-$
 const localStamp = (date: CalendarDate, time: string) => `${date.year}${pad(date.month)}${pad(date.day)}T${time.replace(":", "")}00`;
 const utcStamp = (date: Date) => `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
 const escapeIcs = (value: string) => value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
+const uidToken = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "-");
 
 function riyadhNow(now = new Date()): RiyadhNow {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -58,22 +63,26 @@ function nextDateForDay(day: number, current: RiyadhNow, startTime: string): Cal
 }
 
 function eventLines(item: ClassScheduleItem, day: number, startDate: CalendarDate, dtstamp: string) {
+  const component = academicComponentTypeLabel(item.componentType);
+  const delivery = academicDeliveryModeLabel(item.deliveryMode);
+  const description = `${component} · ${delivery}${item.locationLabel ? ` · ${item.locationLabel}` : ""} - NAVIXA`;
   const alarms = CLASS_SCHEDULE_REMINDERS.flatMap(minutes => [
     "BEGIN:VALARM",
     `TRIGGER:-PT${minutes}M`,
     "ACTION:DISPLAY",
-    `DESCRIPTION:${escapeIcs(`باقي ${minutes} دقيقة على ${item.name}`)}`,
+    `DESCRIPTION:${escapeIcs(`باقي ${minutes} دقيقة على ${item.name} · ${component}`)}`,
     "END:VALARM",
   ]);
   return [
     "BEGIN:VEVENT",
-    `UID:navixa-class-${item.code}-${day}@navixasa.com`,
+    `UID:navixa-class-${uidToken(item.meetingId)}-${day}@navixasa.com`,
     `DTSTAMP:${dtstamp}`,
     `DTSTART;TZID=${CLASS_SCHEDULE_TIMEZONE}:${localStamp(startDate, item.start)}`,
     `DTEND;TZID=${CLASS_SCHEDULE_TIMEZONE}:${localStamp(startDate, item.end)}`,
     `RRULE:FREQ=WEEKLY;UNTIL=${CLASS_SCHEDULE_RECURRENCE_UNTIL_UTC}`,
-    `SUMMARY:${escapeIcs(`${item.name} (${item.code})`)}`,
-    `DESCRIPTION:${escapeIcs("محاضرة عن بُعد - NAVIXA")}`,
+    `SUMMARY:${escapeIcs(`${item.name} · ${component} (${item.code})`)}`,
+    `DESCRIPTION:${escapeIcs(description)}`,
+    ...(item.locationLabel ? [`LOCATION:${escapeIcs(item.locationLabel)}`] : []),
     "STATUS:CONFIRMED",
     "TRANSP:OPAQUE",
     ...alarms,
@@ -111,7 +120,7 @@ export async function GET(request: Request) {
       return startDate ? eventLines(item, day, startDate, dtstamp) : [];
     }));
 
-    if (!events.length) return new Response("No future lectures", { status: 410, headers: baseHeaders });
+    if (!events.length) return new Response("No future classes", { status: 410, headers: baseHeaders });
 
     const calendar = [
       "BEGIN:VCALENDAR",
