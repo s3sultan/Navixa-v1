@@ -6,14 +6,14 @@ import assert from "node:assert/strict";
 const root=process.cwd();
 const read=(file:string)=>fs.readFileSync(path.join(root,file),"utf8");
 
-test("public pricing defaults are Himma 29 SAR and Azm 11 SAR",()=>{
+test("public pricing defaults are Himma 29 SAR and Azm 7 SAR",()=>{
   const pricing=read("app/billing/planPricing.ts");
   const publicCatalog=read("app/api/billing/catalog/route.ts");
   const pricingPage=read("app/pricing/page.tsx");
   assert.match(pricing,/monthly:\s*2900/);
-  assert.match(pricing,/sprint:\s*1100/);
+  assert.match(pricing,/sprint:\s*700/);
   assert.match(pricingPage,/amount:2900/);
-  assert.match(pricingPage,/amount:1100/);
+  assert.match(pricingPage,/amount:700/);
   assert.match(publicCatalog,/source:"admin-verified"/);
 });
 
