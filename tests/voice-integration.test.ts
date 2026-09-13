@@ -32,8 +32,8 @@ test("listener UI switches to the active state as soon as a start request is acc
 test("transient browser speech endings restart inside the engine without toggling the UI off", () => {
   assert.match(engine, /let keepListening = false;/);
   assert.match(engine, /const scheduleBrowserRestart = \(delay = 250\) => \{/);
-  assert.match(engine, /recognition\.onend = \(\) => \{[\s\S]*if \(destroyed \|\| !keepListening\) return;[\s\S]*scheduleBrowserRestart\(\);/);
-  assert.doesNotMatch(engine, /recognition\.onend = \(\) => \{[\s\S]{0,220}handlers\.onEnd\?\.\(\)/);
+  assert.match(engine, /recognition\.onend = \(\) => \{[\s\S]*if \(destroyed \|\| !keepListening\) return;[\s\S]*if \(!startBrowserSession\(\)\) scheduleBrowserRestart\(\);/);
+  assert.doesNotMatch(engine, /recognition\.onend = \(\) => \{[\s\S]{0,240}handlers\.onEnd\?\.\(\)/);
 });
 test("listener micro interactions respect reduced motion", () => {
   assert.match(css, /NAVIXA Micro Interactions: listener/);
