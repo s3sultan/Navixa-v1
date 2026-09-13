@@ -228,7 +228,7 @@ test("switches the same browser recognizer from Arabic to Indian English when sp
     });
     assert.equal(recognition.stopCalls, 1);
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "en-IN");
     assert.equal(FakeRecognition.latest, recognition);
     engine.destroy();
@@ -255,7 +255,7 @@ test("returns the same recognizer to Arabic when Arabic speech follows English",
     });
     assert.equal(recognition.stopCalls, 1);
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "ar-SA");
     assert.equal(FakeRecognition.latest, recognition);
     engine.destroy();
@@ -277,7 +277,7 @@ test("cycles toward Indian English after a no-speech recognition cycle", () => {
     assert.equal(engine.start(), true);
     recognition.onerror({ error: "no-speech" });
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "en-IN");
     engine.destroy();
   } finally {
@@ -299,7 +299,7 @@ test("rotates language after an explicit browser no-match", () => {
     recognition.onnomatch();
     assert.equal(recognition.stopCalls, 1);
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "en-IN");
     engine.destroy();
   } finally {
@@ -324,7 +324,7 @@ test("rotates language early after a very low-confidence final result", () => {
     });
     assert.equal(recognition.stopCalls, 1);
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "en-IN");
     engine.destroy();
   } finally {
@@ -348,11 +348,11 @@ test("rotates within English accents after English has been identified", () => {
       results: [{ 0: { transcript: "please call sultan now", confidence: 0.9 }, isFinal: true }],
     });
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "en-IN");
     recognition.onnomatch();
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 3);
     assert.equal(recognition.lang, "en-US");
     engine.destroy();
   } finally {
@@ -377,7 +377,7 @@ test("rotates within Arabic dialect profiles after Arabic has been identified", 
     });
     recognition.onnomatch();
     recognition.onend();
-    assert.equal(engine.start(), true);
+    assert.equal(recognition.startCalls, 2);
     assert.equal(recognition.lang, "ar-EG");
     engine.destroy();
   } finally {

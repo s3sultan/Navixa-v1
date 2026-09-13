@@ -338,9 +338,12 @@ export function createNavixaBrowserVoiceEngine({
     : null;
 
   let destroyed = false;
-  let active = false;
+  let browserActive = false;
+  let browserStarting = false;
+  let keepListening = false;
   let startNotified = false;
   let languageProbeTimer: ReturnType<typeof setTimeout> | null = null;
+  let browserRestartTimer: ReturnType<typeof setTimeout> | null = null;
 
   const notifyStarted = () => {
     if (destroyed || startNotified) return;
@@ -357,27 +360,60 @@ export function createNavixaBrowserVoiceEngine({
     languageProbeTimer = null;
   };
 
+  const clearBrowserRestart = () => {
+    if (browserRestartTimer) clearTimeout(browserRestartTimer);
+    browserRestartTimer = null;
+  };
+
+  const startBrowserSession = () => {
+    if (destroyed || !keepListening || browserActive || browserStarting) return false;
+    try {
+      recognition.lang = currentLanguage();
+      browserStarting = true;
+      recognition.start();
+      return true;
+    } catch {
+      browserStarting = false;
+      return false;
+    }
+  };
+
+  const scheduleBrowserRestart = (delay = 250) => {
+    if (destroyed || !keepListening) return;
+    clearBrowserRestart();
+    browserRestartTimer = setTimeout(() => {
+      browserRestartTimer = null;
+      if (destroyed || !keepListening || browserActive || browserStarting) return;
+      if (startBrowserSession()) return;
+      if (localFallback?.supported) return;
+      keepListening = false;
+      resetStartNotification();
+      handlers.onError?.("voice-recognition-error");
+    }, delay);
+  };
+
   const requestLanguageRestart = (next?: NavixaVoiceLanguage) => {
-    if (!adaptiveLanguage || destroyed || !active) return;
+    if (!adaptiveLanguage || destroyed || !browserActive) return;
     if (next) setLanguage(next);
     else advanceLanguage();
     clearLanguageProbe();
     try {
       recognition.stop();
     } catch {
-      // The browser may already be between recognition sessions.
+      scheduleBrowserRestart();
     }
   };
 
   const armLanguageProbe = (delay = INITIAL_LANGUAGE_PROBE_MS) => {
-    if (!adaptiveLanguage || destroyed || !active) return;
+    if (!adaptiveLanguage || destroyed || !browserActive) return;
     clearLanguageProbe();
     languageProbeTimer = setTimeout(() => requestLanguageRestart(), delay);
   };
 
   recognition.onstart = () => {
     if (destroyed) return;
-    active = true;
+    browserStarting = false;
+    browserActive = true;
     armLanguageProbe();
     notifyStarted();
   };
@@ -450,9 +486,19 @@ export function createNavixaBrowserVoiceEngine({
 
   recognition.onerror = (event) => {
     if (destroyed) return;
+    browserStarting = false;
     const error = typeof event?.error === "string" ? event.error : "voice-recognition-error";
     if (adaptiveLanguage && error === "no-speech") advanceLanguage();
-    if (localFallback?.supported && error !== "not-allowed" && error !== "audio-capture") return;
+    if (error === "not-allowed" || error === "audio-capture") {
+      keepListening = false;
+      clearBrowserRestart();
+      resetStartNotification();
+      handlers.onError?.(error);
+      return;
+    }
+    if (localFallback?.supported || error === "no-speech") return;
+    keepListening = false;
+    clearBrowserRestart();
     resetStartNotification();
     handlers.onError?.(error);
   };
@@ -463,49 +509,52 @@ export function createNavixaBrowserVoiceEngine({
   };
 
   recognition.onend = () => {
-    active = false;
-    resetStartNotification();
+    browserActive = false;
+    browserStarting = false;
     clearLanguageProbe();
-    if (!destroyed) handlers.onEnd?.();
+    if (destroyed || !keepListening) return;
+    if (!startBrowserSession()) scheduleBrowserRestart();
   };
 
   return {
     provider: "browser",
     supported: true,
     start: () => {
-      if (destroyed || active) return false;
-      let browserStarted = false;
-      try {
-        recognition.lang = currentLanguage();
-        recognition.start();
-        browserStarted = true;
-        notifyStarted();
-      } catch {
-        // A local fallback can still keep name listening available if the browser recognizer refuses to start.
-      }
+      if (destroyed || keepListening || browserActive || browserStarting) return false;
+      keepListening = true;
+      const browserStarted = startBrowserSession();
+      if (browserStarted) notifyStarted();
 
       if (localFallback?.supported) {
         if (!browserStarted) notifyStarted();
         void localFallback.start().then((localStarted) => {
           if (destroyed || browserStarted) return;
           if (localStarted) {
-            active = true;
-          } else {
-            resetStartNotification();
-            handlers.onError?.("voice-recognition-error");
+            scheduleBrowserRestart(1_000);
+            return;
           }
+          keepListening = false;
+          resetStartNotification();
+          handlers.onError?.("voice-recognition-error");
         }).catch(() => {
           if (destroyed || browserStarted) return;
+          keepListening = false;
           resetStartNotification();
           handlers.onError?.("voice-recognition-error");
         });
         return true;
       }
 
+      if (!browserStarted) keepListening = false;
       return browserStarted;
     },
     stop: () => {
       if (destroyed) return;
+      const wasRunning = keepListening || browserActive || browserStarting || startNotified;
+      keepListening = false;
+      browserActive = false;
+      browserStarting = false;
+      clearBrowserRestart();
       clearLanguageProbe();
       resetStartNotification();
       localFallback?.stop();
@@ -514,12 +563,16 @@ export function createNavixaBrowserVoiceEngine({
       } catch {
         // Browser recognition can already be stopped between events.
       }
+      if (wasRunning) handlers.onEnd?.();
     },
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      active = false;
+      keepListening = false;
+      browserActive = false;
+      browserStarting = false;
       resetStartNotification();
+      clearBrowserRestart();
       clearLanguageProbe();
       localFallback?.destroy();
       recognition.onstart = null;
