@@ -13,7 +13,7 @@ test("صفحة هِمّة تعرض السعر الرسمي بوضوح من ال�
   assert.match(page, /PlanPriceInline plan="monthly"/);
   assert.match(page, /قائمة الأسعار/);
   assert.match(pricing, /monthly:\s*2900/);
-  assert.match(pricing, /sprint:\s*1100/);
+  assert.match(pricing, /sprint:\s*700/);
   assert.match(page, /<InterestForm \/>/);
   assert.doesNotMatch(page, /CheckoutPanel/);
   assert.doesNotMatch(page, /السعر الحالي 0 ر\.س|25 ر\.س|12 ر\.س|57 ر\.س|19 سبتمبر 2026|3 \+ 1|سعر مؤسس|عرض مؤسسي|salla\.sa/);
