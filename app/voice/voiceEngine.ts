@@ -190,6 +190,60 @@ const detectTranscriptScript = (text: string): NavixaVoiceLanguageFamily | null 
   return null;
 };
 
+function createLocalOnlyVoiceEngine({
+  mediaStream,
+  learningEnabled,
+  handlers,
+}: Pick<BrowserVoiceEngineOptions, "mediaStream" | "learningEnabled" | "handlers">): NavixaVoiceEngine {
+  let destroyed = false;
+  let active = false;
+  let starting = false;
+
+  const localFallback = createNavixaLocalNameFallback({
+    onTranscript: (text) => {
+      if (learningEnabled) learnNavixaVoiceTranscript(text, "local");
+      handlers.onTranscript({ text, interim: true });
+    },
+    getLanguageHint: () => "auto",
+    mediaStream,
+  });
+
+  return {
+    provider: "browser",
+    supported: localFallback.supported,
+    start: () => {
+      if (!localFallback.supported || destroyed || active || starting) return false;
+      starting = true;
+      void localFallback.start().then((started) => {
+        starting = false;
+        if (destroyed) return;
+        if (!started) {
+          handlers.onError?.("voice-recognition-error");
+          return;
+        }
+        active = true;
+        handlers.onStart?.();
+      });
+      return true;
+    },
+    stop: () => {
+      if (destroyed) return;
+      const wasRunning = active || starting;
+      active = false;
+      starting = false;
+      localFallback.stop();
+      if (wasRunning) handlers.onEnd?.();
+    },
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      active = false;
+      starting = false;
+      localFallback.destroy();
+    },
+  };
+}
+
 export function createNavixaBrowserVoiceEngine({
   language = "ar-SA",
   continuous = true,
@@ -205,6 +259,9 @@ export function createNavixaBrowserVoiceEngine({
 }: BrowserVoiceEngineOptions): NavixaVoiceEngine {
   const Recognition = getRecognitionConstructor();
   if (!Recognition) {
+    if (localAccuracyFallback) {
+      return createLocalOnlyVoiceEngine({ mediaStream, learningEnabled, handlers });
+    }
     return {
       provider: "browser",
       supported: false,
@@ -245,8 +302,8 @@ export function createNavixaBrowserVoiceEngine({
       return;
     }
     const candidates = familyLanguages(lastDetectedFamily);
-    const active = currentLanguage();
-    const familyIndex = candidates.indexOf(active);
+    const activeLanguage = currentLanguage();
+    const familyIndex = candidates.indexOf(activeLanguage);
     setLanguage(candidates[(familyIndex + 1 + candidates.length) % candidates.length]);
   };
 
@@ -363,6 +420,7 @@ export function createNavixaBrowserVoiceEngine({
     if (destroyed) return;
     const error = typeof event?.error === "string" ? event.error : "voice-recognition-error";
     if (adaptiveLanguage && error === "no-speech") advanceLanguage();
+    if (localFallback?.supported && error !== "not-allowed" && error !== "audio-capture") return;
     handlers.onError?.(error);
   };
 
@@ -382,14 +440,29 @@ export function createNavixaBrowserVoiceEngine({
     supported: true,
     start: () => {
       if (destroyed || active) return false;
+      let browserStarted = false;
       try {
         recognition.lang = currentLanguage();
         recognition.start();
-        if (localFallback?.supported) void localFallback.start();
-        return true;
+        browserStarted = true;
       } catch {
-        return false;
+        // A local fallback can still keep name listening available if the browser recognizer refuses to start.
       }
+
+      if (localFallback?.supported) {
+        void localFallback.start().then((localStarted) => {
+          if (destroyed || browserStarted) return;
+          if (localStarted) {
+            active = true;
+            handlers.onStart?.();
+          } else {
+            handlers.onError?.("voice-recognition-error");
+          }
+        });
+        return true;
+      }
+
+      return browserStarted;
     },
     stop: () => {
       if (destroyed) return;
