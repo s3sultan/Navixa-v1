@@ -72,3 +72,17 @@ test("automatic transcription completion uses automation core and privacy-safe p
   assert.ok(payloadStart >= 0 && payloadEnd > payloadStart);
   assert.doesNotMatch(payload, /\binput\s*:|\boutput\s*:|\berror\s*:|\btranscript\s*:|\bsummary\s*:/);
 });
+
+test("local transcription splits long meeting parts into bounded windows and retries a failed window once", async () => {
+  const worker = await readFile(new URL("app/meetings/transcription.worker.ts", root), "utf8");
+
+  assert.match(worker, /const SAMPLE_RATE = 16_000/);
+  assert.match(worker, /const MAX_WINDOW_SECONDS/);
+  assert.match(worker, /tiny: 180/);
+  assert.match(worker, /base: 120/);
+  assert.match(worker, /data\.audio\.slice\(startSample, endSample\)/);
+  assert.match(worker, /await transcribeWindow\(worker, windowAudio, options, windowIndex, totalWindows\)/);
+  assert.match(worker, /تعثر مقطع محلي قصير؛ نعيد المحاولة تلقائيًا/);
+  assert.match(worker, /return await worker\(audio, options\) as TranscriptionOutput/);
+  assert.match(worker, /offsetSeconds/);
+});
