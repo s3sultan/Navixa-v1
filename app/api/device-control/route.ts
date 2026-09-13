@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server.js";
+import { sendFeaturePush } from "../../../worker/generalPush.ts";
 import { hashOpaqueValue, readUserSessionToken, resolveUserSession, trustedUserMutation, type D1Database, type UserDeviceClass } from "../../../worker/userAuth.ts";
 
 type Database = D1Database;
@@ -16,10 +17,17 @@ type ControlRow = {
   acknowledged_at: string;
 };
 type PublicControlRow = Omit<ControlRow,"status"> & { status: PublicStatus };
+type PushRow = { endpoint:string; p256dh:string; auth:string };
 
 const allowedCommands = new Set<DeviceCommand>(["prepare_name_listener","prepare_screen_watch","open_alerts","open_account_sync"]);
 const REQUEST_TTL_MS = 5 * 60 * 1000;
 const MAX_PENDING = 8;
+const controlPush:Record<DeviceCommand,{body:string;url:string}>={
+  prepare_name_listener:{body:"وصل طلب تجهيز استماع الاسم من جوالك. افتح NAVIXA على الكمبيوتر ووافق على التشغيل من هناك.",url:"/"},
+  prepare_screen_watch:{body:"وصل طلب تجهيز متابعة الشاشة من جوالك. اختيار الشاشة أو التبويب يبقى بيدك على الكمبيوتر.",url:"/"},
+  open_alerts:{body:"وصل طلب من جوالك لفتح مركز تنبيهات NAVIXA على الكمبيوتر.",url:"/"},
+  open_account_sync:{body:"وصل طلب من جوالك لفتح المزامنة المشفرة على الكمبيوتر. كلمة التشفير لا تنتقل مع الطلب.",url:"/account"},
+};
 
 async function database(): Promise<Database | null> {
   try { return (await import("cloudflare:workers") as { env?: { DB?: Database } }).env?.DB || null; }
@@ -38,6 +46,21 @@ async function persistedDeviceClass(db: Database, request: Request, userId: stri
 async function computerSessionExists(db: Database, userId: string, now: string) {
   const rows = await db.prepare("SELECT id FROM navixa_user_sessions WHERE user_id=? AND device_class='computer' AND revoked_at='' AND expires_at>? LIMIT 1").bind(userId, now).all<{ id: string }>();
   return Boolean(rows.results[0]);
+}
+
+async function notifyActiveComputer(db:Database,userId:string,command:DeviceCommand,now:string){
+  let subscriptions:PushRow[]=[];
+  try{
+    subscriptions=(await db.prepare("SELECT p.endpoint,p.p256dh,p.auth FROM navixa_push_subscriptions p JOIN navixa_user_sessions s ON s.id=p.device_session_id WHERE p.user_id=? AND p.device_class='computer' AND p.enabled=1 AND p.device_session_id<>'' AND s.user_id=p.user_id AND s.device_class='computer' AND s.revoked_at='' AND s.expires_at>? LIMIT 4").bind(userId,now).all<PushRow>()).results;
+  }catch{return 0}
+  let delivered=0;
+  for(const subscription of subscriptions){
+    const payload=controlPush[command];
+    const result=await sendFeaturePush(subscription,{kind:"general",title:"NAVIXA · طلب من جوالك",body:payload.body,url:payload.url,tag:`navixa-control-${command}`,requireInteraction:true,urgency:"high",ttl:300});
+    if(result.ok){delivered+=1;continue}
+    if(result.status===404||result.status===410){try{await db.prepare("DELETE FROM navixa_push_subscriptions WHERE endpoint=? AND user_id=?").bind(subscription.endpoint,userId).run()}catch{}}
+  }
+  return delivered;
 }
 
 function exposeRow(row: ControlRow, now: string): PublicControlRow {
@@ -84,14 +107,15 @@ export async function POST(request: Request) {
     if (!available) return reply({ error: "لا توجد جلسة كمبيوتر صالحة لهذا الحساب حاليًا" }, 409);
 
     const existing = (await db.prepare("SELECT id,command,status,source_device_class,target_device_class,created_at,expires_at,acknowledged_at FROM navixa_device_control_requests WHERE user_id=? AND source_device_class='mobile' AND target_device_class='computer' AND command=? AND status='pending' AND expires_at>? ORDER BY created_at DESC LIMIT 1").bind(session.userId, command, nowIso).all<ControlRow>()).results[0];
-    if (existing) return reply({ ok: true, reused: true, request: existing });
+    if (existing) return reply({ ok: true, reused: true, pushDelivered: 0, request: existing });
 
     const pendingRows = await db.prepare("SELECT id FROM navixa_device_control_requests WHERE user_id=? AND source_device_class='mobile' AND target_device_class='computer' AND status='pending' AND expires_at>? LIMIT ?").bind(session.userId, nowIso, MAX_PENDING).all<{ id: string }>();
     if (pendingRows.results.length >= MAX_PENDING) return reply({ error: "يوجد عدد كافٍ من الطلبات المعلقة. عالجها على الكمبيوتر أولًا" }, 429);
     const id = crypto.randomUUID();
     const expiresAt = new Date(now.getTime() + REQUEST_TTL_MS).toISOString();
     await db.prepare("INSERT INTO navixa_device_control_requests(id,user_id,source_device_class,target_device_class,command,status,created_at,expires_at,acknowledged_at) VALUES (?,?, 'mobile','computer',?,'pending',?,?, '')").bind(id, session.userId, command, nowIso, expiresAt).run();
-    return reply({ ok: true, reused: false, request: { id, command, status: "pending", expiresAt } }, 201);
+    const pushDelivered=await notifyActiveComputer(db,session.userId,command,nowIso);
+    return reply({ ok: true, reused: false, pushDelivered, request: { id, command, status: "pending", expiresAt } }, 201);
   }
 
   if (action === "acknowledge") {
