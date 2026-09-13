@@ -3,12 +3,14 @@
 import {useEffect,useRef,useState} from "react";
 import {dismissPersonalReminder,getPersonalReminderPrefs,isPersonalReminderMuted,PersonalReminderKind} from "./reminderPrefs";
 import {readAcademicReminders} from "./academicReminders";
-import {isScreenEnabled} from "./alertPrefs";
-import {sendNavixaFeaturePushEvent,showNavixaDeviceNotification} from "./pushClient";
+import {isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
+import {showNavixaDeviceNotification} from "./pushClient";
 
 const MINUTE=60_000;
 const ACTIVITY_KEY="navixa-last-activity-at";
 const LAST_ANY_KEY="navixa-personal-reminder-last-any";
+const SCREEN_REMOTE_COOLDOWN=30_000;
+const SCREEN_REPEAT_COOLDOWN=60_000;
 const sentKey=(kind:PersonalReminderKind)=>`navixa-personal-reminder-last-${kind}`;
 const today=()=>new Date().toISOString().slice(0,10);
 
@@ -33,10 +35,11 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
       else if(text.startsWith("OCR: ظهر النص")){mode="ocr";detail=text.replace(/^OCR:\s*ظهر النص\s*/,"").replace(/^\(|\)$/g,"").trim().slice(0,100)}
       if(!mode)return;
       const signature=`${mode}:${detail}`,now=Date.now();
-      if(screenBridgeRef.current.signature===signature&&now-screenBridgeRef.current.at<15_000)return;
-      if(now-screenBridgeRef.current.at<8_000)return;
+      if(screenBridgeRef.current.signature===signature&&now-screenBridgeRef.current.at<SCREEN_REPEAT_COOLDOWN)return;
+      if(now-screenBridgeRef.current.at<SCREEN_REMOTE_COOLDOWN)return;
       screenBridgeRef.current={signature,at:now};
-      void sendNavixaFeaturePushEvent({kind:"screen_watch",mode,detail});
+      const message=mode==="ocr"?`🔎 NAVIXA: ظهر النص (${detail||"نص مهم"}) في منطقة متابعة الشاشة.`:`🖥️ NAVIXA: رصدت متابعة الشاشة ${detail||"تغيّرًا واضحًا"}.`;
+      sendFeatureAlert("screen",message,{kind:"screen_watch",mode,detail});
     };
     const observer=new MutationObserver(bridgeScreenToast);
     observer.observe(document.body,{subtree:true,childList:true,characterData:true});
