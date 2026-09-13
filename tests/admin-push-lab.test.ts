@@ -6,10 +6,12 @@ const route=await readFile(new URL("../app/api/admin/push-lab/route.ts",import.m
 const lab=await readFile(new URL("../app/admin/settings/AdminPushLab.tsx",import.meta.url),"utf8");
 const helper=await readFile(new URL("../worker/generalPush.ts",import.meta.url),"utf8");
 
-test("admin Push lab requires admin session and same-origin requests",()=>{
-  assert.match(route,/isTrustedSameOriginRequest/);
-  assert.match(route,/verifyAdminSessionToken/);
-  assert.match(route,/ADMIN_SESSION_COOKIE/);
+test("admin Push lab requires explicit server permission",()=>{
+  assert.match(route,/requireAdminPermission\(request,"push\.test"\)/);
+  assert.match(route,/writeAdminActivity/);
+  assert.match(route,/push_lab\.send/);
+  assert.match(route,/Cache-Control/);
+  assert.doesNotMatch(route,/metadata:\{[^}]*endpoint/);
 });
 
 test("Push lab supports feature events and configurable preview",()=>{
