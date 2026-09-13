@@ -1,0 +1,367 @@
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(16rem, 0.75fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.heroIntro {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
+  color: var(--nx-color-primary);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--nx-color-primary);
+  box-shadow: 0 0 0 0.28rem var(--nx-color-primary-soft);
+}
+
+.heroTitle {
+  margin: 0;
+  max-width: 42rem;
+  font-size: clamp(1.55rem, 4vw, 2.65rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.heroCopy {
+  max-width: 44rem;
+  margin: 0.9rem 0 0;
+  color: var(--nx-color-muted);
+  line-height: 1.9;
+  font-size: 0.94rem;
+}
+
+.actionRow {
+  margin-block-start: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.signalCard {
+  min-height: 100%;
+  padding: 1.15rem;
+  border-radius: var(--nx-radius-md);
+  background: linear-gradient(155deg, #0b6e72, #174d5a);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  position: relative;
+}
+
+.signalCard::after {
+  content: "";
+  position: absolute;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 50%;
+  inset-inline-end: -4.5rem;
+  inset-block-end: -5rem;
+  border: 1px solid rgb(255 255 255 / 15%);
+  box-shadow: 0 0 0 2.2rem rgb(255 255 255 / 3%);
+}
+
+.signalTop,
+.signalBottom {
+  position: relative;
+  z-index: 1;
+}
+
+.signalTop small {
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.75rem;
+}
+
+.signalTop strong {
+  display: block;
+  margin-block-start: 0.4rem;
+  font-size: 1.3rem;
+}
+
+.signalMeter {
+  height: 0.45rem;
+  margin-block: 1.15rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 14%);
+  overflow: hidden;
+}
+
+.signalMeter > span {
+  display: block;
+  width: 78%;
+  height: 100%;
+  border-radius: inherit;
+  background: white;
+}
+
+.signalBottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: rgb(255 255 255 / 80%);
+  font-size: 0.75rem;
+}
+
+.sectionHead {
+  margin-block: 1.55rem 0.8rem;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionHead h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.sectionHead p {
+  margin: 0.3rem 0 0;
+  color: var(--nx-color-muted);
+  font-size: 0.8rem;
+}
+
+.sectionHead > span {
+  color: var(--nx-color-muted);
+  font-size: 0.76rem;
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cardIcon {
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.8rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--nx-color-primary);
+  background: var(--nx-color-primary-soft);
+}
+
+.cardIcon > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.cardTitleRow h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.cardTitleRow small {
+  display: block;
+  margin-block-start: 0.2rem;
+  color: var(--nx-color-muted);
+  font-size: 0.74rem;
+}
+
+.bigNumber {
+  margin-block-start: 1.15rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.bigNumber strong {
+  font-size: 2rem;
+  letter-spacing: -0.03em;
+}
+
+.bigNumber span {
+  color: var(--nx-color-muted);
+  font-size: 0.8rem;
+}
+
+.miniBar {
+  height: 0.42rem;
+  margin-block-start: 0.85rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--nx-color-surface-soft);
+}
+
+.miniBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nx-color-primary);
+}
+
+.timeline {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.timelineItem {
+  min-height: 3.75rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  border-block-end: 1px solid var(--nx-color-line);
+}
+
+.timelineItem:last-child {
+  border-block-end: 0;
+}
+
+.timelineDot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--nx-color-primary);
+  box-shadow: 0 0 0 0.28rem var(--nx-color-primary-soft);
+}
+
+.timelineCopy strong,
+.timelineCopy small {
+  display: block;
+}
+
+.timelineCopy strong {
+  font-size: 0.86rem;
+}
+
+.timelineCopy small {
+  margin-block-start: 0.2rem;
+  color: var(--nx-color-muted);
+  font-size: 0.72rem;
+}
+
+.timelineTime {
+  color: var(--nx-color-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.featureList {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.featureList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  color: var(--nx-color-muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.check {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--nx-color-primary);
+  background: var(--nx-color-primary-soft);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.privacyStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--nx-color-muted);
+  font-size: 0.74rem;
+}
+
+.privacyDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #3aa66d;
+  box-shadow: 0 0 0 0.2rem #e7f6ed;
+}
+
+.modalBody {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.modalNote {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: var(--nx-radius-sm);
+  color: var(--nx-color-muted);
+  background: var(--nx-color-surface-soft);
+  line-height: 1.75;
+  font-size: 0.82rem;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .signalCard {
+    min-height: 12rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .heroTitle {
+    font-size: 1.55rem;
+  }
+
+  .heroCopy {
+    font-size: 0.86rem;
+    line-height: 1.8;
+  }
+
+  .signalCard {
+    min-height: 10.75rem;
+  }
+
+  .sectionHead {
+    align-items: flex-start;
+  }
+
+  .sectionHead > span {
+    display: none;
+  }
+
+  .timelineItem {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .timelineTime {
+    grid-column: 2;
+  }
+
+  .actionRow > button {
+    flex: 1 1 9rem;
+  }
+}

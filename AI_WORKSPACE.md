@@ -6,8 +6,8 @@
 
 - الوكيل النشط: ChatGPT
 - المهمة الحالية: بناء المرحلة الأولى من `NAVIXA UI System` بنظام واجهة Responsive مملوك للمشروع وقابل للتطوير والاستبدال، دون اعتماد Runtime جديد على مكتبة واجهات خارجية.
-- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. أول فحص كشف lint على رابط داخلي وتم إصلاحه؛ الفحص التالي أثبت نجاح 245 اختبارًا وكشف أن قياس Drawer تم أثناء حركة الدخول، لذلك يُفصل فحص الـUI System في smoke مستقل أكثر ثباتًا.
-- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`.
+- الحالة: PR #193 Draft على الفرع `feat/navixa-ui-system-20260912`؛ الإنتاج غير متأثر. الفرع محدث مع آخر `master` (`behind=0`). آخر head اجتاز `Verify NAVIXA Pull Request` و`NAVIXA Pre-Launch Gate` و`Release gate`، ونجح Workflow مستقل في التقاط أدلة بصرية حقيقية للجوال والـDrawer والتابلت والكمبيوتر. تمت مراجعة الصور وتصحيح تغطية الـSplash لمسار `/ui-lab` فقط وتنقيح النصوص، دون تغيير واجهة الإنتاج.
+- الملفات المحجوزة: `app/ui-system/*`, `app/ui-lab/*`, `tests/navixa-ui-system.test.ts`, `tests/ui-smoke.mjs`, `tests/ui-system-smoke.mjs`, `package.json`, `PROJECT_MEMORY.md`, `AI_CHANGELOG.md`, `AI_WORKSPACE.md`, `.github/workflows/ui-system-preview.yml`.
 
 ## مهمة موازية غير متقاطعة — NAVIXA Dev Guardian Foundation
 
@@ -44,12 +44,14 @@
 - الصوت الخام وtranscript لا يُخزنان ولا يُرسلان للخادم، ومسار الدراسة لا يعدّل حالة NameSense الإنتاجية أو تلميحات اللغة أو الكلمات المراقبة.
 - نجح آخر head موثق لـPR #188 في Verify NAVIXA Pull Request #437 وNAVIXA Pre-Launch Gate #320 شاملًا lint والاختبارات وUI smoke وبناء الإنتاج وفحص الاعتماديات والأسرار وGitHub Actions.
 - المراجعة المستقلة النهائية لم تجد MAJOR/BLOCKER، مع بقاء الحكم الحقيقي لدقة NameSense معتمدًا فقط على corpus بشري مؤهل وتشغيل scorer الصارم.
+- اكتملت المرحلة الأولى من PR #193: نظام Responsive مملوك لـNAVIXA، Sidebar/rail/bottom navigation، Drawer وOverlay مع عقود الوصول، primitives داخلية، مختبر `/ui-lab` غير مفهرس، واختبارات تمنع إدخال UI runtime خارجي إلى النواة.
+- آخر head موثق لـPR #193 هو `64ccb5f6dd8b5af7b75b63374d7d54952d6780c3`: نجح Verify #522 وPre-Launch #417 وRelease gate، إضافة إلى `NAVIXA UI System Preview` #3. أدلة المعاينة: 390px للجوال، Drawer للجوال، 820px للتابلت، و1440px للكمبيوتر.
+- المراجعة البصرية للأدلة النهائية لم تظهر overflow أو تداخلًا أو تغطية من Splash؛ الهوية فاتحة وتركوازية ومتسقة، والتنقل يتغير فعليًا حسب فئة الجهاز.
 
 ## التالي
 
 - انتظار مراجعة المستخدم لـDraft PR #210 قبل أي دمج أو نشر أو بدء جدولة غفوة حقيقية/مرحلة ثانية لتنبيهات الساعة.
 - تنفيذ NAVIXA Security Validation على فرع مستقل بفحوص كود واعتماديات وتحقق غير مدمر للموقع وتقارير CI.
-- إعادة `tests/ui-smoke.mjs` لفحصه الأصلي وفصل `/ui-lab` في `tests/ui-system-smoke.mjs` على narrow/medium/wide مع انتظار استقرار الحركة قبل القياس.
-- إكمال GitHub Actions على PR #193 وإصلاح أي فشل حتى تصبح البوابة نظيفة.
-- توثيق التسليم وإبقاء PR #193 Draft دون دمج حتى مراجعة المستخدم.
+- إبقاء PR #193 Draft دون دمج أو نشر إلى أن يراجع المستخدم صور المعاينة ويعتمد الاتجاه البصري.
+- بعد الاعتماد فقط: التخطيط لنقل أول جزء من واجهة الإنتاج إلى النظام الجديد تدريجيًا مع بوابة رجوع واضحة، دون إعادة بناء الموقع دفعة واحدة.
 - تبقى متابعة PR #188 ونشر NameSense مسارًا مستقلًا ولا تتداخل ملفاته مع هذه المهمة.
