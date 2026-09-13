@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import "./academic-section-linkage.test.ts";
 import { academicSuggestions } from "../app/meetings/academicSuggestions.ts";
 
 test("academic suggestions extract multiple dates from one Arabic and English summary", () => {
