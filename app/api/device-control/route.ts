@@ -15,6 +15,7 @@ type ControlRow = {
   expires_at: string;
   acknowledged_at: string;
 };
+type PublicControlRow = Omit<ControlRow,"status"> & { status: PublicStatus };
 
 const allowedCommands = new Set<DeviceCommand>(["prepare_name_listener","prepare_screen_watch","open_alerts","open_account_sync"]);
 const REQUEST_TTL_MS = 5 * 60 * 1000;
@@ -39,7 +40,7 @@ async function computerSessionExists(db: Database, userId: string, now: string) 
   return Boolean(rows.results[0]);
 }
 
-function exposeRow(row: ControlRow, now: string): ControlRow & { status: PublicStatus } {
+function exposeRow(row: ControlRow, now: string): PublicControlRow {
   if (row.status === "pending" && row.expires_at <= now) return { ...row, status: "expired" };
   return row;
 }
