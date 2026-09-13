@@ -4,9 +4,11 @@ import test from "node:test";
 
 const root=new URL("../",import.meta.url);
 const route=fs.readFileSync(new URL("app/api/device-control/route.ts",root),"utf8");
+const pushSubscriptions=fs.readFileSync(new URL("app/api/push/subscriptions/route.ts",root),"utf8");
 const agent=fs.readFileSync(new URL("app/DeviceControlAgent.tsx",root),"utf8");
 const panel=fs.readFileSync(new URL("app/account/DeviceControlPanel.tsx",root),"utf8");
 const migration=fs.readFileSync(new URL("migrations/0056_device_control.sql",root),"utf8");
+const pushBindingMigration=fs.readFileSync(new URL("migrations/0057_push_device_binding.sql",root),"utf8");
 const layout=fs.readFileSync(new URL("app/layout.tsx",root),"utf8");
 const account=fs.readFileSync(new URL("app/account/page.tsx",root),"utf8");
 
@@ -48,6 +50,36 @@ test("duplicate live commands are coalesced and expired commands are explicit",(
   assert.match(route,/command=\? AND status='pending' AND expires_at>\?/);
   assert.match(panel,/انتهت المهلة/);
   assert.match(panel,/لم نكرر إرساله/);
+});
+
+test("Push subscriptions bind to the authenticated device session",()=>{
+  assert.match(pushBindingMigration,/device_class TEXT NOT NULL DEFAULT ''/);
+  assert.match(pushBindingMigration,/device_session_id TEXT NOT NULL DEFAULT ''/);
+  assert.match(pushBindingMigration,/idx_navixa_push_user_device/);
+  assert.match(pushSubscriptions,/SELECT id,device_class FROM navixa_user_sessions WHERE token_hash=\? AND user_id=\?/);
+  assert.match(pushSubscriptions,/device_session_id/);
+  assert.match(pushSubscriptions,/device_class/);
+  assert.match(pushSubscriptions,/deviceBound:Boolean\(userId&&device\)/);
+  assert.doesNotMatch(pushSubscriptions,/body\.deviceClass|body\.deviceSessionId/);
+});
+
+test("mobile control Push targets only an active computer session",()=>{
+  assert.match(route,/JOIN navixa_user_sessions s ON s\.id=p\.device_session_id/);
+  assert.match(route,/p\.user_id=\? AND p\.device_class='computer' AND p\.enabled=1/);
+  assert.match(route,/s\.device_class='computer' AND s\.revoked_at='' AND s\.expires_at>\?/);
+  assert.match(route,/sendFeaturePush/);
+  assert.match(route,/title:"NAVIXA · طلب من جوالك"/);
+  assert.match(route,/requireInteraction:true/);
+  assert.match(route,/ttl:300/);
+  assert.match(route,/DELETE FROM navixa_push_subscriptions WHERE endpoint=\? AND user_id=\?/);
+  assert.doesNotMatch(route,/getDisplayMedia|getUserMedia|SpeechRecognition/);
+});
+
+test("Push failure keeps the durable control queue as fallback",()=>{
+  assert.match(route,/catch\{return 0\}/);
+  assert.match(route,/pushDelivered/);
+  assert.match(panel,/إذا لم يكن Push مفعّلًا على الكمبيوتر فسيظهر عند فتح NAVIXA/);
+  assert.match(panel,/وصل Push إلى الكمبيوتر النشط/);
 });
 
 test("computer agent polls only an authenticated computer while visible",()=>{
