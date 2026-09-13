@@ -1,5 +1,6 @@
 import {
-  flattenAcademicOfferingMeetings,
+  flattenAcademicRegistrationOptionMeetings,
+  isTrustedAcademicLinkage,
   validateAcademicOffering,
   type AcademicCourseOffering,
   type AcademicScheduledMeeting,
@@ -27,7 +28,6 @@ function lectureOffering(
     offeringId: `pilot-${code}`,
     courseCode: code,
     courseName: name,
-    context: { termId: "pilot-2026" },
     components: [{
       componentId,
       componentType: "lecture",
@@ -60,4 +60,15 @@ if (scheduleIssues.length) {
   throw new Error(`Invalid academic schedule model: ${scheduleIssues.map(issue => `${issue.code}:${issue.detail}`).join(", ")}`);
 }
 
-export const CLASS_SCHEDULE_CLASSES: readonly ClassScheduleItem[] = CLASS_SCHEDULE_OFFERINGS.flatMap(flattenAcademicOfferingMeetings);
+function selectedPilotMeetings(offering: AcademicCourseOffering) {
+  if (offering.registrationOptions.length !== 1) {
+    throw new Error(`Pilot offering ${offering.offeringId} must have exactly one selected registration option`);
+  }
+  const option = offering.registrationOptions[0];
+  if (!isTrustedAcademicLinkage(option)) {
+    throw new Error(`Pilot offering ${offering.offeringId} uses untrusted section linkage`);
+  }
+  return flattenAcademicRegistrationOptionMeetings(offering, option);
+}
+
+export const CLASS_SCHEDULE_CLASSES: readonly ClassScheduleItem[] = CLASS_SCHEDULE_OFFERINGS.flatMap(selectedPilotMeetings);
