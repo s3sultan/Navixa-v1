@@ -7,7 +7,7 @@ export const PLAN_PRICE_KEYS = {
 
 export const DEFAULT_PLAN_PRICES = {
   monthly: 2900,
-  sprint: 1100,
+  sprint: 700,
 } as const;
 
 export const PUBLIC_PLAN_META = {

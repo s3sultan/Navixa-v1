@@ -5,7 +5,7 @@ import {useEffect,useState} from "react";
 import "../public-pricing.css";
 
 type Plan={id:"monthly"|"sprint";name:string;days:number;periodLabel:string;amount:number};
-const fallback:Plan[]=[{id:"monthly",name:"هِمّة",days:30,periodLabel:"شهر واحد",amount:2900},{id:"sprint",name:"عَزْم",days:5,periodLabel:"خمسة أيام",amount:1100}];
+const fallback:Plan[]=[{id:"monthly",name:"هِمّة",days:30,periodLabel:"شهر واحد",amount:2900},{id:"sprint",name:"عَزْم",days:5,periodLabel:"خمسة أيام",amount:700}];
 const riyals=(amount:number)=>(amount/100).toLocaleString("ar-SA",{maximumFractionDigits:2});
 
 export default function PricingPage(){
