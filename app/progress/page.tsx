@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FeatureAccessGate from "../FeatureAccessGate";
 import { readAcademicReminders, type AcademicReminder } from "../academicReminders";
-import { buildWeeklyLifeReport, readWeeklyLifeDay } from "../weeklyLifeReport";
+import { buildWeeklyLifeReport, localDateKey, readWeeklyLifeDay } from "../weeklyLifeReport";
 import "./progress.css";
 import "../weekly-life-report.css";
 
 type Task={title:string;done:boolean;meta?:string};
-const day=(offset=0)=>{const d=new Date();d.setDate(d.getDate()+offset);return d.toISOString().slice(0,10)};
+const day=(offset=0)=>localDateKey(offset);
 const dateText=(value:string)=>new Intl.DateTimeFormat("ar-SA",{weekday:"long",day:"numeric",month:"long"}).format(new Date(`${value}T12:00:00+03:00`));
 
 export default function ProgressPage(){
