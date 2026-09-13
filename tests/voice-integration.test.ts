@@ -23,11 +23,17 @@ test("listener keeps the local fallback reachable when browser speech recognitio
 });
 test("listener UI switches to the active state as soon as a start request is accepted", () => {
   assert.match(engine, /const notifyStarted = \(\) => \{[\s\S]*handlers\.onStart\?\.\(\)/);
-  assert.match(engine, /recognition\.start\(\);[\s\S]*browserStarted = true;[\s\S]*notifyStarted\(\)/);
+  assert.match(engine, /const browserStarted = startBrowserSession\(\);[\s\S]*if \(browserStarted\) notifyStarted\(\)/);
   assert.match(engine, /starting = true;[\s\S]*notifyStarted\(\);[\s\S]*localFallback\.start\(\)/);
   assert.match(page, /onStart:\(\)=>setListening\(true\)/);
   assert.match(page, /listening\?"إيقاف الاستماع":"تشغيل الاستماع"/);
   assert.match(page, /listening\?"● يستمع الآن"/);
+});
+test("transient browser speech endings restart inside the engine without toggling the UI off", () => {
+  assert.match(engine, /let keepListening = false;/);
+  assert.match(engine, /const scheduleBrowserRestart = \(delay = 250\) => \{/);
+  assert.match(engine, /recognition\.onend = \(\) => \{[\s\S]*if \(destroyed \|\| !keepListening\) return;[\s\S]*scheduleBrowserRestart\(\);/);
+  assert.doesNotMatch(engine, /recognition\.onend = \(\) => \{[\s\S]{0,220}handlers\.onEnd\?\.\(\)/);
 });
 test("listener micro interactions respect reduced motion", () => {
   assert.match(css, /NAVIXA Micro Interactions: listener/);
