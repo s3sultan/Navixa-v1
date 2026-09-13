@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import "./admin-audit.css";
 
 type Permission = { key: string; label: string; detail: string };
 type Activity = {
