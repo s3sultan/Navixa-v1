@@ -3,10 +3,10 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { ADMIN_SESSION_COOKIE, createMemoryRateLimiter, isProtectedAdminApiPath, isProtectedAdminPath, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "./adminAuth";
 import { clientIp, consumeAuthRateLimit } from "./authRateLimit";
-import { deliverDueMatchPushes } from "./matchPush";
 import { checkDomainExpiry } from "./domainExpiryAlert";
 import { deliverDueSubscriptionRenewals } from "./subscriptionRenewals";
-import { deliverDueImportantReminders } from "./importantReminders";
+import { consumeAcademicReminderQueue, triggerAcademicReminderWorkflow, type AcademicQueueBatch } from "./backgroundAcademic";
+export { AcademicReminderWorkflow } from "./backgroundAcademic";
 import { sendApprovedMoyasarSalesInquiry } from "./moyasarSalesInquiry";
 import { pruneUsageAnalytics, scanUsageAnalyticsAlerts } from "./usageAnalytics";
 import { runWeeklySiteHealthCheck } from "./siteHealth";
@@ -333,18 +333,21 @@ async function aggregatePerformanceWindows(env: Env) {
 }
 
 const worker = {
-  async scheduled(_controller: { cron: string }, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(deliverDueMatchPushes(env).then(result => console.log(JSON.stringify({ event: "match_push_scheduled", delivered: result.delivered, skipped: result.skipped }))));
+  async scheduled(controller: { cron: string; scheduledTime?: number }, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(triggerAcademicReminderWorkflow(env,controller.scheduledTime).then(result => console.log(JSON.stringify({ event: "academic_reminder_workflow", ...result }))).catch(error => console.log(JSON.stringify({ event: "academic_reminder_workflow_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(aggregatePerformanceWindows(env).catch(error => console.log(JSON.stringify({ event: "performance_aggregation_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(checkDomainExpiry(env).catch(error => console.log(JSON.stringify({ event: "domain_expiry_check_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(deliverDueSubscriptionRenewals(env).then(result => console.log(JSON.stringify({ event: "subscription_renewal_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "subscription_renewal_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
-    ctx.waitUntil(deliverDueImportantReminders(env).then(result => console.log(JSON.stringify({ event: "important_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "important_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(sendApprovedMoyasarSalesInquiry(env).then(result => console.log(JSON.stringify({ event: "moyasar_sales_inquiry", ...result }))).catch(error => console.log(JSON.stringify({ event: "moyasar_sales_inquiry_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(pruneUsageAnalytics(env).catch(error => console.log(JSON.stringify({ event: "usage_analytics_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(scanUsageAnalyticsAlerts(env).then(result => console.log(JSON.stringify({ event: "usage_analytics_alert_scan", ...result }))).catch(error => console.log(JSON.stringify({ event: "usage_analytics_alert_scan_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(runWeeklySiteHealthCheck(env).then(result => console.log(JSON.stringify({ event: "weekly_site_health", ...result }))).catch(error => console.log(JSON.stringify({ event: "weekly_site_health_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(pruneClosedSupportTickets(env.DB).catch(error => console.log(JSON.stringify({ event: "support_ticket_prune_failed", message: error instanceof Error ? error.message : "unknown" }))));
     ctx.waitUntil(pollStudySuspensionTestRecipients(env).then(result => console.log(JSON.stringify({ event: "study_suspension_test_poll", ...result }))).catch(error => console.log(JSON.stringify({ event: "study_suspension_test_poll_failed", message: error instanceof Error ? error.message : "unknown" }))));
+  },
+  async queue(batch: AcademicQueueBatch, env: Env): Promise<void> {
+    const result=await consumeAcademicReminderQueue(batch,env);
+    console.log(JSON.stringify({event:"academic_reminder_queue",...result}));
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
