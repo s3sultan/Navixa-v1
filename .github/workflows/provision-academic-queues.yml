@@ -1,0 +1,32 @@
+name: Provision academic reminder queues
+
+on:
+  push:
+    branches:
+      - ops/provision-academic-queues-20260914
+    paths:
+      - .github/workflows/provision-academic-queues.yml
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Ensure queues exist
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler queues info navixa-academic-alerts >/dev/null 2>&1 || npx --no-install wrangler queues create navixa-academic-alerts
+          npx --no-install wrangler queues info navixa-academic-alerts-dlq >/dev/null 2>&1 || npx --no-install wrangler queues create navixa-academic-alerts-dlq
+          npx --no-install wrangler queues info navixa-academic-alerts
+          npx --no-install wrangler queues info navixa-academic-alerts-dlq
