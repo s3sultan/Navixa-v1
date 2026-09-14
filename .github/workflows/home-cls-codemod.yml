@@ -1,0 +1,58 @@
+name: Home CLS codemod
+
+on:
+  push:
+    branches:
+      - perf/home-cls-phase5
+    paths:
+      - .github/workflows/home-cls-codemod.yml
+
+permissions:
+  contents: write
+
+jobs:
+  codemod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/home-cls-phase5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Stabilize greeting first paint
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path = Path('app/page.tsx')
+          page = page_path.read_text()
+          old_state = 'const [greetingVisible,setGreetingVisible]=useState(false);'
+          new_state = 'const [greetingVisible,setGreetingVisible]=useState(true);'
+          old_effect = '  useEffect(()=>{if(sessionStorage.getItem("navixa-greeting-hidden-session")==="1")return;setGreetingVisible(true);const timer=window.setTimeout(()=>{sessionStorage.setItem("navixa-greeting-hidden-session","1");setGreetingVisible(false)},8500);return()=>window.clearTimeout(timer)},[]);\n'
+          assert page.count(old_state) == 1, 'greeting state target changed'
+          assert page.count(old_effect) == 1, 'greeting hydration effect target changed'
+          page = page.replace(old_state, new_state, 1).replace(old_effect, '', 1)
+          page_path.write_text(page)
+
+          test_path = Path('tests/mobile-startup.test.ts')
+          test = test_path.read_text()
+          marker = 'test("direct-entry hides welcome before hydration and persists the real preference key", async () => {'
+          assert marker in test, 'mobile startup test marker changed'
+          addition = '''test("homepage greeting does not mount after hydration and shift layout", async () => {\n  const page = await readFile(new URL("app/page.tsx", root), "utf8");\n  assert.match(page, /greetingVisible,setGreetingVisible\\]=useState\\(true\\)/);\n  assert.doesNotMatch(page, /setGreetingVisible\\(true\\);const timer=window\\.setTimeout/);\n});\n\n'''
+          assert 'homepage greeting does not mount after hydration and shift layout' not in test, 'test already exists'
+          test = test.replace(marker, addition + marker, 1)
+          test_path.write_text(test)
+          PY
+      - name: Verify exact change
+        run: |
+          grep -F 'const [greetingVisible,setGreetingVisible]=useState(true);' app/page.tsx
+          ! grep -F 'setGreetingVisible(true);const timer=window.setTimeout' app/page.tsx
+          grep -F 'homepage greeting does not mount after hydration and shift layout' tests/mobile-startup.test.ts
+      - name: Commit codemod result
+        run: |
+          git config user.name 'navixa-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/page.tsx tests/mobile-startup.test.ts
+          git commit -m 'perf(home): prevent greeting layout shift'
+          git push
