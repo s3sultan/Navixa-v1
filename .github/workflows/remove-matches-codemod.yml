@@ -1,0 +1,145 @@
+name: NAVIXA Remove Matches Codemod
+
+on:
+  push:
+    branches: [perf/remove-matches-phase4]
+    paths:
+      - '.github/workflows/remove-matches-codemod.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout isolated matches branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: perf/remove-matches-phase4
+
+      - name: Remove matches runtime from homepage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('app/page.tsx')
+          text = path.read_text()
+          before = len(text.encode())
+
+          required = [
+              'import "./matches.css";',
+              'type FootballMatch=',
+              'const [matchDate,setMatchDate]',
+              'const matchEventRef=useRef(new Set<string>());',
+              'const savedMatchAlerts=localStorage.getItem(matchStorageKey);',
+              'if(!ready||!runtimeFeatures.matchesHomeEnabled)',
+              'setModal("matches")',
+              'className="matches-ribbon',
+              'className="matches-tool"',
+              'modal==="matches"',
+              'selectedMatch&&<div className="match-detail-back"',
+          ]
+          missing = [marker for marker in required if marker not in text]
+          if missing:
+              raise SystemExit(f'Refusing matches cleanup; expected markers missing: {missing}')
+
+          text = text.replace('import "./matches.css";\n', '', 1)
+          text = text.replace('type HomeModal="tasks"|"ask"|"automation"|"screen"|"alerts"|"backup"|"appearance"|"matches";',
+                              'type HomeModal="tasks"|"ask"|"automation"|"screen"|"alerts"|"backup"|"appearance";', 1)
+
+          start = text.index('type FootballMatch=')
+          end = text.index('// صياغة ديناميكية:', start)
+          text = text[:start] + text[end:]
+
+          start = text.index('  const [matchDate,setMatchDate]')
+          end = text.index('  const voiceEngineRef=', start)
+          text = text[:start] + text[end:]
+          text = text.replace('  const matchEventRef=useRef(new Set<string>());\n', '', 1)
+
+          pattern = r'const savedMatchAlerts=localStorage\.getItem\(matchStorageKey\);.*?if\(savedManualMatches\)\{try\{setManualMatches\(JSON\.parse\(savedManualMatches\)\)\}catch\{\}\}'
+          text, count = re.subn(pattern, '', text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('Refusing cleanup; match localStorage initialization block did not match exactly once.')
+
+          persisted_markers = (
+              'localStorage.setItem(matchStorageKey',
+              'localStorage.setItem(matchPersonalStorageKey',
+              'localStorage.setItem(manualMatchesStorageKey',
+          )
+          text = ''.join(line for line in text.splitlines(keepends=True) if not any(marker in line for marker in persisted_markers))
+
+          start = text.index('  useEffect(()=>{if(!ready||!runtimeFeatures.matchesHomeEnabled)')
+          end = text.index('  useEffect(()=>{if(screen&&screenVideoRef.current&&screenRef.current)', start)
+          text = text[:start] + text[end:]
+
+          mobile_matches = '{runtimeFeatures.matchesHomeEnabled&&<button type="button" onClick={()=>{setMobileMoreOpen(false);setModal("matches")}}>المباريات</button>}'
+          if text.count(mobile_matches) != 1:
+              raise SystemExit('Refusing cleanup; mobile matches entry was not found exactly once.')
+          text = text.replace(mobile_matches, '', 1)
+
+          drop_line_markers = (
+              'runtimeFeatures.matchesHomeEnabled&&favouriteMatch&&',
+              'runtimeFeatures.matchesHomeEnabled&&<section className={`matches-ribbon',
+              '{selectedMatch&&<div className="match-detail-back"',
+          )
+          lines = text.splitlines(keepends=True)
+          hit_counts = {marker: sum(marker in line for line in lines) for marker in drop_line_markers}
+          if any(count != 1 for count in hit_counts.values()):
+              raise SystemExit(f'Refusing cleanup; expected one JSX line per matches block: {hit_counts}')
+          text = ''.join(line for line in lines if not any(marker in line for marker in drop_line_markers))
+
+          text, count = re.subn(r'\{runtimeFeatures\.matchesHomeEnabled&&<button className="matches-tool".*?</button>\}', '', text, count=1)
+          if count != 1:
+              raise SystemExit('Refusing cleanup; secondary matches tool did not match exactly once.')
+
+          text, count = re.subn(r':modal==="matches"\?<><small>مبارياتك.*?</>:modal==="automation"\?', ':modal==="automation"?', text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('Refusing cleanup; matches modal branch did not match exactly once.')
+
+          forbidden = [
+              'import "./matches.css"',
+              'type FootballMatch=',
+              'MATCH_COMPETITIONS',
+              'matchStorageKey',
+              'matchPersonalStorageKey',
+              'manualMatchesStorageKey',
+              '/api/matches',
+              '/api/match-display',
+              '/api/match-events',
+              'matchEventRef',
+              'matchAlerts',
+              'matchPersonal',
+              'manualMatches',
+              'selectedMatch',
+              'modal==="matches"',
+              'setModal("matches")',
+              'matches-ribbon',
+              'matches-tool',
+          ]
+          remaining = [marker for marker in forbidden if marker in text]
+          if remaining:
+              raise SystemExit(f'Refusing cleanup; homepage still contains matches runtime markers: {remaining}')
+
+          path.write_text(text)
+          after = len(text.encode())
+          print(f'app/page.tsx bytes: {before} -> {after} (removed {before-after})')
+
+          test = Path('tests/home-matches-disabled.test.ts')
+          test.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\nconst root = new URL("../", import.meta.url);\n\ntest("homepage keeps matches fully out of the startup runtime", async () => {\n  const page = await readFile(new URL("app/page.tsx", root), "utf8");\n  for (const marker of [\n    "./matches.css",\n    "/api/matches",\n    "/api/match-display",\n    "/api/match-events",\n    "MATCH_COMPETITIONS",\n    "matchAlerts",\n    "matchPersonal",\n    "manualMatches",\n    "selectedMatch",\n    "matches-ribbon",\n    "matches-tool",\n    "setModal(\\\"matches\\\")",\n    "modal===\\\"matches\\\"",\n  ]) assert.equal(page.includes(marker), false, `homepage still contains ${marker}`);\n});\n\ntest("matches backend remains available for a reversible future return", async () => {\n  const route = await readFile(new URL("app/api/matches/route.ts", root), "utf8");\n  assert.match(route, /export async function GET|export function GET/);\n});\n''')
+          PY
+          git diff --check
+
+      - name: Commit isolated matches removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 's3sultan'
+          git config user.email 's2shug@gmail.com'
+          git add app/page.tsx tests/home-matches-disabled.test.ts
+          git commit -m 'perf(home): remove matches from homepage runtime'
+          git push origin HEAD:perf/remove-matches-phase4
