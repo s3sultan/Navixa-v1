@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server.js";
-import {
-  ADMIN_SESSION_COOKIE,
-  createMemoryRateLimiter,
-  isTrustedSameOriginRequest,
-  readCookie,
-  resolveAdminJwtSecret,
-  verifyAdminSessionToken,
-} from "../../../../worker/adminAuth.ts";
+import { createMemoryRateLimiter } from "../../../../worker/adminAuth.ts";
+import { requireAdminPermission } from "../../../../worker/adminAccess.ts";
+import { writeAdminActivity, type AdminActivityDatabase } from "../../../../worker/adminActivity.ts";
 
-type Env = Record<string, string | undefined>;
+type Env = {
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  NAVIXA_AUTH_FROM?: string;
+  NAVIXA_ADMIN_EMAIL?: string;
+  DB?: AdminActivityDatabase;
+};
 type Provider = "tap" | "tabby" | "tamara" | "cashew" | "telr" | "paytabs" | "myfatoorah";
 
 const limiter = createMemoryRateLimiter();
@@ -21,13 +22,15 @@ async function runtimeEnv(): Promise<Env> {
   }
 }
 
-async function allowed(request: Request) {
-  const secret = await resolveAdminJwtSecret();
-  return Boolean(
-    secret
-      && isTrustedSameOriginRequest(request)
-      && await verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret),
-  );
+async function audit(env: Env, adminEmail: string, provider: Provider, outcome: "success" | "failure", metadata?: Record<string, unknown>) {
+  if (!env.DB) return;
+  await writeAdminActivity(env.DB, {
+    adminEmail,
+    action: "payment_quote.send",
+    resource: "billing",
+    outcome,
+    metadata: { provider, ...(metadata || {}) },
+  });
 }
 
 function noStore(body: Record<string, unknown>, status = 200) {
@@ -107,7 +110,8 @@ function isProvider(value: unknown): value is Provider {
 }
 
 export async function POST(request: Request) {
-  if (!await allowed(request)) return noStore({ error: "غير مصرح" }, 401);
+  const identity = await requireAdminPermission(request, "billing.manage");
+  if (!identity) return noStore({ error: "غير مصرح" }, 401);
 
   let provider: unknown;
   try {
@@ -119,14 +123,15 @@ export async function POST(request: Request) {
 
   const client = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "admin";
   const quota = limiter.consume(`navixa-admin-custom-quote:${provider}:${client}`, 1, 7 * 24 * 60 * 60_000);
-  if (!quota.allowed) {
-    return noStore({ error: "أُرسل طلب عرض مخصص لهذه الجهة خلال آخر 7 أيام.", retryAfterSeconds: quota.retryAfterSeconds }, 429);
-  }
+  if (!quota.allowed) return noStore({ error: "أُرسل طلب عرض مخصص لهذه الجهة خلال آخر 7 أيام.", retryAfterSeconds: quota.retryAfterSeconds }, 429);
 
   const env = await runtimeEnv();
   const from = env.RESEND_FROM_EMAIL || env.NAVIXA_AUTH_FROM;
   const replyTo = env.NAVIXA_ADMIN_EMAIL;
-  if (!env.RESEND_API_KEY || !from || !replyTo) return noStore({ error: "إعداد بريد NAVIXA غير مكتمل" }, 409);
+  if (!env.RESEND_API_KEY || !from || !replyTo) {
+    await audit(env, identity.email, provider, "failure", { reason: "configuration" });
+    return noStore({ error: "إعداد بريد NAVIXA غير مكتمل" }, 409);
+  }
 
   const inquiry = inquiries[provider];
   const text = `السلام عليكم ورحمة الله وبركاته،
@@ -154,9 +159,14 @@ https://navixasa.com
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from, to: [inquiry.to], reply_to: replyTo, subject: inquiry.subject, text }),
     });
-    if (!response.ok) return noStore({ error: "تعذر إرسال الطلب عبر Resend" }, 502);
+    if (!response.ok) {
+      await audit(env, identity.email, provider, "failure", { status: response.status });
+      return noStore({ error: "تعذر إرسال الطلب عبر Resend" }, 502);
+    }
+    await audit(env, identity.email, provider, "success", { channel: "email" });
     return noStore({ ok: true, message: inquiry.successMessage });
   } catch {
+    await audit(env, identity.email, provider, "failure", { reason: "provider_unreachable" });
     return noStore({ error: "تعذر الاتصال بخدمة البريد الآن" }, 502);
   }
 }
