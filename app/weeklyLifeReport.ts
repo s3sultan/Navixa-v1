@@ -1,3 +1,7 @@
+import { localDateKey } from "./localDate.ts";
+
+export { localDateKey } from "./localDate.ts";
+
 export const trackedPrayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"] as const;
 export type TrackedPrayer = (typeof trackedPrayers)[number];
 
@@ -21,12 +25,6 @@ export type WeeklyLifeReport = {
   movementActiveDays: number;
   movementRecordedDays: number;
 };
-
-export function localDateKey(offsetDays = 0, base = new Date()) {
-  const date = new Date(base);
-  date.setDate(date.getDate() + offsetDays);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
 
 export const prayerTrackingKey = (date: string) => `navixa-prayers-${date}`;
 export const movementTrackingKey = (date: string) => `navixa-movement-${date}`;
