@@ -5,6 +5,7 @@ import {dismissPersonalReminder,getPersonalReminderPrefs,isPersonalReminderMuted
 import {readAcademicReminders} from "./academicReminders";
 import {isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
 import {showNavixaDeviceNotification} from "./pushClient";
+import {localDateKey} from "./localDate";
 
 const MINUTE=60_000;
 const REMINDER_START_GRACE=45_000;
@@ -13,7 +14,6 @@ const LAST_ANY_KEY="navixa-personal-reminder-last-any";
 const SCREEN_REMOTE_COOLDOWN=30_000;
 const SCREEN_REPEAT_COOLDOWN=60_000;
 const sentKey=(kind:PersonalReminderKind)=>`navixa-personal-reminder-last-${kind}`;
-const today=()=>new Date().toISOString().slice(0,10);
 
 type Props={focusRunning:boolean;focusElapsedSeconds:number;onReminder?:(message:string)=>void};
 type Candidate={kind:PersonalReminderKind;title:string;body:string;due:boolean};
@@ -62,11 +62,12 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
       const now=Date.now();
       if(now<reminderEligibleAtRef.current)return;
       const prefs=getPersonalReminderPrefs();if(!prefs.enabled)return;
+      const day=localDateKey(0,new Date(now));
       const lastActivity=Number(localStorage.getItem(ACTIVITY_KEY)||now),lastAny=Number(localStorage.getItem(LAST_ANY_KEY)||0),quietFor=Math.max(15,prefs.quietMinutes)*MINUTE;
       if(now-lastAny<quietFor)return;
-      const lastWaterIso=localStorage.getItem(`navixa-water-${today()}-last`),lastWater=lastWaterIso?new Date(lastWaterIso).getTime():0,waterInterval=Math.max(60,prefs.quietMinutes+40)*MINUTE,activityAge=now-lastActivity;
+      const lastWaterIso=localStorage.getItem(`navixa-water-${day}-last`),lastWater=lastWaterIso?new Date(lastWaterIso).getTime():0,waterInterval=Math.max(60,prefs.quietMinutes+40)*MINUTE,activityAge=now-lastActivity;
       if(activityAge>=2*60*MINUTE)return;
-      const focus=focusRef.current,academic=readAcademicReminders().find(item=>item.alertDate<=today()&&item.date>=today());
+      const focus=focusRef.current,academic=readAcademicReminders().find(item=>item.alertDate<=day&&item.date>=day);
       const candidates:Candidate[]=[
         {kind:"eye",title:"راحة لعينيك",body:"خذ 20 ثانية وانظر إلى نقطة بعيدة. عيناك تستحقان الاستراحة.",due:prefs.eye&&isScreenEnabled("break")&&((focus.focusRunning&&focus.focusElapsedSeconds>=20*60)||activityAge>=35*MINUTE)},
         {kind:"water",title:"تذكير ماء لطيف",body:"مر وقت منذ آخر كوب ماء مسجّل. خذ رشفة إذا احتجت.",due:prefs.water&&isScreenEnabled("water")&&(!lastWater||now-lastWater>=waterInterval)},
