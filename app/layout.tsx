@@ -18,7 +18,7 @@ import "./visitor-counter.css";
 import "./health-disabled.css";
 
 const siteUrl = "https://navixasa.com";
-const alexandriaStylesheet = "https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap";
+const alexandriaStylesheet = "https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=optional";
 
 export const viewport: Viewport = {
   width: "device-width",
