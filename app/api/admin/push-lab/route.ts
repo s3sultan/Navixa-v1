@@ -17,7 +17,6 @@ const actionIdPattern=/^[a-z0-9_-]{1,32}$/i;
 const safeRelativeUrl=(value:string)=>value.startsWith("/")&&!value.startsWith("//");
 
 async function db():Promise<Database|null>{try{return (await import("cloudflare:workers") as {env?:{DB?:Database}}).env?.DB||null}catch{return (globalThis as {DB?:Database}).DB||null}}
-async function schema(database:D1Database){await database.prepare("CREATE TABLE IF NOT EXISTS navixa_admin_push_lab_log (id TEXT PRIMARY KEY, admin_email TEXT NOT NULL, endpoint TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, sent_at TEXT NOT NULL)").run()}
 const reply=(body:Record<string,unknown>,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
 
 function readActions(value:unknown):FeaturePushAction[]{
@@ -52,7 +51,6 @@ export async function POST(request:Request){
   const actions=readActions(body.actions);
   if(!/^https:\/\//i.test(endpoint)||!title||!message)return reply({error:"بيانات الاختبار ناقصة"},400);
   const database=await db();if(!database)return reply({error:"التخزين غير مهيأ"},503);
-  await schema(database);
   const found=await database.prepare("SELECT endpoint,p256dh,auth FROM navixa_push_subscriptions WHERE endpoint=? AND enabled=1 LIMIT 1").bind(endpoint).all<Subscription>();
   const subscription=found.results[0];if(!subscription)return reply({error:"فعّل Push على جهاز الإدارة أولًا"},400);
   const result=await sendFeaturePush(subscription,{kind,title,body:message,url,tag,priority,actions,requireInteraction,silent:body.silent===true,urgency,ttl,accentColor});
@@ -61,7 +59,6 @@ export async function POST(request:Request){
     await writeAdminActivity(database,{adminEmail:identity.email,action:"push_lab.send",resource:"push",outcome:"failure",metadata:{kind,status:result.status||0,priority:priority||"auto",actions:actions.length}});
     return reply({error:"تعذر إرسال Push التجريبي"},502);
   }
-  await database.prepare("INSERT INTO navixa_admin_push_lab_log (id,admin_email,endpoint,kind,title,sent_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),identity.email,endpoint,kind,title,new Date().toISOString()).run();
   await writeAdminActivity(database,{adminEmail:identity.email,action:"push_lab.send",resource:"push",metadata:{kind,priority:priority||"auto",urgency:urgency||"auto",actions:actions.length,requireInteraction:requireInteraction??"auto",silent:body.silent===true}});
   return reply({ok:true});
 }
