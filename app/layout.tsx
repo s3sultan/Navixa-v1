@@ -5,6 +5,8 @@ import VisitorCounter from "./VisitorCounter";
 import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import PricingHeaderShortcut from "./PricingHeaderShortcut";
+import PushSubscriptionBootstrap from "./PushSubscriptionBootstrap";
+import DeviceControlAgent from "./DeviceControlAgent";
 import DeferredAppAgents from "./DeferredAppAgents";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
@@ -63,6 +65,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <DirectEntry />
       <NavixaSplash />
       <PerformanceReporter />
+      <PushSubscriptionBootstrap />
+      <DeviceControlAgent />
       <DeferredAppAgents />
       {children}
       <VisitorCounter />
