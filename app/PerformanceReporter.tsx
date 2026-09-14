@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const sampledPaths = new Set(["/", "/health", "/organize-your-day", "/meeting-summaries", "/smart-reminders", "/local-privacy"]);
+const sampledPaths = new Set(["/", "/organize-your-day", "/meeting-summaries", "/smart-reminders", "/local-privacy"]);
 
 type VitalEntry = PerformanceEntry & { value?: number; duration?: number; interactionId?: number; hadRecentInput?: boolean; startTime: number };
 

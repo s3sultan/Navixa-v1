@@ -7,6 +7,7 @@ import {isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
 import {showNavixaDeviceNotification} from "./pushClient";
 
 const MINUTE=60_000;
+const REMINDER_START_GRACE=45_000;
 const ACTIVITY_KEY="navixa-last-activity-at";
 const LAST_ANY_KEY="navixa-personal-reminder-last-any";
 const SCREEN_REMOTE_COOLDOWN=30_000;
@@ -20,6 +21,7 @@ type Candidate={kind:PersonalReminderKind;title:string;body:string;due:boolean};
 export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds}:Props){
   const focusRef=useRef({focusRunning,focusElapsedSeconds});
   const screenBridgeRef=useRef({signature:"",at:0});
+  const reminderEligibleAtRef=useRef(Date.now()+REMINDER_START_GRACE);
   const [visible,setVisible]=useState<Candidate|null>(null);
   const [notice,setNotice]=useState("");
   useEffect(()=>{focusRef.current={focusRunning,focusElapsedSeconds}},[focusRunning,focusElapsedSeconds]);
@@ -57,8 +59,10 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
 
     const maybeRemind=()=>{
       if(document.visibilityState!=="visible"||visible)return;
+      const now=Date.now();
+      if(now<reminderEligibleAtRef.current)return;
       const prefs=getPersonalReminderPrefs();if(!prefs.enabled)return;
-      const now=Date.now(),lastActivity=Number(localStorage.getItem(ACTIVITY_KEY)||now),lastAny=Number(localStorage.getItem(LAST_ANY_KEY)||0),quietFor=Math.max(15,prefs.quietMinutes)*MINUTE;
+      const lastActivity=Number(localStorage.getItem(ACTIVITY_KEY)||now),lastAny=Number(localStorage.getItem(LAST_ANY_KEY)||0),quietFor=Math.max(15,prefs.quietMinutes)*MINUTE;
       if(now-lastAny<quietFor)return;
       const lastWaterIso=localStorage.getItem(`navixa-water-${today()}-last`),lastWater=lastWaterIso?new Date(lastWaterIso).getTime():0,waterInterval=Math.max(60,prefs.quietMinutes+40)*MINUTE,activityAge=now-lastActivity;
       if(activityAge>=2*60*MINUTE)return;
