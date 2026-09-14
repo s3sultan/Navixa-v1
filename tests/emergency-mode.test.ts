@@ -23,8 +23,9 @@ test("emergency mode is admin-only and sends only approved Hِmmah continuity al
   assert.match(core, /claimIncidentNotification/);
   assert.doesNotMatch(core, /RESEND_API_KEY|TELEGRAM_BOT_TOKEN|moyasar|payment/i);
 
-  assert.match(route, /verifyAdminSessionToken/);
-  assert.match(route, /isTrustedSameOriginRequest/);
+  assert.match(route, /requireAdminPermission\(request, "emergency\.manage"\)/);
+  assert.match(route, /writeAdminActivity/);
+  assert.match(route, /emergency_mode\.update/);
   assert.match(route, /deliverEmergencyIncidentNotifications/);
   assert.match(route, /state\.state === "outage" \|\| state\.state === "recovery"/);
   assert.match(route, /Cache-Control": "no-store/);
