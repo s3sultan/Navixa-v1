@@ -1,0 +1,40 @@
+name: Reserve background runtime implementation
+
+on:
+  push:
+    branches:
+      - chore/reserve-background-runtime-20260914
+    paths:
+      - .github/workflows/reserve-background-runtime.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reserve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reserve files on master
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          git checkout -B master origin/master
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('AI_WORKSPACE.md')
+          text=p.read_text(encoding='utf-8')
+          start=text.index('## حالة العمل')
+          end=text.index('## مهمة سابقة', start)
+          block='''## حالة العمل\n\n- الوكيل النشط: ChatGPT.\n- المهمة الحالية: تنفيذ المرحلة الأولى من بنية Cloudflare الخلفية للتنبيهات الأكاديمية والمواعيد المهمة.\n- الحالة: حجز تنفيذ Runtime على `master` قبل التعديل؛ العمل سيكون على فرع معزول وPull Request ولن يدمج قبل نجاح الفحوص.\n- البنية المستهدفة: `Cron Trigger → Cloudflare Workflow → Queue → Web Push/Telegram` مع fallback آمن للمسار الحالي.\n- الملفات المحجوزة: `worker/index.ts`, `worker/backgroundAcademic.ts`, `.github/workflows/deploy-navixa-auto.yml`, `tests/important-reminders.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.\n- القيود: لا تعديل لتسجيل الدخول أو OTP أو الدفع أو واجهة المستخدم أو الاستماع الصوتي. ويستمر إيقاف المباريات من الواجهة والخلفية.\n- نقطة الرجوع: آخر `master` مستقر قبل هذه المهمة.\n\n'''
+          p.write_text(text[:start]+block+text[end:], encoding='utf-8')
+          PY
+          git config user.name 'NAVIXA coordination'
+          git config user.email 'actions@users.noreply.github.com'
+          git add AI_WORKSPACE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: reserve background runtime files'
+          git push origin HEAD:master
