@@ -37,13 +37,18 @@ jobs:
             exit 1
           fi
 
-          refs="$(git grep -n -I -e 'navixa-overview-v3.mp4' -- . || true)"
+          refs="$(git grep -n -I -e 'navixa-overview-v3.mp4' -- . ':!.github/workflows/media-cleanup-codemod.yml' ':!scripts/assemble_navixa_v3.sh' || true)"
           if [ -n "$refs" ]; then
-            echo 'Duplicate video is referenced; refusing cleanup:' >&2
+            echo 'Duplicate video has runtime or documentation references; refusing cleanup:' >&2
             echo "$refs" >&2
             exit 1
           fi
 
+          sed -i 's#navixa-overview-v3.mp4#navixa-overview-sync.mp4#g' scripts/assemble_navixa_v3.sh
+          if git grep -n -I -e 'navixa-overview-v3.mp4' -- . ':!.github/workflows/media-cleanup-codemod.yml'; then
+            echo 'A stale duplicate-video reference remains; refusing cleanup.' >&2
+            exit 1
+          fi
           rm "$duplicate"
 
           if command -v magick >/dev/null 2>&1; then
@@ -73,7 +78,7 @@ jobs:
           fi
 
           sed -i 's#/video/navixa-overview-primary-reference.png#/video/navixa-overview-primary-reference.webp#g' app/home-performance/HomeVideoModal.tsx
-          if git grep -n -I -e 'navixa-overview-primary-reference.png' -- .; then
+          if git grep -n -I -e 'navixa-overview-primary-reference.png' -- . ':!.github/workflows/media-cleanup-codemod.yml'; then
             echo 'A stale poster reference remains; refusing cleanup.' >&2
             exit 1
           fi
@@ -86,6 +91,6 @@ jobs:
           set -euo pipefail
           git config user.name 's3sultan'
           git config user.email 's2shug@gmail.com'
-          git add app/home-performance/HomeVideoModal.tsx public/video/final/navixa-overview-v3.mp4 public/video/navixa-overview-primary-reference.png public/video/navixa-overview-primary-reference.webp
+          git add app/home-performance/HomeVideoModal.tsx scripts/assemble_navixa_v3.sh public/video/final/navixa-overview-v3.mp4 public/video/navixa-overview-primary-reference.png public/video/navixa-overview-primary-reference.webp
           git commit -m 'perf(media): remove duplicate video and optimize poster'
           git push origin HEAD:perf/media-cleanup-phase2
