@@ -37,6 +37,34 @@ test("activity API and runtime controls enforce explicit admin permissions", () 
   assert.match(runtime, /writeAdminActivity/);
 });
 
+test("sensitive admin surfaces use explicit permissions and unified activity logging", () => {
+  const access = fs.readFileSync(new URL("worker/adminAccess.ts", root), "utf8");
+  const billing = fs.readFileSync(new URL("app/api/admin/billing-settings/route.ts", root), "utf8");
+  const discounts = fs.readFileSync(new URL("app/api/admin/discount-codes/route.ts", root), "utf8");
+  const quote = fs.readFileSync(new URL("app/api/admin/custom-payment-quote/route.ts", root), "utf8");
+  const emergency = fs.readFileSync(new URL("app/api/admin/emergency-mode/route.ts", root), "utf8");
+  const email = fs.readFileSync(new URL("app/api/admin/email-test/route.ts", root), "utf8");
+
+  assert.match(access, /billing\.manage/);
+  assert.match(access, /emergency\.manage/);
+  assert.match(access, /communications\.test/);
+
+  for (const source of [billing, discounts, quote]) {
+    assert.match(source, /requireAdminPermission\(request,\s*"billing\.manage"\)/);
+    assert.match(source, /writeAdminActivity/);
+    assert.doesNotMatch(source, /verifyAdminSessionToken/);
+  }
+  assert.match(emergency, /requireAdminPermission\(request,\s*"emergency\.manage"\)/);
+  assert.match(emergency, /emergency_mode\.update/);
+  assert.match(emergency, /writeAdminActivity/);
+  assert.doesNotMatch(emergency, /verifyAdminSessionToken/);
+
+  assert.match(email, /requireAdminPermission\(request,\s*"communications\.test"\)/);
+  assert.match(email, /email_test\.send/);
+  assert.match(email, /writeAdminActivity/);
+  assert.doesNotMatch(email, /verifyAdminSessionToken/);
+});
+
 test("admin dashboard uses the server-backed access and activity panels", () => {
   const page = fs.readFileSync(new URL("app/admin/page.tsx", root), "utf8");
   const panel = fs.readFileSync(new URL("app/admin/AdminAccessAuditPanel.tsx", root), "utf8");
