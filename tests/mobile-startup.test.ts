@@ -38,6 +38,19 @@ test("homepage lazy-loads the welcome splash", async () => {
   assert.match(welcome, /welcome-persistent-toggle/);
 });
 
+test("homepage uses one optional Alexandria source and stable priority card rows", async () => {
+  const [layout, styles] = await Promise.all([
+    readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("app/navixa.css", root), "utf8"),
+  ]);
+  assert.match(layout, /Alexandria:wght@400;500;600;700;800&display=optional/);
+  assert.doesNotMatch(layout, /Alexandria:wght@400;500;600;700;800&display=swap/);
+  assert.doesNotMatch(styles, /fonts\.googleapis\.com/);
+  assert.match(styles, /font-family:"Alexandria","Segoe UI",Tahoma,Arial,sans-serif/);
+  assert.match(styles, /grid-template-rows:auto minmax\(0,1fr\) auto auto auto/);
+  assert.match(styles, /meeting-feature\{grid-template-rows:auto minmax\(0,1fr\) auto auto auto auto/);
+});
+
 test("homepage greeting does not mount after hydration and shift layout", async () => {
   const page = await readFile(new URL("app/page.tsx", root), "utf8");
   assert.match(page, /greetingVisible,setGreetingVisible\]=useState\(true\)/);
