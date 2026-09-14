@@ -38,6 +38,12 @@ test("homepage lazy-loads the welcome splash", async () => {
   assert.match(welcome, /welcome-persistent-toggle/);
 });
 
+test("homepage greeting does not mount after hydration and shift layout", async () => {
+  const page = await readFile(new URL("app/page.tsx", root), "utf8");
+  assert.match(page, /greetingVisible,setGreetingVisible\]=useState\(true\)/);
+  assert.doesNotMatch(page, /setGreetingVisible\(true\);const timer=window\.setTimeout/);
+});
+
 test("direct-entry hides welcome before hydration and persists the real preference key", async () => {
   const [directEntry, directEntryStyles, layout] = await Promise.all([
     readFile(new URL("app/DirectEntry.tsx", root), "utf8"),
