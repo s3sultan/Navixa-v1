@@ -1,15 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import PerformanceReporter from "./PerformanceReporter";
-import VisitorReporter from "./VisitorReporter";
 import VisitorCounter from "./VisitorCounter";
 import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import PricingHeaderShortcut from "./PricingHeaderShortcut";
-import ClassScheduleShortcut from "./ClassScheduleShortcut";
-import PrayerAlertSync from "./PrayerAlertSync";
-import DeviceControlAgent from "./DeviceControlAgent";
-import PushSubscriptionBootstrap from "./PushSubscriptionBootstrap";
+import DeferredAppAgents from "./DeferredAppAgents";
 import "./globals.css";
 import "./mobile-spacing-fix.css";
 import "./direct-entry.css";
@@ -19,6 +15,7 @@ import "./worship-smart.css";
 import "./visitor-counter.css";
 
 const siteUrl = "https://navixasa.com";
+const alexandriaStylesheet = "https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -53,5 +50,22 @@ const structuredData = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ar" dir="rtl" suppressHydrationWarning><body><Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /><DirectEntry /><NavixaSplash /><PerformanceReporter /><VisitorReporter /><PrayerAlertSync /><PushSubscriptionBootstrap /><ClassScheduleShortcut /><DeviceControlAgent />{children}<VisitorCounter /><PricingHeaderShortcut /></body></html>;
+  return <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <head>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link rel="preload" href={alexandriaStylesheet} as="style" />
+    </head>
+    <body>
+      <Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <DirectEntry />
+      <NavixaSplash />
+      <PerformanceReporter />
+      <DeferredAppAgents />
+      {children}
+      <VisitorCounter />
+      <PricingHeaderShortcut />
+    </body>
+  </html>;
 }
