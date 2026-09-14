@@ -25,6 +25,19 @@ test("homepage lazy-loads tutorial and overview video modals", async () => {
   assert.match(videoModal, /preload="none"/);
 });
 
+test("homepage lazy-loads the welcome splash", async () => {
+  const [page, welcome] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/home-performance/HomeWelcome.tsx", root), "utf8"),
+  ]);
+  assert.match(page, /dynamic\(\(\) => import\("\.\/home-performance\/HomeWelcome"\)/);
+  assert.match(page, /welcomePreferenceReady&&!entered&&!hideWelcomeForever&&<HomeWelcome/);
+  assert.doesNotMatch(page, /aria-label="لوحة ترحيب NAVIXA"/);
+  assert.match(welcome, /aria-label="لوحة ترحيب NAVIXA"/);
+  assert.match(welcome, /welcome-overview-video/);
+  assert.match(welcome, /welcome-persistent-toggle/);
+});
+
 test("direct-entry hides welcome before hydration and persists the real preference key", async () => {
   const [directEntry, directEntryStyles, layout] = await Promise.all([
     readFile(new URL("app/DirectEntry.tsx", root), "utf8"),
