@@ -8,7 +8,7 @@
 - المهمة الحالية: تنفيذ المرحلة الأولى من بنية Cloudflare الخلفية للتنبيهات الأكاديمية والمواعيد المهمة.
 - الحالة: حجز تنفيذ Runtime على `master` قبل التعديل؛ العمل سيكون على فرع معزول وPull Request ولن يدمج قبل نجاح الفحوص.
 - البنية المستهدفة: `Cron Trigger → Cloudflare Workflow → Queue → Web Push/Telegram` مع fallback آمن للمسار الحالي.
-- الملفات المحجوزة: `worker/index.ts`, `worker/backgroundAcademic.ts`, `.github/workflows/deploy-navixa-auto.yml`, `tests/important-reminders.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+- الملفات المحجوزة: `worker/index.ts`, `worker/backgroundAcademic.ts`, `vite.config.ts`, `.github/workflows/deploy-navixa-auto.yml`, `tests/important-reminders.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
 - القيود: لا تعديل لتسجيل الدخول أو OTP أو الدفع أو واجهة المستخدم أو الاستماع الصوتي. ويستمر إيقاف المباريات من الواجهة والخلفية.
 - نقطة الرجوع: آخر `master` مستقر قبل هذه المهمة.
 
