@@ -11,6 +11,9 @@ export const adminPermissionCatalog = [
   { key: "activity.read", label: "سجل النشاط", detail: "قراءة سجل الإجراءات الإدارية الموثق." },
   { key: "runtime.manage", label: "مفاتيح التشغيل", detail: "تعديل الميزات التشغيلية الثانوية بتحقق صريح من الخادم." },
   { key: "push.test", label: "اختبارات Push", detail: "تشغيل اختبارات الإشعارات الإدارية بتحقق صريح من الخادم." },
+  { key: "billing.manage", label: "إدارة الدفع", detail: "تعديل إعدادات الدفع والخصومات والتواصل مع مزودي الدفع." },
+  { key: "emergency.manage", label: "وضع الطوارئ", detail: "قراءة وتغيير حالة الاستمرارية والطوارئ وإرسال تنبيهاتها." },
+  { key: "communications.test", label: "اختبارات التواصل", detail: "تشغيل اختبارات قنوات التواصل الخارجية مثل البريد الإداري." },
 ] as const;
 
 export type AdminPermission = (typeof adminPermissionCatalog)[number]["key"];

@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server.js";
-import { ADMIN_SESSION_COOKIE, isTrustedSameOriginRequest, readCookie, resolveAdminJwtSecret, verifyAdminSessionToken } from "../../../../worker/adminAuth.ts";
+import { requireAdminPermission } from "../../../../worker/adminAccess.ts";
+import { writeAdminActivity, type AdminActivityDatabase } from "../../../../worker/adminActivity.ts";
 import { listEmergencyIncidents, readEmergencyState, setEmergencyState, type EmergencyDatabase } from "../../../../worker/emergencyMode.ts";
 import { deliverEmergencyIncidentNotifications, type EmergencyNotificationEnv } from "../../../../worker/emergencyNotifications.ts";
 
-type RuntimeEnv = EmergencyNotificationEnv & { DB: EmergencyDatabase };
+type RuntimeDatabase = EmergencyDatabase & AdminActivityDatabase;
+type RuntimeEnv = EmergencyNotificationEnv & { DB: RuntimeDatabase };
 
 async function runtimeEnv(): Promise<Partial<RuntimeEnv>> {
   try { return (await import("cloudflare:workers") as { env?: Partial<RuntimeEnv> }).env || {}; }
   catch { return (globalThis as { __NAVIXA_EMERGENCY_ENV__?: Partial<RuntimeEnv> }).__NAVIXA_EMERGENCY_ENV__ || {}; }
-}
-
-async function adminAllowed(request: Request, requireSameOrigin = false) {
-  const secret = await resolveAdminJwtSecret();
-  if (!secret) return false;
-  if (requireSameOrigin && !isTrustedSameOriginRequest(request)) return false;
-  return verifyAdminSessionToken(readCookie(request, ADMIN_SESSION_COOKIE), secret);
 }
 
 function noStore(body: Record<string, unknown>, status = 200) {
@@ -22,7 +17,8 @@ function noStore(body: Record<string, unknown>, status = 200) {
 }
 
 export async function GET(request: Request) {
-  if (!await adminAllowed(request)) return noStore({ error: "غير مصرح" }, 401);
+  const identity = await requireAdminPermission(request, "emergency.manage");
+  if (!identity) return noStore({ error: "غير مصرح" }, 401);
   const env = await runtimeEnv();
   if (!env.DB) return noStore({ error: "قاعدة بيانات NAVIXA غير متاحة" }, 503);
   try {
@@ -34,7 +30,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!await adminAllowed(request, true)) return noStore({ error: "غير مصرح" }, 401);
+  const identity = await requireAdminPermission(request, "emergency.manage");
+  if (!identity) return noStore({ error: "غير مصرح" }, 401);
   const env = await runtimeEnv();
   if (!env.DB) return noStore({ error: "قاعدة بيانات NAVIXA غير متاحة" }, 503);
 
@@ -61,8 +58,10 @@ export async function POST(request: Request) {
       }
     }
 
+    await writeAdminActivity(env.DB,{adminEmail:identity.email,action:"emergency_mode.update",resource:"emergency",metadata:{state:state.state,hasReason:Boolean(body.reason),notificationsClaimed:notificationResult.claimed,emailSent:notificationResult.emailSent,telegramSent:notificationResult.telegramSent}});
     return noStore({ ok: true, state, notifications: notificationResult });
   } catch (error) {
+    await writeAdminActivity(env.DB,{adminEmail:identity.email,action:"emergency_mode.update",resource:"emergency",outcome:"failure",metadata:{requestedState:String(body.state||"").slice(0,40)}});
     if (error instanceof Error && error.message === "invalid_state") return noStore({ error: "حالة طوارئ غير صالحة" }, 400);
     if (error instanceof Error && error.message === "invalid_transition") return noStore({ error: "الانتقال بين حالتي الطوارئ غير مسموح" }, 409);
     return noStore({ error: "تعذر تحديث وضع الطوارئ" }, 500);

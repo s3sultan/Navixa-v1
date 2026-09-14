@@ -13,6 +13,7 @@ test("admin Push lab requires explicit server permission and records activity",(
   assert.match(route,/push_lab\.send/);
   assert.match(route,/Cache-Control/);
   assert.doesNotMatch(route,/metadata:\{[^}]*endpoint/);
+  assert.doesNotMatch(route,/navixa_admin_push_lab_log/);
 });
 
 test("Push lab supports feature events and configurable preview",()=>{
