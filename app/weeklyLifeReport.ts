@@ -1,6 +1,6 @@
-import { localDateKey } from "./localDate";
+import { localDateKey } from "./localDate.ts";
 
-export { localDateKey } from "./localDate";
+export { localDateKey } from "./localDate.ts";
 
 export const trackedPrayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"] as const;
 export type TrackedPrayer = (typeof trackedPrayers)[number];
