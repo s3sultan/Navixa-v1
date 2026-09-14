@@ -4,12 +4,13 @@
 
 ## حالة العمل
 
-- الوكيل النشط: لا يوجد حجز منتج نشط لهذه المهمة.
-- المهمة الحالية: اعتماد بنية Cloudflare للمهام الخلفية في NAVIXA.
-- الحالة: القرار موثق فقط؛ لا يوجد تغيير Runtime أو نشر ناتج عن هذه المهمة.
-- البنية المعتمدة: `Cron Trigger → Cloudflare Workflow → Queue → Web Push/Telegram`، مع `Durable Object Alarms` للمواعيد الدقيقة لكل مستخدم.
-- الملفات المحجوزة: محررة؛ لا يوجد حجز نشط بسبب هذا القرار التوثيقي.
-- التالي المقترح: تنفيذ مرحلة أولى معزولة للتنبيهات الأكاديمية والمواعيد المهمة، مع idempotency وretry ومراقبة واضحة، بعد بدء مهمة تنفيذ مستقلة.
+- الوكيل النشط: ChatGPT.
+- المهمة الحالية: تنفيذ المرحلة الأولى من بنية Cloudflare الخلفية للتنبيهات الأكاديمية والمواعيد المهمة.
+- الحالة: حجز تنفيذ Runtime على `master` قبل التعديل؛ العمل سيكون على فرع معزول وPull Request ولن يدمج قبل نجاح الفحوص.
+- البنية المستهدفة: `Cron Trigger → Cloudflare Workflow → Queue → Web Push/Telegram` مع fallback آمن للمسار الحالي.
+- الملفات المحجوزة: `worker/index.ts`, `worker/backgroundAcademic.ts`, `.github/workflows/deploy-navixa-auto.yml`, `tests/important-reminders.test.ts`, `AI_WORKSPACE.md`, `AI_CHANGELOG.md`.
+- القيود: لا تعديل لتسجيل الدخول أو OTP أو الدفع أو واجهة المستخدم أو الاستماع الصوتي. ويستمر إيقاف المباريات من الواجهة والخلفية.
+- نقطة الرجوع: آخر `master` مستقر قبل هذه المهمة.
 
 ## مهمة سابقة — NAVIXA UI System Phase 1
 
