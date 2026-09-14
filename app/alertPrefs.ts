@@ -10,8 +10,8 @@ export const ALERT_LABELS:Record<AlertType,string>={
   focus:"انتهاء جلسة التركيز",name:"سماع الاسم",screen:"متابعة الشاشة",wird:"إتمام الورد اليومي",sadaqah:"تذكير الصدقة",task:"إنجاز مهمة"
 };
 
-const defaultUserPrefs=():Record<AlertType,Channels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:true,telegram:true}])) as Record<AlertType,Channels>;
-const defaultAdminPolicy=():Record<AlertType,PolicyChannels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:"user",telegram:"user"}])) as Record<AlertType,PolicyChannels>;
+const defaultUserPrefs=():Record<AlertType,Channels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:t!=="water",telegram:t!=="water"}])) as Record<AlertType,Channels>;
+const defaultAdminPolicy=():Record<AlertType,PolicyChannels>=>Object.fromEntries(ALERT_TYPES.map(t=>[t,{screen:t==="water"?"off":"user",telegram:t==="water"?"off":"user"}])) as Record<AlertType,PolicyChannels>;
 
 export const getUserPrefs=():Record<AlertType,Channels>=>{try{return {...defaultUserPrefs(),...JSON.parse(localStorage.getItem("navixa-alert-prefs")||"{}")} }catch{return defaultUserPrefs()}};
 export const setUserPrefs=(prefs:Record<AlertType,Channels>)=>localStorage.setItem("navixa-alert-prefs",JSON.stringify(prefs));
@@ -21,6 +21,7 @@ export const getAdminMessages=():Partial<Record<AlertType,string>>=>{try{return 
 export const setAdminMessages=(msgs:Partial<Record<AlertType,string>>)=>localStorage.setItem("navixa-admin-alert-messages",JSON.stringify(msgs));
 
 const isChannelEnabled=(type:AlertType,channel:"screen"|"telegram"):boolean=>{
+  if(type==="water")return false;
   const policy=getAdminPolicy()[type]?.[channel]||"user";
   if(policy==="on")return true;
   if(policy==="off")return false;
@@ -60,6 +61,7 @@ const forwardNameAlert=(message:string)=>{
 };
 
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
+  if(type==="water")return;
   if(type==="name"&&forwardNameAlert(fallbackMessage))return;
   if(!isTelegramEnabled(type))return;
   const custom=getAdminMessages()[type];
