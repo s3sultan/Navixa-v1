@@ -1,0 +1,91 @@
+name: NAVIXA Media Cleanup Codemod
+
+on:
+  push:
+    branches: [perf/media-cleanup-phase2]
+    paths:
+      - '.github/workflows/media-cleanup-codemod.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated media branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: perf/media-cleanup-phase2
+
+      - name: Validate duplicate and optimize overview poster
+        shell: bash
+        run: |
+          set -euo pipefail
+          sync='public/video/final/navixa-overview-sync.mp4'
+          duplicate='public/video/final/navixa-overview-v3.mp4'
+          poster='public/video/navixa-overview-primary-reference.png'
+          optimized='public/video/navixa-overview-primary-reference.webp'
+
+          test -f "$sync"
+          test -f "$duplicate"
+          test -f "$poster"
+
+          if ! cmp -s "$sync" "$duplicate"; then
+            echo 'Overview videos are no longer byte-identical; refusing cleanup.' >&2
+            exit 1
+          fi
+
+          refs="$(git grep -n -I -e 'navixa-overview-v3.mp4' -- . || true)"
+          if [ -n "$refs" ]; then
+            echo 'Duplicate video is referenced; refusing cleanup:' >&2
+            echo "$refs" >&2
+            exit 1
+          fi
+
+          rm "$duplicate"
+
+          if command -v magick >/dev/null 2>&1; then
+            magick "$poster" -strip -quality 88 "$optimized"
+          elif command -v convert >/dev/null 2>&1; then
+            convert "$poster" -strip -quality 88 "$optimized"
+          else
+            sudo apt-get update
+            sudo apt-get install -y imagemagick
+            convert "$poster" -strip -quality 88 "$optimized"
+          fi
+
+          test -s "$optimized"
+          old_size="$(stat -c%s "$poster")"
+          new_size="$(stat -c%s "$optimized")"
+          echo "Poster bytes: $old_size -> $new_size"
+          if [ "$new_size" -ge "$old_size" ]; then
+            echo 'Optimized poster is not smaller; refusing replacement.' >&2
+            exit 1
+          fi
+
+          if command -v identify >/dev/null 2>&1; then
+            old_dims="$(identify -format '%wx%h' "$poster")"
+            new_dims="$(identify -format '%wx%h' "$optimized")"
+            echo "Poster dimensions: $old_dims -> $new_dims"
+            test "$old_dims" = "$new_dims"
+          fi
+
+          sed -i 's#/video/navixa-overview-primary-reference.png#/video/navixa-overview-primary-reference.webp#g' app/home-performance/HomeVideoModal.tsx
+          if git grep -n -I -e 'navixa-overview-primary-reference.png' -- .; then
+            echo 'A stale poster reference remains; refusing cleanup.' >&2
+            exit 1
+          fi
+          git grep -n -I -e 'navixa-overview-primary-reference.webp' -- app/home-performance/HomeVideoModal.tsx
+          rm "$poster"
+
+      - name: Commit isolated media cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 's3sultan'
+          git config user.email 's2shug@gmail.com'
+          git add app/home-performance/HomeVideoModal.tsx public/video/final/navixa-overview-v3.mp4 public/video/navixa-overview-primary-reference.png public/video/navixa-overview-primary-reference.webp
+          git commit -m 'perf(media): remove duplicate video and optimize poster'
+          git push origin HEAD:perf/media-cleanup-phase2
