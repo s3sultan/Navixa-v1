@@ -11,6 +11,20 @@ test("homepage defers non-essential mobile startup tools", async () => {
   assert.doesNotMatch(page, /import FloatingAssistant from/);
 });
 
+test("homepage lazy-loads tutorial and overview video modals", async () => {
+  const [page, videoModal] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/home-performance/HomeVideoModal.tsx", root), "utf8"),
+  ]);
+  assert.match(page, /dynamic\(\(\) => import\("\.\/home-performance\/HomeVideoModal"\)/);
+  assert.match(page, /\(overviewVideoOpen\|\|tutorialOpen\)&&<HomeVideoModal/);
+  assert.doesNotMatch(page, /navixa-overview-video-backdrop/);
+  assert.doesNotMatch(page, /tutorial-modal-back/);
+  assert.match(videoModal, /navixa-overview-video-backdrop/);
+  assert.match(videoModal, /tutorial-modal-back/);
+  assert.match(videoModal, /preload="none"/);
+});
+
 test("direct-entry hides welcome before hydration and persists the real preference key", async () => {
   const [directEntry, directEntryStyles, layout] = await Promise.all([
     readFile(new URL("app/DirectEntry.tsx", root), "utf8"),
