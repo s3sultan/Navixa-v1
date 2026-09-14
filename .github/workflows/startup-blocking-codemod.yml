@@ -1,0 +1,62 @@
+name: NAVIXA Startup Blocking Codemod
+
+on:
+  push:
+    branches: [perf/startup-blocking-phase5]
+    paths:
+      - '.github/workflows/startup-blocking-codemod.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout isolated startup branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: perf/startup-blocking-phase5
+
+      - name: Remove decorative splash and duplicate font import
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          layout = Path('app/layout.tsx')
+          text = layout.read_text()
+          if 'import NavixaSplash from "./NavixaSplash";\n' not in text or '      <NavixaSplash />\n' not in text:
+              raise SystemExit('Refusing cleanup: expected NavixaSplash mount markers are missing.')
+          text = text.replace('import NavixaSplash from "./NavixaSplash";\n', '', 1)
+          text = text.replace('      <NavixaSplash />\n', '', 1)
+          if 'NavixaSplash' in text:
+              raise SystemExit('Refusing cleanup: NavixaSplash still referenced by root layout.')
+          layout.write_text(text)
+
+          css = Path('app/navixa.css')
+          css_text = css.read_text()
+          font_import = "@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap');\n"
+          if css_text.count(font_import) != 1:
+              raise SystemExit('Refusing cleanup: duplicate Alexandria @import marker was not found exactly once.')
+          css_text = css_text.replace(font_import, '', 1)
+          if 'fonts.googleapis.com' in css_text:
+              raise SystemExit('Refusing cleanup: a Google Fonts import remains in navixa.css.')
+          css.write_text(css_text)
+
+          test = Path('tests/startup-blocking.test.ts')
+          test.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\nconst root = new URL("../", import.meta.url);\n\ntest("root startup does not mount the decorative splash", async () => {\n  const [layout, splash] = await Promise.all([\n    readFile(new URL("app/layout.tsx", root), "utf8"),\n    readFile(new URL("app/NavixaSplash.tsx", root), "utf8"),\n  ]);\n  assert.doesNotMatch(layout, /NavixaSplash/);\n  assert.match(splash, /900/);\n});\n\ntest("Alexandria stylesheet is loaded once without a nested CSS import", async () => {\n  const [layout, navixa] = await Promise.all([\n    readFile(new URL("app/layout.tsx", root), "utf8"),\n    readFile(new URL("app/navixa.css", root), "utf8"),\n  ]);\n  assert.match(layout, /fonts\\.googleapis\\.com\\/css2\\?family=Alexandria/);\n  assert.doesNotMatch(navixa, /fonts\\.googleapis\\.com/);\n});\n''')
+          PY
+          git diff --check
+
+      - name: Commit isolated startup cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 's3sultan'
+          git config user.email 's2shug@gmail.com'
+          git add app/layout.tsx app/navixa.css tests/startup-blocking.test.ts
+          git commit -m 'perf(startup): remove decorative splash and duplicate font import'
+          git push origin HEAD:perf/startup-blocking-phase5
