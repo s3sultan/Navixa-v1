@@ -1,0 +1,75 @@
+name: Home font CLS codemod
+
+on:
+  push:
+    branches:
+      - perf/home-font-cls-phase6
+    paths:
+      - .github/workflows/home-font-cls-codemod.yml
+
+permissions:
+  contents: write
+
+jobs:
+  codemod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/home-font-cls-phase6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Stabilize Alexandria loading and priority card rows
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          css_path = Path('app/navixa.css')
+          css = css_path.read_text()
+          duplicate_import = "@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap');\n"
+          assert css.startswith(duplicate_import), 'Alexandria import target changed'
+          css = css[len(duplicate_import):]
+          old_family = '.nx{font-family:"Alexandria",sans-serif;'
+          new_family = '.nx{font-family:"Alexandria","Segoe UI",Tahoma,Arial,sans-serif;'
+          assert css.count(old_family) == 1, 'NAVIXA font-family target changed'
+          css = css.replace(old_family, new_family, 1)
+          old_rows = '.priority-feature{position:relative;isolation:isolate;min-height:365px;padding:28px;display:grid;grid-template-rows:auto 1fr auto auto;'
+          new_rows = '.priority-feature{position:relative;isolation:isolate;min-height:365px;padding:28px;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;'
+          assert css.count(old_rows) == 1, 'priority feature grid target changed'
+          css = css.replace(old_rows, new_rows, 1)
+          meeting_anchor = '.meeting-feature{background:'
+          assert css.count(meeting_anchor) == 1, 'meeting feature target changed'
+          css = css.replace(meeting_anchor, '.meeting-feature{grid-template-rows:auto minmax(0,1fr) auto auto auto auto;background:', 1)
+          css_path.write_text(css)
+
+          layout_path = Path('app/layout.tsx')
+          layout = layout_path.read_text()
+          old_font_url = 'https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap'
+          new_font_url = 'https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=optional'
+          assert layout.count(old_font_url) == 1, 'layout Alexandria URL target changed'
+          layout = layout.replace(old_font_url, new_font_url, 1)
+          layout_path.write_text(layout)
+
+          test_path = Path('tests/mobile-startup.test.ts')
+          test = test_path.read_text()
+          marker = 'test("homepage greeting does not mount after hydration and shift layout", async () => {'
+          assert marker in test, 'test marker changed'
+          addition = '''test("homepage uses one optional Alexandria source and stable priority card rows", async () => {\n  const [layout, styles] = await Promise.all([\n    readFile(new URL("app/layout.tsx", root), "utf8"),\n    readFile(new URL("app/navixa.css", root), "utf8"),\n  ]);\n  assert.match(layout, /Alexandria:wght@400;500;600;700;800&display=optional/);\n  assert.doesNotMatch(layout, /Alexandria:wght@400;500;600;700;800&display=swap/);\n  assert.doesNotMatch(styles, /fonts\\.googleapis\\.com/);\n  assert.match(styles, /font-family:\"Alexandria\",\"Segoe UI\",Tahoma,Arial,sans-serif/);\n  assert.match(styles, /grid-template-rows:auto minmax\\(0,1fr\\) auto auto auto/);\n  assert.match(styles, /meeting-feature\\{grid-template-rows:auto minmax\\(0,1fr\\) auto auto auto auto/);\n});\n\n'''
+          assert 'homepage uses one optional Alexandria source and stable priority card rows' not in test, 'test already exists'
+          test = test.replace(marker, addition + marker, 1)
+          test_path.write_text(test)
+          PY
+      - name: Verify exact change
+        run: |
+          ! grep -F 'fonts.googleapis.com' app/navixa.css
+          grep -F 'display=optional' app/layout.tsx
+          grep -F 'grid-template-rows:auto minmax(0,1fr) auto auto auto' app/navixa.css
+          grep -F 'homepage uses one optional Alexandria source and stable priority card rows' tests/mobile-startup.test.ts
+      - name: Commit codemod result
+        run: |
+          git config user.name 'navixa-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/navixa.css app/layout.tsx tests/mobile-startup.test.ts
+          git commit -m 'perf(home): stabilize font and priority layout'
+          git push
