@@ -34,7 +34,7 @@ test("مسارات مفاتيح التشغيل تفصل القراءة العا�
   assert.match(adminAccess, /verifyAdminSessionToken/);
   assert.match(adminAccess, /isTrustedSameOriginRequest/);
   assert.match(adminRoute, /Cache-Control.*no-store/);
-  assert.match(home, /runtimeFeatures\.matchesHomeEnabled/);
+  assert.doesNotMatch(home, /runtimeFeatures\.matchesHomeEnabled/);
   assert.match(home, /runtimeFeatures\.floatingAssistantEnabled/);
   assert.match(home, /loading="lazy" fetchPriority="low"/);
   assert.match(tracker, /usageAnalyticsEnabled/);
