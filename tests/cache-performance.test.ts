@@ -23,7 +23,7 @@ assert.match(matches, /caches\.default/);
 assert.match(matches, /X-NAVIXA-Matches-Provider-Cache/);
 assert.match(matches, /cache:"no-store"/);
 const home = source("app/page.tsx");
-assert.match(home, /api\/matches\?date=.*cache:"default"/);
+assert.doesNotMatch(home, /api\/matches/);
 
 const performanceReporter = source("app/PerformanceReporter.tsx");
 assert.match(performanceReporter, /navigation\.loadEventEnd <= 0/);
