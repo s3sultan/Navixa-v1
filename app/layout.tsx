@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import PerformanceReporter from "./PerformanceReporter";
 import VisitorCounter from "./VisitorCounter";
-import NavixaSplash from "./NavixaSplash";
 import DirectEntry from "./DirectEntry";
 import PricingHeaderShortcut from "./PricingHeaderShortcut";
 import PushSubscriptionBootstrap from "./PushSubscriptionBootstrap";
@@ -63,7 +62,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <DirectEntry />
-      <NavixaSplash />
       <PerformanceReporter />
       <PushSubscriptionBootstrap />
       <DeviceControlAgent />
