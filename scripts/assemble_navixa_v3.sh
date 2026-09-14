@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VID="$ROOT/public/video"
 AUD="$VID/audio"
-OUT="$VID/final/navixa-overview-v3.mp4"
+OUT="$VID/final/navixa-overview-sync.mp4"
 TMP="$ROOT/.tmp-navixa-v3"
 mkdir -p "$TMP" "$(dirname "$OUT")"
 
