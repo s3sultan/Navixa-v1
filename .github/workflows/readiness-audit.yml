@@ -1,0 +1,118 @@
+name: NAVIXA Readiness Audit
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/readiness-audit.yml'
+      - 'lighthouserc.json'
+      - 'security/NAVIXA_ASVS_5_CHECKLIST.md'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/readiness-audit.yml'
+      - 'lighthouserc.json'
+      - 'security/NAVIXA_ASVS_5_CHECKLIST.md'
+  schedule:
+    - cron: '23 4 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navixa-readiness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NAVIXA_PUBLIC_HOST: navixasa.com
+  NAVIXA_PUBLIC_URL: https://navixasa.com
+
+jobs:
+  lighthouse:
+    name: Lighthouse CI baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.13.0'
+
+      - name: Prepare Lighthouse report directory
+        run: mkdir -p security/reports/lighthouse
+
+      - name: Run read-only Lighthouse CI against production
+        run: npm exec --yes --package=@lhci/cli@0.15.1 -- lhci autorun --config=lighthouserc.json
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: navixa-lighthouse-baseline
+          path: security/reports/lighthouse
+          if-no-files-found: warn
+          retention-days: 14
+
+  observatory:
+    name: MDN HTTP Observatory
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run read-only HTTP header scan
+        shell: bash
+        run: |
+          set -u
+          mkdir -p security/reports/observatory
+          report="security/reports/observatory/navixa-http-observatory.json"
+
+          set +e
+          http_code="$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --retry 2 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 60 \
+            --request POST \
+            --output "$report" \
+            --write-out '%{http_code}' \
+            "https://observatory-api.mdn.mozilla.net/api/v2/scan?host=${NAVIXA_PUBLIC_HOST}")"
+          curl_status=$?
+          set -e
+
+          if [ "$curl_status" -ne 0 ] || [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::warning::MDN HTTP Observatory did not return a successful scan (curl=$curl_status http=$http_code)."
+            printf '{"status":"unavailable","curl_status":%s,"http_status":"%s"}\n' \
+              "$curl_status" "$http_code" > "$report"
+            exit 0
+          fi
+
+          if ! jq -e . "$report" >/dev/null 2>&1; then
+            echo "::warning::MDN HTTP Observatory returned a non-JSON response."
+            mv "$report" "${report%.json}.raw"
+            printf '{"status":"invalid-response"}\n' > "$report"
+            exit 0
+          fi
+
+          grade="$(jq -r '.grade // "unknown"' "$report")"
+          score="$(jq -r '.score // "unknown"' "$report")"
+          details="$(jq -r '.details_url // "unavailable"' "$report")"
+          echo "HTTP Observatory grade: $grade"
+          echo "HTTP Observatory score: $score"
+          echo "Details: $details"
+
+      - name: Upload HTTP Observatory report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: navixa-http-observatory
+          path: security/reports/observatory
+          if-no-files-found: warn
+          retention-days: 14
