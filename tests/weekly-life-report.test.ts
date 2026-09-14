@@ -17,6 +17,21 @@ test("daily tracking uses the device calendar date instead of a UTC slice", () =
   assert.equal(localDateKey(-1, localMidnight), "2026-09-12");
 });
 
+test("personal reminder daily keys share the local calendar helper", () => {
+  const root = new URL("../", import.meta.url);
+  const helper = fs.readFileSync(new URL("app/localDate.ts", root), "utf8");
+  const reminders = fs.readFileSync(new URL("app/PersonalReminderEngine.tsx", root), "utf8");
+  assert.match(helper, /getFullYear\(\)/);
+  assert.match(helper, /getMonth\(\)/);
+  assert.match(helper, /getDate\(\)/);
+  assert.doesNotMatch(helper, /toISOString/);
+  assert.match(reminders, /import \{localDateKey\} from "\.\/localDate"/);
+  assert.match(reminders, /dayKey=localDateKey\(\)/);
+  assert.match(reminders, /navixa-water-\$\{dayKey\}-last/);
+  assert.match(reminders, /item\.alertDate<=dayKey&&item\.date>=dayKey/);
+  assert.doesNotMatch(reminders, /toISOString\(\)\.slice\(0,10\)/);
+});
+
 test("prayer tracking keeps only the five supported prayers", () => {
   assert.deepEqual(readPrayerCompletions('["Fajr","Asr","Unknown","Fajr"]'), ["Fajr", "Asr"]);
   assert.deepEqual(readPrayerCompletions("broken"), []);
