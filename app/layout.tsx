@@ -13,6 +13,7 @@ import "./public-pricing.css";
 import "./pricing-header-shortcut.css";
 import "./worship-smart.css";
 import "./visitor-counter.css";
+import "./health-disabled.css";
 
 const siteUrl = "https://navixasa.com";
 const alexandriaStylesheet = "https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap";
@@ -54,7 +55,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <head>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link rel="preload" href={alexandriaStylesheet} as="style" />
+      <link rel="stylesheet" href={alexandriaStylesheet} />
     </head>
     <body>
       <Script src="/navixa-appearance-bootstrap.js" strategy="beforeInteractive" />
