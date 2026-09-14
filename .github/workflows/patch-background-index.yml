@@ -1,0 +1,49 @@
+name: Patch background reminder worker entry
+
+on:
+  push:
+    branches:
+      - feat/background-reminders-phase1
+    paths:
+      - .github/workflows/patch-background-index.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/background-reminders-phase1
+      - name: Patch worker entry
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('worker/index.ts')
+          text=p.read_text(encoding='utf-8')
+          old='import { deliverDueMatchPushes } from "./matchPush";\n'
+          if old not in text: raise SystemExit('match import missing')
+          text=text.replace(old,'',1)
+          old='import { deliverDueImportantReminders } from "./importantReminders";\n'
+          if old not in text: raise SystemExit('reminder import missing')
+          text=text.replace(old,'import { consumeAcademicReminderQueue, triggerAcademicReminderWorkflow, type AcademicQueueBatch } from "./backgroundAcademic";\nexport { AcademicReminderWorkflow } from "./backgroundAcademic";\n',1)
+          old='  async scheduled(_controller: { cron: string }, env: Env, ctx: ExecutionContext) {\n    ctx.waitUntil(deliverDueMatchPushes(env).then(result => console.log(JSON.stringify({ event: "match_push_scheduled", delivered: result.delivered, skipped: result.skipped }))));\n'
+          new='  async scheduled(controller: { cron: string; scheduledTime?: number }, env: Env, ctx: ExecutionContext) {\n    ctx.waitUntil(triggerAcademicReminderWorkflow(env,controller.scheduledTime).then(result => console.log(JSON.stringify({ event: "academic_reminder_workflow", ...result }))).catch(error => console.log(JSON.stringify({ event: "academic_reminder_workflow_failed", message: error instanceof Error ? error.message : "unknown" }))));\n'
+          if old not in text: raise SystemExit('scheduled anchor missing')
+          text=text.replace(old,new,1)
+          old='    ctx.waitUntil(deliverDueImportantReminders(env).then(result => console.log(JSON.stringify({ event: "important_reminders", ...result }))).catch(error => console.log(JSON.stringify({ event: "important_reminders_failed", message: error instanceof Error ? error.message : "unknown" }))));\n'
+          if old not in text: raise SystemExit('direct reminder call missing')
+          text=text.replace(old,'',1)
+          anchor='  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {\n'
+          queue='  async queue(batch: AcademicQueueBatch, env: Env): Promise<void> {\n    const result=await consumeAcademicReminderQueue(batch,env);\n    console.log(JSON.stringify({event:"academic_reminder_queue",...result}));\n  },\n'
+          if anchor not in text: raise SystemExit('fetch anchor missing')
+          p.write_text(text.replace(anchor,queue+anchor,1),encoding='utf-8')
+      - name: Commit worker entry
+        run: |
+          git config user.name 'NAVIXA automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add worker/index.ts
+          git commit -m 'feat: connect cron workflow and reminder queue'
+          git push origin HEAD:feat/background-reminders-phase1
