@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import { GET, POST } from "../app/api/sync/route.ts";
 import { decryptSyncPayload, encryptSyncPayload, normalizeSyncPassphrase } from "../lib/accountSyncCrypto.ts";
@@ -187,4 +188,14 @@ test("account sync crypto restores with the canonical passphrase on another devi
 test("account sync crypto reports a wrong passphrase without exposing plaintext", async () => {
   const encrypted = await encryptSyncPayload("private-navixa-data", "correct-passphrase");
   await assert.rejects(() => decryptSyncPayload(encrypted, "wrong-passphrase"), /passphrase-mismatch/);
+});
+
+
+test("homepage no longer exposes the stale independent cloud-sync path", () => {
+  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const accountSync = fs.readFileSync(new URL("../app/account/AccountSync.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(page, /navixa-sync-id|syncUpload|syncDownload|syncPassphrase|createSyncId|betaUsageRemaining|consumeBetaUsage/);
+  assert.match(page, /المزامنة السحابية من حسابك/);
+  assert.match(page, /href="\/account"/);
+  assert.match(accountSync, /fetch\("\/api\/sync"/);
 });
