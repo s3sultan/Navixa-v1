@@ -1,0 +1,18 @@
+/* Temporary NAVIXA pause: health center and hydration UI stay in source but are hidden until a product decision is made. */
+.health-gateway,
+.mobile-more-links > a[href="/health"],
+.daily-strip > div:nth-child(2),
+.habit-insight-card .habit-stats-grid > div:nth-child(3),
+.habit-insight-card .habit-month-summary > span:nth-child(2) {
+  display: none !important;
+}
+
+@media (min-width: 651px) {
+  .daily-strip {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .habit-insight-card .habit-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
