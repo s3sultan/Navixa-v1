@@ -1,0 +1,116 @@
+name: Temporary sync entry cleanup
+
+on:
+  push:
+    branches:
+      - cleanup/unify-sync-entry-20260914
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cleanup/unify-sync-entry-20260914
+          fetch-depth: 0
+
+      - name: Remove stale homepage cloud sync path
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("app/page.tsx")
+          page = path.read_text(encoding="utf-8")
+
+          page, count = re.subn(
+              r'\nimport \{ betaUsageLabel, betaUsageRemaining, consumeBetaUsage \} from "\./betaUsage";',
+              '',
+              page,
+              count=1,
+          )
+          assert count == 1, f"beta usage import replacement count={count}"
+
+          page, count = re.subn(
+              r'\n  const \[syncId,setSyncId\]=useState\(""\);\n  const \[syncStatus,setSyncStatus\]=useState\(""\);\n  const \[syncPassphrase,setSyncPassphrase\]=useState\(""\);',
+              '',
+              page,
+              count=1,
+          )
+          assert count == 1, f"sync state replacement count={count}"
+
+          page, count = re.subn(
+              r'\n  const createSyncId=.*?\n  const \[insightsTick',
+              '\n  const [insightsTick',
+              page,
+              count=1,
+              flags=re.S,
+          )
+          assert count == 1, f"legacy sync function replacement count={count}"
+
+          page, count = re.subn(
+              r'const savedSyncId=localStorage\.getItem\("navixa-sync-id"\);if\(savedSyncId\)setSyncId\(savedSyncId\);',
+              '',
+              page,
+              count=1,
+          )
+          assert count == 1, f"legacy sync hydration replacement count={count}"
+
+          replacement = '<div className="cloud-sync-box"><div><b>المزامنة السحابية من حسابك</b><small>المزامنة المشفرة بين أجهزتك أصبحت مرتبطة بحساب NAVIXA بدل رمز منفصل.</small></div><Link className="assistant-primary-action" href="/account">فتح المزامنة في الحساب ←</Link></div><small className="backup-note">تصدير واستيراد JSON يبقى محليًا على جهازك. للمزامنة السحابية استخدم صفحة الحساب؛ كلمة مرور التشفير لا تُرسل إلى الخادم.</small><div className="welcome-settings-row">'
+          page, count = re.subn(
+              r'<div className="cloud-sync-box">.*?<div className="welcome-settings-row">',
+              replacement,
+              page,
+              count=1,
+              flags=re.S,
+          )
+          assert count == 1, f"cloud sync UI replacement count={count}"
+
+          forbidden = (
+              "navixa-sync-id",
+              "syncUpload",
+              "syncDownload",
+              "syncPassphrase",
+              "createSyncId",
+              "encryptSyncPayload",
+              "decryptSyncPayload",
+              "deriveSyncKey",
+              "betaUsageRemaining",
+              "consumeBetaUsage",
+              'fetch("/api/sync"',
+          )
+          for token in forbidden:
+              assert token not in page, f"stale homepage sync token remains: {token}"
+          assert 'href="/account"' in page
+          assert "المزامنة السحابية من حسابك" in page
+          path.write_text(page, encoding="utf-8")
+
+          test_path = Path("tests/sync-security.test.ts")
+          test_source = test_path.read_text(encoding="utf-8")
+          if 'import fs from "node:fs";' not in test_source:
+              test_source = test_source.replace(
+                  'import assert from "node:assert/strict";\n',
+                  'import assert from "node:assert/strict";\nimport fs from "node:fs";\n',
+                  1,
+              )
+          regression = '''\n\ntest("homepage no longer exposes the stale independent cloud-sync path", () => {\n  const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");\n  const accountSync = fs.readFileSync(new URL("../app/account/AccountSync.tsx", import.meta.url), "utf8");\n  assert.doesNotMatch(page, /navixa-sync-id|syncUpload|syncDownload|syncPassphrase|createSyncId|betaUsageRemaining|consumeBetaUsage/);\n  assert.match(page, /المزامنة السحابية من حسابك/);\n  assert.match(page, /href="\\/account"/);\n  assert.match(accountSync, /fetch\\("\\/api\\/sync"/);\n});\n'''
+          if "homepage no longer exposes the stale independent cloud-sync path" not in test_source:
+              test_source += regression
+          test_path.write_text(test_source, encoding="utf-8")
+          PY
+
+      - name: Remove temporary workflow and commit cleanup
+        shell: bash
+        run: |
+          rm .github/workflows/temp-sync-entry-cleanup.yml
+          git config user.name "NAVIXA Cleanup"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/page.tsx tests/sync-security.test.ts .github/workflows/temp-sync-entry-cleanup.yml
+          git diff --cached --check
+          git commit -m "fix(sync): retire stale homepage cloud sync entry"
+          git push origin HEAD:cleanup/unify-sync-entry-20260914
