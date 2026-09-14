@@ -18,6 +18,13 @@ const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   triggers: { crons: ["0 3 * * *"] },
+  workflows: [
+    { name: "navixa-academic-reminders", binding: "ACADEMIC_REMINDER_WORKFLOW", class_name: "AcademicReminderWorkflow" },
+  ],
+  queues: {
+    producers: [{ binding: "ACADEMIC_ALERT_QUEUE", queue: "navixa-academic-alerts" }],
+    consumers: [{ queue: "navixa-academic-alerts", max_batch_size: 1, max_batch_timeout: 1, max_retries: 3, dead_letter_queue: "navixa-academic-alerts-dlq" }],
+  },
   d1_databases: [
     {
       binding: "DB",

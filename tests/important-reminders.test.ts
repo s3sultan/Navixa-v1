@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [worker, route, index, academic, preferences, controls, today] = await Promise.all([
+const [worker, background, route, index, academic, preferences, controls, today, vite] = await Promise.all([
   readFile(new URL("../worker/importantReminders.ts", import.meta.url), "utf8"),
+  readFile(new URL("../worker/backgroundAcademic.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/api/reminders/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/academicReminders.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/api/push/preferences/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/PushCategoryControls.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/today/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../vite.config.ts", import.meta.url), "utf8"),
 ]);
 assert.match(worker, /UNIQUE\(user_id,title,due_at\)/);
 assert.match(worker, /maxAttempts=3/);
@@ -46,5 +48,16 @@ assert.match(controls, /غفوة مؤقتة/);
 assert.match(controls, /استئناف الآن/);
 assert.match(today, /source:"schedule"/);
 assert.match(today, /dueAt:dueAt\.toISOString/);
-assert.match(index, /deliverDueImportantReminders/);
+assert.match(background, /WorkflowEntrypoint/);
+assert.match(background, /ACADEMIC_ALERT_QUEUE/);
+assert.match(background, /deliverDueImportantReminders/);
+assert.match(background, /message\.retry\(\{delaySeconds\}\)/);
+assert.match(index, /triggerAcademicReminderWorkflow/);
+assert.match(index, /consumeAcademicReminderQueue/);
+assert.doesNotMatch(index, /deliverDueMatchPushes/);
+assert.doesNotMatch(index, /ctx\.waitUntil\(deliverDueImportantReminders/);
+assert.match(vite, /ACADEMIC_REMINDER_WORKFLOW/);
+assert.match(vite, /navixa-academic-alerts/);
+assert.match(vite, /navixa-academic-alerts-dlq/);
+assert.match(vite, /dead_letter_queue: "navixa-academic-alerts-dlq"/);
 console.log("important reminders contract: ok");
