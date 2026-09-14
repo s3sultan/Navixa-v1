@@ -5,9 +5,7 @@ import { useEffect, useState } from "react";
 
 const VisitorReporter = dynamic(() => import("./VisitorReporter"), { ssr: false });
 const PrayerAlertSync = dynamic(() => import("./PrayerAlertSync"), { ssr: false });
-const PushSubscriptionBootstrap = dynamic(() => import("./PushSubscriptionBootstrap"), { ssr: false });
 const ClassScheduleShortcut = dynamic(() => import("./ClassScheduleShortcut"), { ssr: false });
-const DeviceControlAgent = dynamic(() => import("./DeviceControlAgent"), { ssr: false });
 
 type IdleWindow = Window & {
   requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
@@ -35,8 +33,6 @@ export default function DeferredAppAgents() {
   return <>
     <VisitorReporter />
     <PrayerAlertSync />
-    <PushSubscriptionBootstrap />
     <ClassScheduleShortcut />
-    <DeviceControlAgent />
   </>;
 }
