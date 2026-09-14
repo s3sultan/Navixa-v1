@@ -4,12 +4,12 @@
 
 ## طريقة الاستخدام
 
-- `verified`: يوجد دليل اختبار أو فحص واضح ومراجع.
+- `verified`: يوجد دليل اختبار أو فحص واضح ومراجع لكل المتطلبات المنطبقة في المجال.
 - `partial`: توجد حماية أو اختبارات، لكن التغطية ليست كاملة وفق ASVS.
 - `pending`: لم يثبت التحقق بعد.
 - `n/a`: غير منطبق على NAVIXA مع سبب موثق.
 
-لا يتم تغيير حالة أي بند إلى `verified` بسبب نجاح ماسح واحد فقط. يجب وجود دليل مناسب للكود أو الاختبار أو الإعداد التشغيلي.
+لا يتم تغيير حالة أي بند إلى `verified` بسبب نجاح ماسح واحد فقط. يجب ربط جميع متطلبات ASVS المنطبقة في المجال بدليل مناسب للكود أو الاختبار أو الإعداد التشغيلي.
 
 | المجال | مرجع ASVS | الحالة الحالية | الدليل الحالي في NAVIXA | المطلوب قبل verified |
 |---|---|---|---|---|
@@ -23,10 +23,10 @@
 | الصلاحيات والتحكم بالوصول | ASVS access-control controls | partial | access model + admin/device tests | اختبار deny-by-default وIDOR لكل مورد حساس |
 | OAuth/OIDC وتسجيل Google | ASVS OAuth/OIDC controls | partial | تدفق Google الحالي + اختبارات auth | مراجعة state/nonce/redirect URIs/token handling على staging |
 | التشفير وTLS | ASVS cryptography/communications controls | partial | HTTPS production + فحوص live security | مراجعة TLS والمواد السرية ومواقع التخزين وعدم وجود crypto مخصص غير لازم |
-| الإعدادات والأسرار والاعتماديات | ASVS configuration controls | verified | Trivy vuln/misconfig/secret + Gitleaks + npm audit + SBOM | يستمر التحقق الدوري وتراجع الحالة عند ظهور finding غير مغلق |
+| الإعدادات والأسرار والاعتماديات | ASVS configuration controls | partial | Trivy vuln/misconfig/secret + Gitleaks + npm audit + SBOM | ربط كل متطلبات ASVS المنطبقة بدليل ثم إغلاق أي finding معروف |
 | حماية البيانات والخصوصية | ASVS data-protection controls | partial | سياسات المشروع + نمط التخزين المحلي لبعض الميزات | جرد البيانات، retention، الحذف، الوصول، السجلات والنسخ الاحتياطية |
 | التسجيل والأخطاء والمراقبة | ASVS logging/error controls | partial | admin activity log + CI security reports | التأكد من عدم تسجيل أسرار/رموز وإضافة قواعد تنبيه للحالات الحرجة |
-| سلامة البناء وسلسلة التوريد | ASVS secure-development controls | verified | pinned GitHub Actions + zizmor + lockfile + pre-launch gate | إبقاء الترقيات كتغييرات مستقلة ومراجعة |
+| سلامة البناء وسلسلة التوريد | ASVS secure-development controls | partial | pinned GitHub Actions + zizmor + lockfile + pre-launch gate | ربط كل متطلبات ASVS المنطبقة بدليل مستقل ومراجعة التحديثات دوريًا |
 
 ## فحوص NAVIXA المرتبطة
 
