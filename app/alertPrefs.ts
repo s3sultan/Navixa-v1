@@ -39,7 +39,6 @@ export const purgeLegacyTelegramConfig=()=>{try{localStorage.removeItem(LEGACY_T
 purgeLegacyTelegramConfig();
 
 export const sendTelegramMessage=async(message:string,type?:AlertType):Promise<boolean>=>{
-  if(type&&!HEALTH_FEATURE_ENABLED&&isHealthAlertType(type))return false;
   try{
     const response=await fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message,type})});
     return response.ok;
