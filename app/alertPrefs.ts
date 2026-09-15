@@ -1,3 +1,7 @@
+export const HEALTH_FEATURE_ENABLED=false;
+export const isHealthAlertType=(type:string)=>type==="water"||type==="break";
+export const isHealthReminderKind=(kind:string)=>kind==="water"||kind==="break"||kind==="eye";
+
 export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"screen"|"wird"|"sadaqah"|"task";
 export type Policy="user"|"on"|"off";
 type Channels={screen:boolean;telegram:boolean};
@@ -21,7 +25,7 @@ export const getAdminMessages=():Partial<Record<AlertType,string>>=>{try{return 
 export const setAdminMessages=(msgs:Partial<Record<AlertType,string>>)=>localStorage.setItem("navixa-admin-alert-messages",JSON.stringify(msgs));
 
 const isChannelEnabled=(type:AlertType,channel:"screen"|"telegram"):boolean=>{
-  if(type==="water")return false;
+  if(!HEALTH_FEATURE_ENABLED&&isHealthAlertType(type))return false;
   const policy=getAdminPolicy()[type]?.[channel]||"user";
   if(policy==="on")return true;
   if(policy==="off")return false;
@@ -61,7 +65,7 @@ const forwardNameAlert=(message:string)=>{
 };
 
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
-  if(type==="water")return;
+  if(!HEALTH_FEATURE_ENABLED&&isHealthAlertType(type))return;
   if(type==="name"&&forwardNameAlert(fallbackMessage))return;
   if(!isTelegramEnabled(type))return;
   const custom=getAdminMessages()[type];

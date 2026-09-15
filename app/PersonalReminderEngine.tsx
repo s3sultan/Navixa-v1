@@ -3,7 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 import {dismissPersonalReminder,getPersonalReminderPrefs,isPersonalReminderMuted,PersonalReminderKind} from "./reminderPrefs";
 import {readAcademicReminders} from "./academicReminders";
-import {isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
+import {HEALTH_FEATURE_ENABLED,isHealthReminderKind,isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
 import {showNavixaDeviceNotification} from "./pushClient";
 import {localDateKey} from "./localDate";
 
@@ -74,7 +74,8 @@ export default function PersonalReminderEngine({focusRunning,focusElapsedSeconds
         {kind:"break",title:"استراحة حركة قصيرة",body:"مضت فترة من دون تفاعل. حرّك كتفيك وخذ دقيقة خفيفة لنفسك.",due:prefs.break&&isScreenEnabled("break")&&!focus.focusRunning&&activityAge>=55*MINUTE},
         {kind:"academic",title:"تذكير أكاديمي",body:academic?`غدًا أو اليوم: ${academic.title} (${academic.date}). راجع الموعد قبل البدء.`:"",due:Boolean(prefs.academic&&academic)},
       ];
-      const next=candidates.find(candidate=>candidate.due&&!isPersonalReminderMuted(candidate.kind)&&now-Number(localStorage.getItem(sentKey(candidate.kind))||0)>=quietFor);if(!next)return;
+      const activeCandidates=HEALTH_FEATURE_ENABLED?candidates:candidates.filter(candidate=>!isHealthReminderKind(candidate.kind));
+      const next=activeCandidates.find(candidate=>candidate.due&&!isPersonalReminderMuted(candidate.kind)&&now-Number(localStorage.getItem(sentKey(candidate.kind))||0)>=quietFor);if(!next)return;
       localStorage.setItem(LAST_ANY_KEY,String(now));localStorage.setItem(sentKey(next.kind),String(now));
       if(prefs.browser)void showNavixaDeviceNotification(next.title,{body:next.body,tag:`navixa-${next.kind}`,url:next.kind==="academic"?"/today":"/"}).catch(()=>false);
       setVisible(next);
