@@ -3,10 +3,9 @@
 import {useEffect,useRef,useState} from "react";
 import {dismissPersonalReminder,getPersonalReminderPrefs,isPersonalReminderMuted,PersonalReminderKind} from "./reminderPrefs";
 import {readAcademicReminders} from "./academicReminders";
-import {isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
+import {HEALTH_FEATURE_ENABLED,isHealthReminderKind,isScreenEnabled,sendFeatureAlert} from "./alertPrefs";
 import {showNavixaDeviceNotification} from "./pushClient";
 import {localDateKey} from "./localDate";
-import {HEALTH_FEATURE_ENABLED,isHealthReminderKind} from "./healthFeature";
 
 const MINUTE=60_000;
 const REMINDER_START_GRACE=45_000;
