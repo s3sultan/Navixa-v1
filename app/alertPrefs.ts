@@ -1,3 +1,5 @@
+import {HEALTH_FEATURE_ENABLED,isHealthAlertType} from "./healthFeature";
+
 export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"screen"|"wird"|"sadaqah"|"task";
 export type Policy="user"|"on"|"off";
 type Channels={screen:boolean;telegram:boolean};
@@ -21,7 +23,7 @@ export const getAdminMessages=():Partial<Record<AlertType,string>>=>{try{return 
 export const setAdminMessages=(msgs:Partial<Record<AlertType,string>>)=>localStorage.setItem("navixa-admin-alert-messages",JSON.stringify(msgs));
 
 const isChannelEnabled=(type:AlertType,channel:"screen"|"telegram"):boolean=>{
-  if(type==="water")return false;
+  if(!HEALTH_FEATURE_ENABLED&&isHealthAlertType(type))return false;
   const policy=getAdminPolicy()[type]?.[channel]||"user";
   if(policy==="on")return true;
   if(policy==="off")return false;
@@ -35,6 +37,7 @@ export const purgeLegacyTelegramConfig=()=>{try{localStorage.removeItem(LEGACY_T
 purgeLegacyTelegramConfig();
 
 export const sendTelegramMessage=async(message:string,type?:AlertType):Promise<boolean>=>{
+  if(type&&!HEALTH_FEATURE_ENABLED&&isHealthAlertType(type))return false;
   try{
     const response=await fetch("/api/telegram-alert",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message,type})});
     return response.ok;
@@ -61,7 +64,7 @@ const forwardNameAlert=(message:string)=>{
 };
 
 export const sendTelegramAlert=(type:AlertType,fallbackMessage:string)=>{
-  if(type==="water")return;
+  if(!HEALTH_FEATURE_ENABLED&&isHealthAlertType(type))return;
   if(type==="name"&&forwardNameAlert(fallbackMessage))return;
   if(!isTelegramEnabled(type))return;
   const custom=getAdminMessages()[type];
