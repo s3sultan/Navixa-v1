@@ -1,9 +1,9 @@
-/* Temporary NAVIXA pause: health center and hydration UI stay in source but are hidden until a product decision is made. */
+/* Temporary NAVIXA pause: health code and saved data remain intact, but every health-facing surface stays hidden until the product flag is restored. */
 a[href="/health"],
 .health-gateway,
 .daily-strip > div:nth-child(2),
-.habit-insight-card .habit-stats-grid > div:nth-child(3),
-.habit-insight-card .habit-month-summary > span:nth-child(2) {
+.habit-insight-card,
+.weekly-challenge .challenge-list > div:nth-child(2) {
   display: none !important;
 }
 
@@ -12,7 +12,13 @@ a[href="/health"],
     grid-template-columns: repeat(3, 1fr) !important;
   }
 
-  .habit-insight-card .habit-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+  .insights-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .insights-grid {
+    grid-template-columns: 1fr !important;
   }
 }
