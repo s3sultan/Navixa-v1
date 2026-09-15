@@ -1,4 +1,6 @@
-import {HEALTH_FEATURE_ENABLED,isHealthAlertType} from "./healthFeature";
+export const HEALTH_FEATURE_ENABLED=false;
+export const isHealthAlertType=(type:string)=>type==="water"||type==="break";
+export const isHealthReminderKind=(kind:string)=>kind==="water"||kind==="break"||kind==="eye";
 
 export type AlertType="adhan"|"iqama"|"water"|"break"|"focus"|"name"|"screen"|"wird"|"sadaqah"|"task";
 export type Policy="user"|"on"|"off";
